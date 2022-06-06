@@ -1,0 +1,21 @@
+---
+title: "IR2024: Getting Started"
+author: "Emma Jones"
+date: "6/6/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+This report is the first step for preparing the 2024 Integrated Report. This cycle will be the first cycle to benefit from more than one programmer. Major changes to this IR process from previous cycles includes:
+* WQS temporal changes based on special standards
+* Station buffers to intakes
+* Review water column metals analyses
+    + Prepare this analysis for offical agency tool
+    + Cast wider net across assessment periods to include metals data outside the current window
+* Add 7Q10 6yr window flag by smallest scale feasible (VAHU6/HUC12?)
+* Begin Bookdown of R assessment guidance
+
