@@ -12,10 +12,30 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This report is the first step for preparing the 2024 Integrated Report. This cycle will be the first cycle to benefit from more than one programmer. Major changes to this IR process from previous cycles includes:
 * WQS temporal changes based on special standards
-* Station buffers to intakes
+* Station buffers to intakes in order to apply appropriate WQS
 * Review water column metals analyses
     + Prepare this analysis for official agency tool
     + Cast wider net across assessment periods to include metals data outside the current window
 * Add 7Q10 6yr window flag by smallest scale feasible (VAHU6/HUC12?)
 * Begin Bookdown of R assessment guidance
 
+The major steps to prepare data for automated assessment and subsequently complete the assessment and rebuild WQA riverine and lacustrine applications are outlined below. These section names reference the directory where these processes are completed.
+1.preprocessData
+* This is where all stations included in the assessment are spatially snapped to the appropriate WQS and AU information in order to provide accurate metadata for the assessment process.
+* Each snap is manually reviewed by regional assessment staff prior to the assessment official kick off so automated assessment results can be provided as soon as the assessment begins. Manual review is conducted using a shiny app hosted on the R connect server. 
+
+2.organizeMetadata
+* This is where the manually reviewed WQS and AU metadata are QAed and combined with data from the assessment window. 
+* Any data cleaning/manipulation to assessment data is performed here: conventionals, metals, PCB, fish tissue, Citizen Monitoring, etc.
+* This is the final data check prior to applying the automated assessment scripts to the data.
+
+3.automatedAssessment
+* This section applies the assessment logic to all data within the assessment window to output a stations table. This stations table summarizes each station in the assessment window and serves as a starting point for regional assessment staff in their assessment process. 
+* The station table output is an input to both the CEDS WQA bulk upload and the assessment review shiny apps.
+
+4.LakesApplication
+4.RiverineApplication
+* These directories hold all scripts required to build the riverine and lacustrine interactive assessment data review shiny applications. These applications are hosted on the R server.
+
+5.BioassessmentTools
+* This repository holds all scripts required to build the bioassessment dashboard and fact sheet generation tool. These tools allow regional biologists to review benthic macroinvertebrate and habitat data and archive their bioassessment results for automated fact sheet generation tools as well as seamless integration of bioassessment results to the riverine assessment application.
