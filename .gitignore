@@ -42,3 +42,7 @@ rsconnect/
 *.yml
 data/
 GIS/
+
+1.preprocessData/data/
+1.preprocessData/config.yml
+1.preprocessData/data_old/

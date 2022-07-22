@@ -39,3 +39,6 @@ The major steps to prepare data for automated assessment and subsequently comple
 
 5.BioassessmentTools
 * This repository holds all scripts required to build the bioassessment dashboard and fact sheet generation tool. These tools allow regional biologists to review benthic macroinvertebrate and habitat data and archive their bioassessment results for automated fact sheet generation tools as well as seamless integration of bioassessment results to the riverine assessment application.
+
+## R Version
+Unless otherwise stated in a specific script, all processes are built in R 3.6.2 in order to ensure products work on the R server.

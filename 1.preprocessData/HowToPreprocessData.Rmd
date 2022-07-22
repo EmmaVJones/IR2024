@@ -1,0 +1,186 @@
+---
+title: "Statewide Data Preprocessing"
+author: "Emma Jones"
+date: "7/22/2022"
+output: html_document
+---
+
+After an update to lwgeom, this entire script needs to be run in R4.0.3 or you run into 'C Stack limit' errors at geospatial processes. Likely this has to do with updates to geospatial operations in underlying system dependencies with sf0.8 to sf 0.9, but not entirely sure.
+
+All other scripts should be performed in R 3.6.2 to ensure they work on the server (which is still running GDAL 2.2X and PROJ4)
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(sf)
+library(readxl)
+library(lwgeom) # used in assessmentLayerSubbasinJoin missingSites step
+
+```
+
+This project is a outlines how to preprocess data for the manual WQS and AU attribution process. 
+
+Each step will be written as individual modules where lengthy code to complete each step is stored elsewhere and sourced for use. This method of organizing the project helps with project maintenance and troubleshooting specific problem areas when they occur.
+
+# Water Quality Standards
+
+## WQS Split up
+
+After each update of WQS layers, it is important to split these layers into bite size consumption for the review app such that we don't send unnecessary data to/from servers and speed up rending time. All snapping will be completed against the official WQS layers, but for app purposes, we will only bring in WQS in a selected subbasin.
+
+Because most (all) DEQ subbasin layers incorrectly attribute the upper Potomac basin inside the Shenandoah in VRO, we will create our own layer to work from that fixes this error. 
+
+```{r fix subbasin layer}
+#source('./preprocessingModules/newDEQsubbasinLayerCreation.R') # only run once as needed
+```
+
+That really only needs to be done once such that 'GIS/DEQsubbasins_EVJ.shp' is created. This is the layer the splitWQSbySubbasin will use.
+
+Now we take that newly created layer and use it to split up each of the riverine, lakes, and both types of estuary layers appropriately.
+
+
+```{r splitWQS by subbasin for app}
+#source('./preprocessingModules/splitWQSbySubbasin.R') # only run once as needed
+```
+
+And one last step to link basins to VAHU6 information for easier filtering inside the apps.
+
+```{r build lookuptable for VAHU6 to subbasin}
+#source('./preprocessingModules/VAHU6toSubbasin.R')
+```
+
+
+Now we can move on to actual data processing.
+
+
+
+
+## Data Organization
+
+The key data needed for these analyses is the conventionals dataset that Roger Stewart pulls every two years for each IR window. This method is built such that additional stations that need WQS data attached (for EDAS/CEDS Stations Table update project) can be run through just that portion of the methodology.
+
+
+### Conventionals Data
+
+First bring in Roger's conventionals data pull for the 2022IR window. The data schema will be altered in 2.organizeMetadata to match Roland's new citmon database schema. For now, just use this as a list of stations sampled in the window for WQS and AU attribution.
+
+```{r conventionals}
+conventionalsRaw <- read_excel('data_old/CONVENTIONALS_20210316.xlsx') 
+
+conventionals <-  mutate(conventionalsRaw, Source_Sta_Id = as.character(NA),
+                         Data_Source = 'DEQ') %>%
+  dplyr::select(FDT_STA_ID, Source_Sta_Id, STA_DESC, everything()) %>% 
+  dplyr::select(FDT_STA_ID, Source_Sta_Id, STA_DESC, FDT_DATE_TIME)
+rm(conventionalsRaw)
+```
+
+Now check to see which of these stations don't already have WQS information. This is saved on the R server
+
+```{r grab WQS info from server}
+library(pins)
+library(config)
+library(purrr)
+library(lubridate)
+
+# Connect to server
+conn <- config::get("connectionSettings") # get configuration settings
+
+board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_KEY"),
+                         server = conn$CONNECT_SERVER)#Sys.getenv("CONNECT_SERVER"))
+
+stationsWithWQS <- pin_get('ejones/WQSlookup-withStandards', board = 'rsconnect')
+
+```
+
+Remove all stations that are already attributed. Only care about stations that will be in the new cycle window, 2017-2022.
+
+```{r conventionals missing WQS}
+conventionals <- filter(conventionals, year(FDT_DATE_TIME) >= 2017) %>% 
+  distinct(FDT_STA_ID, .keep_all = T) %>% 
+  dplyr::select(-FDT_DATE_TIME) 
+
+conventionalsNeedWQS <- left_join(conventionals, stationsWithWQS, by = c('FDT_STA_ID' = 'StationID')) %>% 
+  filter(is.na(WQS_ID))
+rm(conventionals)# clean up workspace
+```
+
+
+Next pull stations sampled since the close of the 2022IR. The most efficient way to get this data is to use the monthly automated assessment pin on the R server. We will grab just the stations and locations and add that to our IR2022 conventionals list. 
+
+```{r grab new stations with no WQS}
+#pull monthly assessment data
+
+assessment <- pin_get("ejones/statewideResults", board = 'rsconnect')
+
+# Pull station Table for each region, find stations that don't already have WQS information
+newStations <- assessment %>% 
+  map_df('stationTable') %>% 
+  filter(is.na(WQS_ID))
+
+stationsNeedWQS <- bind_rows(conventionalsNeedWQS, 
+                             dplyr::select(newStations, FDT_STA_ID = STATION_ID) %>% 
+                               mutate(Source_Sta_Id = "DEQ")) %>% 
+  dplyr::select(FDT_STA_ID, Source_Sta_Id, STA_DESC)
+rm(stationsWithWQS)
+```
+
+Go back to server and grab any station details that might be helpful.
+
+```{r station spatial metadata}
+WQMstationsView <- pin_get('ejones/WQM-Stations-View', board = 'rsconnect') %>% 
+  dplyr::select(Sta_Id, Sta_Lv1_Code: Sta_Huc_Code)
+WQMstations <- pin_get('ejones/WQM-Stations-Spatial', board = 'rsconnect') %>% 
+  left_join(WQMstationsView, by = c('StationID' = 'Sta_Id'))
+rm(WQMstationsView)
+
+
+stationsNeedWQS1 <- filter(WQMstations, StationID %in% stationsNeedWQS$FDT_STA_ID)
+
+# why missing rows in stationsNeedWQS1?
+##stationsNeedWQS1 %>% group_by(StationID) %>% mutate(n = n()) %>%  filter(n>1)
+##stationsNeedWQS %>% group_by(FDT_STA_ID) %>% mutate(n = n()) %>%  filter(n>1)
+# all good, duplicate rows dropped
+```
+
+
+
+### Other data: Citizen Monitoring and Non Agency
+
+Stations pulled from other sources with Lat/Lng info could be run through the WQS steps if uploaded and reorganized here.
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Attach assessment region and subbasin information
+
+Assessment region is important for processing each region through a loop, AU connection, and WQS attachment. Subbasin information is important for WQS processing.
+
+lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3. Unless you have changed any inputs prior to this point, just keep with 4.6.2 and read in data already processed.
+
+```{r assessment and subbasin join}
+#source('preprocessingModules/assessmentLayerSubbasinJoin.R') # lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3
+distinctSites_sf <- readRDS('./data/distinctSites_sf.RDS')
+distinctSitesToDo <- distinctSites_sf 
+# keep a copy of original distinct sites to check that no one was lost at the end
+``` 
+
+**Note the VAHU6 data is derived spatially, so this is a good first step, but when there is human QAed VAHU6 data available, we will use that data instead. Sometimes assessors use stations outside a VAHU6 to assess said VAHU6.**
+
+
+Save missingSites data for app. This is critical for those sites that fall out of assessment layer boundary that still need work. This will be brought in by app for assessor to use.
+
+```{r missingSites for app}
+saveRDS(missingSites, 'data/missingSites.RDS')
+```
+
