@@ -24,7 +24,7 @@ This project is a outlines how to preprocess data for the manual WQS and AU attr
 
 Each step will be written as individual modules where lengthy code to complete each step is stored elsewhere and sourced for use. This method of organizing the project helps with project maintenance and troubleshooting specific problem areas when they occur.
 
-# Water Quality Standards
+# Water Quality Standards Data Preprocessing
 
 ## WQS Split up
 
@@ -57,28 +57,48 @@ Now we can move on to actual data processing.
 
 
 
-## Data Organization
+# Data Organization
 
-The key data needed for these analyses is the conventionals dataset that Roger Stewart pulls every two years for each IR window. This method is built such that additional stations that need WQS data attached (for EDAS/CEDS Stations Table update project) can be run through just that portion of the methodology.
+Now we will create a list of all stations that are relevant to the IR 2024 assessment window. They are not all pulled from the same sources, so multiple datasets will be combined into a single object named distinctSites that we will then compare to existing WQS and AU information. Where stations in our distinctSites object lack either of these pieces of metadata, we will attribute them in this script.
 
 
 ### Conventionals Data
+
+The largest dataset needed for these analyses is the conventionals dataset that Roger Stewart pulls every two years for each IR window. This is inclusive of data pulled from CEDS that should be used in the assessment. 
+
+**Draft**
+Since this process is written before the final conventionals data pull, we will use last cycle's conventionals pull and stations sampled since the close of the last IR window.
 
 First bring in Roger's conventionals data pull for the 2022IR window. The data schema will be altered in 2.organizeMetadata to match Roland's new citmon database schema. For now, just use this as a list of stations sampled in the window for WQS and AU attribution.
 
 ```{r conventionals}
 conventionalsRaw <- read_excel('data_old/CONVENTIONALS_20210316.xlsx') 
 
-conventionals <-  mutate(conventionalsRaw, Source_Sta_Id = as.character(NA),
+conventionals <-  mutate(conventionalsRaw, #Source_Sta_Id = as.character(NA),
                          Data_Source = 'DEQ') %>%
-  dplyr::select(FDT_STA_ID, Source_Sta_Id, STA_DESC, everything()) %>% 
-  dplyr::select(FDT_STA_ID, Source_Sta_Id, STA_DESC, FDT_DATE_TIME)
+  dplyr::select(FDT_STA_ID, STA_DESC, Data_Source, FDT_DATE_TIME)
 rm(conventionalsRaw)
 ```
 
-Now check to see which of these stations don't already have WQS information. This is saved on the R server
 
-```{r grab WQS info from server}
+Remove all stations that are outside the new IR window. We only care about stations that will be in the new cycle window, 2017-2022.
+
+Create a new object called distinctSites. This will be useful for keeping track of all anticipated sites for the new cycle. We will use this object to check which sites need WQS and which need AU. 
+
+```{r conventionals missing WQS}
+conventionals <- filter(conventionals, year(FDT_DATE_TIME) >= 2017) %>% 
+  distinct(FDT_STA_ID, .keep_all = T) %>% 
+  dplyr::select(-FDT_DATE_TIME) 
+
+distinctSites <- conventionals # object to save unique sites for later
+
+rm(conventionals)# clean up workspace
+```
+
+
+Next pull stations sampled since the close of the 2022IR. The most efficient way to get this data is to use the monthly automated assessment pin on the R server. We will grab just the stations and locations and add that to our IR2022 conventionals list. 
+
+```{r connect to server}
 library(pins)
 library(config)
 library(purrr)
@@ -90,43 +110,28 @@ conn <- config::get("connectionSettings") # get configuration settings
 board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_KEY"),
                          server = conn$CONNECT_SERVER)#Sys.getenv("CONNECT_SERVER"))
 
-stationsWithWQS <- pin_get('ejones/WQSlookup-withStandards', board = 'rsconnect')
-
 ```
 
-Remove all stations that are already attributed. Only care about stations that will be in the new cycle window, 2017-2022.
+```{r grab new stations}
 
-```{r conventionals missing WQS}
-conventionals <- filter(conventionals, year(FDT_DATE_TIME) >= 2017) %>% 
-  distinct(FDT_STA_ID, .keep_all = T) %>% 
-  dplyr::select(-FDT_DATE_TIME) 
-
-conventionalsNeedWQS <- left_join(conventionals, stationsWithWQS, by = c('FDT_STA_ID' = 'StationID')) %>% 
-  filter(is.na(WQS_ID))
-rm(conventionals)# clean up workspace
-```
-
-
-Next pull stations sampled since the close of the 2022IR. The most efficient way to get this data is to use the monthly automated assessment pin on the R server. We will grab just the stations and locations and add that to our IR2022 conventionals list. 
-
-```{r grab new stations with no WQS}
 #pull monthly assessment data
-
 assessment <- pin_get("ejones/statewideResults", board = 'rsconnect')
 
-# Pull station Table for each region, find stations that don't already have WQS information
+# Pull station Table for each region, 
 newStations <- assessment %>% 
   map_df('stationTable') %>% 
-  filter(is.na(WQS_ID))
+  dplyr::select(STATION_ID) %>% 
+  mutate(Data_Source = 'DEQ')
 
-stationsNeedWQS <- bind_rows(conventionalsNeedWQS, 
-                             dplyr::select(newStations, FDT_STA_ID = STATION_ID) %>% 
-                               mutate(Source_Sta_Id = "DEQ")) %>% 
-  dplyr::select(FDT_STA_ID, Source_Sta_Id, STA_DESC)
-rm(stationsWithWQS)
+# add newStations to distinctSites
+distinctSites <- bind_rows(distinctSites,
+                           dplyr::select(newStations, FDT_STA_ID = STATION_ID, Data_Source)) %>% 
+  distinct(FDT_STA_ID, .keep_all = T) # drop duplicates that were added with newStations
+
+rm(assessment); rm(newStations)
 ```
 
-Go back to server and grab any station details that might be helpful.
+Go to server and grab any station details that might be helpful.
 
 ```{r station spatial metadata}
 WQMstationsView <- pin_get('ejones/WQM-Stations-View', board = 'rsconnect') %>% 
@@ -135,13 +140,16 @@ WQMstations <- pin_get('ejones/WQM-Stations-Spatial', board = 'rsconnect') %>%
   left_join(WQMstationsView, by = c('StationID' = 'Sta_Id'))
 rm(WQMstationsView)
 
+distinctSites1 <- left_join(distinctSites, WQMstations, by = c('FDT_STA_ID' = 'StationID')) %>% 
+  distinct(FDT_STA_ID, .keep_all = T)
+  
+# make sure we didn't lose anyone
+distinctSites$FDT_STA_ID[! distinctSites$FDT_STA_ID %in% distinctSites1$FDT_STA_ID]
 
-stationsNeedWQS1 <- filter(WQMstations, StationID %in% stationsNeedWQS$FDT_STA_ID)
-
-# why missing rows in stationsNeedWQS1?
-##stationsNeedWQS1 %>% group_by(StationID) %>% mutate(n = n()) %>%  filter(n>1)
-##stationsNeedWQS %>% group_by(FDT_STA_ID) %>% mutate(n = n()) %>%  filter(n>1)
-# all good, duplicate rows dropped
+#rename objects to keep things organized
+distinctSites <- distinctSites1
+# clean up workspace 
+rm(distinctSites1);rm(WQMstations)
 ```
 
 
@@ -162,11 +170,11 @@ Stations pulled from other sources with Lat/Lng info could be run through the WQ
 
 
 
-### Attach assessment region and subbasin information
+### Attach subbasin information
 
-Assessment region is important for processing each region through a loop, AU connection, and WQS attachment. Subbasin information is important for WQS processing.
+Assessment region is already included in the attached metadata thanks to the previous join to WQMstations. This information is important for processing each region through a loop for AU connection and WQS attachment. Subbasin information is important for WQS processing.
 
-lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3. Unless you have changed any inputs prior to this point, just keep with 4.6.2 and read in data already processed.
+lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3. Unless you have changed any inputs prior to this point, just keep with 3.6.2 and read in data already processed.
 
 ```{r assessment and subbasin join}
 #source('preprocessingModules/assessmentLayerSubbasinJoin.R') # lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3
@@ -180,7 +188,273 @@ distinctSitesToDo <- distinctSites_sf
 
 Save missingSites data for app. This is critical for those sites that fall out of assessment layer boundary that still need work. This will be brought in by app for assessor to use.
 
+For 2024IR draft data, we didn't have any missingSites.
+
 ```{r missingSites for app}
-saveRDS(missingSites, 'data/missingSites.RDS')
+#saveRDS(missingSites, 'data/missingSites.RDS')
 ```
+
+
+# Attach WQS to Stations
+
+Now we will work with our distinctSites_sf object to spatially join WQS information where it doesn't already exist. First, we need to establish which stations already have WQS_ID's so we don't duplicate efforts. This information is stored on the R server. 
+
+```{r WQS info on server}
+WQStableExisting <- pin_get('ejones/WQSlookup', board = 'rsconnect')
+```
+
+
+#### Aside, how to get WQS data from the server
+
+To pull WQS information QAed in the metadata app and saved on the server, first go in to Connect and identify the app number of the current metadata application (under Regional Assessment Metadata Validation Tool- source versions). This information is critical to locating the area where info saved on the server. 
+
+Next, in putty, see what info is available in that directory sudo  ls -l /app/rstudio-connect/apps/43/[sourceVersion]/WQSlookupTable where [sourceVersion] = the current build number from Connect.
+
+Next, in filezilla, make sure the last version of this data pulled down is safely renamed by date to make sure grabbing new data doesnt overwrite old data. To do that, /home/aaejones/temp/ rename WQSlookupTable to WQSlookupTableFILEDATE (e.g. WQSlookupTable12152020).
+
+Then in putty, copy whole directory and change all file permissions for download
+sudo cp -arv /app/rstudio-connect/apps/43/[sourceVersion]/WQSlookupTable /home/aaejones/temp
+sudo chmod -R 755 /home/aaejones/temp/WQSlookupTable
+
+Then in filezilla, download the new WQSlookupTable directory to local system.
+
+These are pulled directly from WQSLookupTable directories and can contain issues
+```{r}
+#source('./preprocessingModules/pullWQSID.R') # this pulls all stations in WQSLookupTable directory, which could include duplicates
+```
+
+#### End WQS data from server aside
+
+## Remove stations that have WQS information from "to do" list
+
+Identify real number of sites that need spatial joining.
+
+```{r find where spatial joins have already happened}
+distinctSitesToDoWQS <- filter(distinctSitesToDo, ! FDT_STA_ID  %in% WQStableExisting$StationID)
+```
+
+
+#### Spatially Join WQS
+
+Since transitioning the WQS storage from local (individual assessor files) to a centralized system (on the R server for multiple program uses), the number of stations that require WQS attribution should decrease significantly each IR cycle. To attribute each station to WQS information, we first need to do all spatial joins to new WQS layer to get appropriate UID information, then we can send that information to an interactive application for humans to manually verify.
+
+Here is the table used to store link information from stations to appropriate WQS.
+
+```{r WQStable}
+WQStable <- tibble(StationID = NA, WQS_ID = NA)
+```
+
+
+Since it is much faster to look for spatial joins by polygons compared to snapping to lines, we will run spatial joins by estuarine polys and reservoir layers first.
+
+##### Estuarine Polygons
+
+Find any sites that fall into an estuary WQS polygon. This method is only applied to subbasins that intersect estuarine areas. This process also removes any estuarine sites from the data frame of unique sites that need WQS information (distinctSitesToDoWQS).
+
+We will bring in (source) a custom function that runs the analysis for us, feed it our latest WQS information, and let the function run across all input stations.
+
+```{r estuary methods}
+source('preprocessingModules/WQS_estuaryPoly.R')
+
+# Bring in estuary layer
+estuarinePolys <- st_read('../GIS/draft_WQS_shapefiles_2022/estuarinepolygons_draft2022.shp', 
+                          fid_column_name = "OBJECTID") %>%
+  st_transform(4326)
+  
+WQStable <- estuaryPolygonJoin(estuarinePolys, distinctSitesToDoWQS, WQStable)
+
+rm(estuarinePolys) # clean up workspace
+```
+
+Remove stations that fell inside estuarine polygons from the 'to do' list.
+
+```{r remove estuary poly sites}
+distinctSitesToDoWQS <- filter(distinctSitesToDoWQS, ! FDT_STA_ID %in% WQStable$StationID)
+```
+
+
+##### Lake Polygons
+
+Find any sites that fall into a lake WQS polygon. This method is applied to all subbasins at once as it is a simple spatial join. 
+The next step removes any lake sites from the data frame of unique sites that need WQS information (distinctSitesToDoWQS).
+
+
+```{r lake methods}
+source('preprocessingModules/WQS_lakePoly.R')
+
+lakesPoly <- st_read('../GIS/draft_WQS_shapefiles_2022/lakes_reservoirs_draft2022.shp',
+                     fid_column_name = "OBJECTID") %>%
+  st_transform(4326)
+
+WQStable <- lakePolygonJoin(lakesPoly, distinctSitesToDoWQS, WQStable)
+
+rm(lakesPoly) # clean up workspace
+```
+
+Remove stations that fell inside lake polygons from the 'to do' list.
+
+```{r remove estuary poly sites}
+distinctSitesToDoWQS <- filter(distinctSitesToDoWQS, ! FDT_STA_ID %in% WQStable$StationID)
+```
+
+
+
+### Spatially Join WQS Lines
+
+Now on to the more computationally heavy WQS line snapping methods. First we will try to attach riverine WQS, and where stations remain we will try the estuarine WQS snap.
+
+##### Riverine Lines
+
+To do this join, we will buffer all sites that don't fall into a polygon layer by a set sequence of distances. The output will add a field called `Buffer Distance` to the WQStable to indicate distance required for snapping. This does not get transported to the data of record, but it is useful to keep for now for QA purposes. If more than one segment is found within a set buffer distance, then many rows will be attached to the WQStable with the single identifying station name. It is up to the QA tool to help the user determine which of these UID's are correct and drop the other records.
+
+We then remove any riverine sites from the data frame of unique sites that need WQS information (distinctSitesToDoWQS).
+
+```{r riverine methods}
+source('snappingFunctions/snapWQS.R')
+
+riverine <- st_read('../GIS/draft_WQS_shapefiles_2022/riverine_draft2022.shp',
+                    fid_column_name = "OBJECTID") #%>% 
+  #st_transform(102003) # forcing to albers from start bc such a huge layer
+  #st_transform('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m no_defs')
+# 2/3/21 have to manually feed character proj4string bc doesn't recognize albers epsg 
+
+WQStable <- snapAndOrganizeWQS(distinctSitesToDoWQS, 'FDT_STA_ID', riverine, 
+                               bufferDistances = seq(20,80,by=20),  # buffering by 20m from 20 - 80 meters
+                               WQStable)
+
+
+rm(riverine)
+```
+
+Remove stations that attached to riverine segments from the 'to do' list.
+
+```{r remove estuary poly sites}
+distinctSitesToDoWQS <- filter(distinctSitesToDoWQS, ! FDT_STA_ID %in% WQStable$StationID)
+```
+
+
+We can use this one last opportunity to test stations that didn't connect to the riverine WQS against the estuarine lines WQS as a one last hope of attributing some WQS information. We will take all stations from the WQStable that didn't snap to any WQS segments (`Buffer Distance` =='No connections within 80 m') and add those back in to our distinctSitesToDoWQS list to try to snap them to the estuarine lines spatial data. 
+
+```{r no riverine snaps}
+distinctSitesToDoWQS <- filter(WQStable, `Buffer Distance` =='No connections within 80 m') %>%
+  left_join(dplyr::select(distinctSites_sf, FDT_STA_ID, Latitude, Longitude, SUBBASIN) %>%
+              rename('StationID'= 'FDT_STA_ID'), by='StationID') %>%
+  dplyr::select(-c(geometry)) %>%
+  st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = T, # don't remove these lat/lon cols from df
+           crs = 4326)
+                            
+```
+
+
+
+##### Estuarine Lines
+
+If a site doesn't attach to a riverine segment, our last step is to try to attach estuary line segments before throwing an empty site to the users for the wild west of manual QA. Only send sites that could be in estuarine subbasin to this function to not waste time.
+Removes any estuary lines sites from the data frame of unique sites that need WQS information.
+
+```{r estuarine lines methods}
+source('snappingFunctions/snapWQS.R')
+
+estuarineLines <- st_read('../GIS/draft_WQS_shapefiles_2022/estuarinelines_draft2022.shp' , fid_column_name = "OBJECTID") #%>%
+  #st_transform(102003) # forcing to albers from start bc such a huge layer
+  #st_transform(4326)
+
+# Only send sites to function that could be in estuarine environment
+WQStable <- snapAndOrganizeWQS(filter(distinctSitesToDoWQS, SUBBASIN %in% c("Potomac River",
+                                                                            "Rappahannock River", 
+                                                                            "Atlantic Ocean Coastal",
+                                                                            "Chesapeake Bay Tributaries",
+                                                                            "Chesapeake Bay - Mainstem",
+                                                                            "James River - Lower",  
+                                                                            "Appomattox River",
+                                                                            "Chowan River", 
+                                                                            "Atlantic Ocean - South" ,
+                                                                            "Dismal Swamp/Albemarle Sound"))[1:25,],
+                               'StationID', estuarineLines, 
+                               bufferDistances = seq(20,80,by=20),  # buffering by 20m from 20 - 80 meters
+                               WQStable)
+
+rm(estuarineLines)
+```
+
+Remove stations that attached to estuarine segments from the 'to do' list.
+
+```{r remove estuary poly sites}
+distinctSitesToDo <- filter(distinctSitesToDo, ! StationID %in% WQStable$StationID)
+```
+
+
+
+```{r double check no one lost}
+#Make sure all stations from original distinct station list have some sort of record (blank or populated) int the WQStable.
+# only useful the very first time you do this operation
+#distinctSites$FDT_STA_ID[!(distinctSites$FDT_STA_ID %in% unique(WQStable$StationID))]
+```
+
+And that none of the missing sites (sites that fall outside of the assessmentLayer) are not missing from the WQS snapping process.
+
+```{r missingSites got WQS}
+missingSites <- readRDS('data/missingSites.RDS')
+missingSites$FDT_STA_ID[!(missingSites$FDT_STA_ID %in% unique(WQStable$StationID))]
+```
+
+
+### Assign something to WQS_ID so sites will not fall through the cracks when application filtering occurs
+
+We don't want to give everyone all the stations that didn't snap to something, so we need to at least partially assign a WQS_ID so the stations get into the correct subbasin on initial filter.
+
+If a station snapped to nothing, we will assigning it a RL WQS_ID and subbasin it falls into by default.
+
+```{r blank WQS_ID partially filled in}
+WQStableMissing <- filter(WQStable, is.na(WQS_ID)) %>%
+  # drop from list if actually fixed by snap to another segment
+  filter(! StationID %in% filter(WQStable, str_extract(WQS_ID, "^.{2}") %in% c('EL','LP','EP'))$StationID) %>%
+  left_join(dplyr::select(distinctSites_sf, FDT_STA_ID, BASIN_CODE) %>%
+              st_drop_geometry(), by = c('StationID' = 'FDT_STA_ID')) %>%
+  # some fixes for missing basin codes so they will match proper naming conventions for filtering
+  mutate(BASIN_CODE1 = case_when(is.na(BASIN_CODE) ~ str_pad(
+    ifelse(grepl('-', str_extract(StationID, "^.{2}")), str_extract(StationID, "^.{1}"), str_extract(StationID, "^.{2}")), 
+    width = 2, side = 'left', pad = '0'),
+    TRUE ~ as.character(BASIN_CODE)),
+    BASIN_CODE2 = str_pad(BASIN_CODE1, width = 2, side = 'left', pad = '0'),
+    WQS_ID = paste0('RL_', BASIN_CODE2,'_NA')) %>%
+  dplyr::select(-c(BASIN_CODE, BASIN_CODE1, BASIN_CODE2))
+
+WQStable <- filter(WQStable, !is.na(WQS_ID)) %>% 
+  filter(! StationID %in% WQStableMissing$StationID) %>%
+  bind_rows(WQStableMissing)
+```
+
+
+
+
+
+### QA Spatial Attribution Process
+
+See how many sites snapped to too many WQS segments
+
+```{r snapCheck}
+tooMany <- snapCheck(WQStable)
+
+# quick snap check previous WQS attributed data from assessors bc some issues have been noticed
+tooMany_WQStableExisting <- snapCheck(WQStableExisting) %>%
+  dplyr::select(-Comments) # delete this so we can sent it back to user to be fixed
+
+WQStable <- bind_rows(WQStable, tooMany_WQStableExisting)
+
+
+fine <- filter(WQStable, ! (StationID %in% tooMany$StationID)) %>% 
+  filter(`Buffer Distance` %in% c(NA,  "20 m", "40 m", "60 m" ,"80 m"))
+none <- filter(WQStable, ! StationID %in% tooMany$StationID) %>%
+  filter(`Buffer Distance` == "No connections within 80 m")
+
+# quick stats 
+(nrow(fine) / nrow(distinctSites)) * 100 # ~ 74% snapped to one segment
+(length(unique(tooMany$StationID)) / nrow(distinctSites)) * 100 # ~ 23% need extra manual review
+(nrow(none) / nrow(distinctSites)) * 100 # ~ 4% snapped to one segment
+
+rm(fine);rm(none);rm(tooMany)
+```
+
 
