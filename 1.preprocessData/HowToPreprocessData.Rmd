@@ -321,7 +321,7 @@ riverine <- st_read('../GIS/draft_WQS_shapefiles_2022/riverine_draft2022.shp',
 WQStable <- snapAndOrganizeWQS(distinctSitesToDoWQS, 'FDT_STA_ID', riverine, 
                                bufferDistances = seq(20,80,by=20),  # buffering by 20m from 20 - 80 meters
                                WQStable)
-
+#saveRDS(WQStable, 'data/WQStable.RDS')
 
 rm(riverine)
 ```
@@ -370,26 +370,28 @@ WQStable <- snapAndOrganizeWQS(filter(distinctSitesToDoWQS, SUBBASIN %in% c("Pot
                                                                             "Appomattox River",
                                                                             "Chowan River", 
                                                                             "Atlantic Ocean - South" ,
-                                                                            "Dismal Swamp/Albemarle Sound"))[1:25,],
+                                                                            "Dismal Swamp/Albemarle Sound")),
                                'StationID', estuarineLines, 
                                bufferDistances = seq(20,80,by=20),  # buffering by 20m from 20 - 80 meters
                                WQStable)
-
+saveRDS(WQStable, 'WQStable2.RDS')
 rm(estuarineLines)
 ```
 
 Remove stations that attached to estuarine segments from the 'to do' list.
 
 ```{r remove estuary poly sites}
-distinctSitesToDo <- filter(distinctSitesToDo, ! StationID %in% WQStable$StationID)
+distinctSitesToDoWQS <- filter(distinctSitesToDoWQS, ! StationID %in% WQStable$StationID)
 ```
 
 
+Double check no stations were lost in these processes. 
 
 ```{r double check no one lost}
 #Make sure all stations from original distinct station list have some sort of record (blank or populated) int the WQStable.
-# only useful the very first time you do this operation
-#distinctSites$FDT_STA_ID[!(distinctSites$FDT_STA_ID %in% unique(WQStable$StationID))]
+
+distinctSitesToDoWQS <- filter(distinctSitesToDo, ! FDT_STA_ID  %in% WQStableExisting$StationID)
+distinctSitesToDoWQS$FDT_STA_ID[!(distinctSitesToDoWQS$FDT_STA_ID %in% unique(WQStable$StationID))]
 ```
 
 And that none of the missing sites (sites that fall outside of the assessmentLayer) are not missing from the WQS snapping process.
@@ -456,5 +458,140 @@ none <- filter(WQStable, ! StationID %in% tooMany$StationID) %>%
 
 rm(fine);rm(none);rm(tooMany)
 ```
+
+skipped some stuff. double check when have citmon etc if needed
+
+
+Save WQStable for manual review in application. 
+```{r save WQS for app review}
+saveRDS(WQStable, './data/WQStable07262022.RDS')
+
+# clean up workspace
+rm(distinctSitesToDoWQS); rm(WQStable); rm(WQStableExisting);rm(WQStableMissing)
+```
+
+
+
+# Assessment Unit
+
+## Split AUs for application easy rendering
+
+First we need to take the spatial data we will use for the app and split it efficiently.
+
+```{r split AUs for app}
+# only run once
+#source('preprocessingModules/splitAUbySubbasin.R')
+```
+
+### Pin spatial AU information to server for application use
+
+This significantly speeds up app rendering. Initially it was performed on draft data, but final data is pinned now.
+
+```{r pin AU data}
+#source('preprocessingModules/pinAUdataToServer.R')
+```
+
+
+
+## Assessment Unit Info from Last Cycle
+
+The logical starting point is to take all the unique stations that need to be assessed (distinctSites_sf from above) and join AU information by StationID where possible before going to more computationally intensive methods. 
+
+Bring in Cleo's final stations data from 2020 cycle. The data was extracted from a featureclass and then saved to shapefile (my system is having issues dealing with geodatabases right now). Then the shapefile was joined to a spreadsheet to make sure the process of converting to a shapefile didn't truncate comment fields.
+
+```{r cleo 2020 final stations}
+# converted featureclass C:\HardDriveBackup\GIS\Assessment\2020IR_final\2020IR_GISData\va_20ir_wqms.gdb to C:\HardDriveBackup\R\GitHub\IR2022\1.preprocessData\GIS\va_20ir_wqms.shp
+
+ # have to read in console
+final2020 <- st_read('GIS/va_20ir_wqms.shp') %>%
+  st_transform(4326) %>%
+  dplyr::select(OBJECTID, STATION_ID)
+
+realComments <- read_excel('C:/HardDriveBackup/GIS/Assessment/2020IR_final/ir20_Appendix8_StationsKey-List.xlsx', sheet = 'ir20_Appendix8_StationsList')
+
+final2020 <- left_join(final2020, realComments, by = "STATION_ID")
+
+```
+
+Join distinct sites to AU information to get all available free data.
+
+```{r AU join}
+# maybe don't do this since these stations are in distinctSites_sf; missingSites$FDT_STA_ID %in% distinctSites_sf$FDT_STA_ID
+# # start by adding back in missing sites (sites that are outside assessmentLayer boundary)
+# missingSites_AU <- mutate(missingSites, HUC12 = NA, VAHU6 = NA, Portion = NA, MAP = NA, ASSESS_REG = NA, OFFICE_NM = NA, States = NA, HUType = NA, HUMod = NA, ToHUC = NA, META_ID = NA, Location = NA, VaName = NA, PC_Water = NA, Tidal = NA, VAHUSB = NA, FedName = NA, HUC10 = NA, VAHU5 = NA, Basin = NA, BASIN_NAME = NA, BASIN_CODE = NA, SUBBASIN = NA) %>%
+#   dplyr::select(names(distinctSites_sf)) %>% st_drop_geometry()
+
+
+distinctSites_AUall <- distinctSites_sf %>% 
+  st_drop_geometry() %>%
+  #rbind(missingSites_AU) %>%
+  left_join(final2020 %>% st_drop_geometry(), # bc two spatial objects need to drop geometry to join on tabular data
+                              by = c('FDT_STA_ID' = 'STATION_ID')) %>%
+  dplyr::select(FDT_STA_ID : VAHU6.y) %>% # drop the last cycle's results, not important now
+  mutate(VAHU6 = ifelse(is.na(VAHU6.y), as.character(VAHU6.x), as.character(VAHU6.y))) %>% # use last cycle's VAHU6 designation over CEDS designation by default if available
+  dplyr::select(-c(VAHU6.x, VAHU6.y)) %>%
+  group_by(FDT_STA_ID) %>%
+  mutate(n = n())
+
+# Find any duplicates
+View(filter(distinctSites_AUall, n >1)) # 0, cool
+
+# above n> 1 used to be stations that were riverine and lacustrine makes sense, these sites are being used for riverine and lacustrine assessment
+```
+
+
+
+
+Organize stations by whether or not they have AU data.
+
+```{r AU haves and have nots}
+# Needs Work
+distinctSites_AUtoDo <- filter(distinctSites_AUall, is.na(ID305B_1)) %>%
+  st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = T, # don't remove these lat/lon cols from df
+           crs = 4326)
+
+# All good for assessment app (once we join WQS info from lookup table)
+distinctSites_AU <- filter(distinctSites_AUall, !is.na(ID305B_1)) %>%
+  st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = T, # don't remove these lat/lon cols from df
+           crs = 4326)
+
+nrow(distinctSites_AU) + nrow(distinctSites_AUtoDo) == nrow(distinctSites_AUall)
+```
+
+
+First we need to side step to join 1a stations that really are in ceds as 1A.
+
+```{r 1A fix}
+distinctSites_AUtoDoFix <- filter(distinctSites_sf, FDT_STA_ID %in% distinctSites_AUtoDo$FDT_STA_ID) %>%
+  st_drop_geometry() %>%
+  left_join(final2020 %>% st_drop_geometry() %>% mutate(STATION_ID = toupper(as.character(STATION_ID))), # bc two spatial objects need to drop geometry to join on tabular data
+                              by = c('FDT_STA_ID' = 'STATION_ID')) %>%
+  dplyr::select(FDT_STA_ID : VAHU6.y) %>% # drop the last cycle's results, not important now
+  mutate(VAHU6 = ifelse(is.na(VAHU6.y), as.character(VAHU6.x), as.character(VAHU6.y))) %>% # use last cycle's VAHU6 designation over CEDS designation by default if available
+  dplyr::select(-c(VAHU6.x, VAHU6.y)) %>%
+  group_by(FDT_STA_ID) %>%
+  mutate(n = n())
+
+
+
+distinctSites_AUtoDoFixed <- filter(distinctSites_AUtoDoFix, !is.na(ID305B_1)) %>%
+  st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = T, # don't remove these lat/lon cols from df
+           crs = 4326)
+
+distinctSites_AU <- #filter(distinctSites_AU,FDT_STA_ID %in% distinctSites_AUtoDoFixed$FDT_STA_ID) %>%
+  rbind(distinctSites_AU, distinctSites_AUtoDoFixed)
+
+distinctSites_AUtoDo <- filter(distinctSites_AUtoDo, ! FDT_STA_ID %in% distinctSites_AUtoDoFixed$FDT_STA_ID)
+
+rm(distinctSites_AUtoDoFix)
+
+nrow(distinctSites_AU) + nrow(distinctSites_AUtoDo) == nrow(distinctSites_AUall)
+
+```
+
+That logic isnt' perfect but will work for now
 
 

@@ -46,3 +46,5 @@ GIS/
 1.preprocessData/data/
 1.preprocessData/config.yml
 1.preprocessData/data_old/
+1.preprocessData/WQSlookupTable/
+1.preprocessData/AUlookupTable/

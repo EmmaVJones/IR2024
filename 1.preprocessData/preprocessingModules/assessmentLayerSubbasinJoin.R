@@ -18,6 +18,8 @@ distinctSites_sf <- st_as_sf(distinctSites,
                             coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
                             remove = F, # don't remove these lat/lon cols from df
                             crs = 4326) %>% # add coordinate reference system, needs to be geographic for now bc entering lat/lng, 
+  dplyr::select(-BASIN_CODE) %>% 
+  #st_intersection(assessmentLayer ) %>% # will need this for citmon
   st_join(dplyr::select(subbasinLayer, BASIN_NAME, BASIN_CODE, SUBBASIN), join = st_intersects) 
 
 # if any joining issues occur, that means that there are stations that fall outside the joined polygon area

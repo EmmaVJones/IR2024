@@ -48,22 +48,26 @@ for(i in 1:length(unique(riverineLB$BASIN_CODE))){
   #                      assessmentRegions)
   z1 <- st_join(z, assessmentLayer, join = st_intersects)
   
-  for(k in 1:length(unique(z1$VAHUSB))){
-    z2 <- filter(z1, VAHUSB == as.character(unique(z1$VAHUSB)[k])) %>%
-      # in case segment split between two regions, just keep one, we already have waht we need from regional data
-      distinct(WQS_ID, .keep_all = T)
-    if(nrow(z2) > 0){
-      st_write(z2, paste0('../GIS/processedWQS/RL_', 
-                          as.character(unique(z2$BASIN_CODE)),'_',
-                          as.character(unique(z2$VAHUSB)), '.shp'), driver = "ESRI Shapefile")
-    }
-  }
+  # for(k in 1:length(unique(z1$VAHUSB))){
+  #   z2 <- filter(z1, VAHUSB == as.character(unique(z1$VAHUSB)[k])) %>%
+  #     # in case segment split between two regions, just keep one, we already have waht we need from regional data
+  #     distinct(WQS_ID, .keep_all = T)
+  #   if(nrow(z2) > 0){
+  #     st_write(z2, paste0('../GIS/processedWQS/RL_', 
+  #                         as.character(unique(z2$BASIN_CODE)),'_',
+  #                         as.character(unique(z2$VAHUSB)), '.shp'), driver = "ESRI Shapefile")
+  #   }
+  
+  st_write(z1, paste0('../GIS/processedWQS/RL_', 
+                      as.character(unique(z1$BASIN_CODE)),'.shp'), driver = "ESRI Shapefile")
+
   
   subbasinAssessmentOptions <- tibble(waterbodyType = as.character('Riverine'),
                                       SubbasinOptions = as.character(unique(z1$BASIN_CODE)),
                                       AssessmentRegion = as.character(unique(z1$ASSESS_REG)),
                                       WQS_ID_Prefix = as.character('RL'))
-  subbasinOptionsByWQStype <- bind_rows(subbasinOptionsByWQStype, subbasinAssessmentOptions)
+  subbasinOptionsByWQStype <- bind_rows(subbasinOptionsByWQStype, subbasinAssessmentOptions) %>% 
+    filter(!is.na(AssessmentRegion))
   ## in case segment split between two regions, just keep one, we already have waht we need from regional data
   #z <- z %>% distinct(WQS_ID, .keep_all = T)
   #st_write(z, paste0('GIS/processedWQS/RL_', 
