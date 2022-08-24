@@ -8,11 +8,16 @@ conventionals_DWQS <- readRDS('data/distinctSites_sf.RDS') %>% #conventionals_D.
            crs = 4326) %>%
   mutate(StationID= FDT_STA_ID)
 
-assessmentRegions <- st_read( '../GIS/AssessmentRegions_simple.shp')
-assessmentLayer <- st_read('../GIS/AssessmentRegions_VA84_basins.shp') %>%
-  st_transform( st_crs(4326)) 
-subbasins <- st_read('../GIS/DEQ_VAHUSB_subbasins_EVJ.shp') %>%
-  rename('SUBBASIN' = 'SUBBASIN_1')
+# Sourcing these from pinned data for IR2024 since these are used across multiple IR2024 applications
+#  and since RSConnect can't bundle anything outside the working directory for upload to the server
+assessmentRegions <- st_as_sf(pin_get("ejones/AssessmentRegions_simple", board = "rsconnect"))
+  #st_read( '../GIS/AssessmentRegions_simple.shp')
+assessmentLayer <- st_as_sf(pin_get("ejones/AssessmentRegions_VA84_basins", board = "rsconnect"))
+  # st_read('../GIS/AssessmentRegions_VA84_basins.shp') %>%
+  #   st_transform( st_crs(4326)) 
+subbasins <- st_as_sf(pin_get("ejones/DEQ_VAHUSB_subbasins_EVJ", board = "rsconnect"))
+  # st_read('../GIS/DEQ_VAHUSB_subbasins_EVJ.shp') %>%
+  #   rename('SUBBASIN' = 'SUBBASIN_1')
 
 
 
@@ -81,14 +86,14 @@ shinyServer(function(input, output, session) {
     
     if(length(basinCodes()) > 1){
       WQSs <- withProgress(message = 'Reading in Large Spatial File',
-                           st_zm(st_read(paste0('../GIS/processedWQS/',typeName[1],'_', basinCodes()[1], '.shp') , 
+                           st_zm(st_read(paste0('data/GIS/processedWQS/',typeName[1],'_', basinCodes()[1], '.shp') , 
                                          fid_column_name = "OBJECTID")) %>%
-                             rbind(st_zm(st_read(paste0('../GIS/processedWQS/',typeName[1],'_', basinCodes()[2], '.shp') , 
+                             rbind(st_zm(st_read(paste0('data/GIS/processedWQS/',typeName[1],'_', basinCodes()[2], '.shp') , 
                                                  fid_column_name = "OBJECTID"))) %>%
-                             rbind(st_zm(st_read(paste0('../GIS/processedWQS/',typeName[1],'_', basinCodes()[3], '.shp') , 
+                             rbind(st_zm(st_read(paste0('data/GIS/processedWQS/',typeName[1],'_', basinCodes()[3], '.shp') , 
                                                  fid_column_name = "OBJECTID"))) )
     } else { WQSs <- withProgress(message = 'Reading in Large Spatial File',
-                                  st_zm(st_read(paste0('../GIS/processedWQS/',typeName[1],'_', basinCodes(), '.shp') ,
+                                  st_zm(st_read(paste0('data/GIS/processedWQS/',typeName[1],'_', basinCodes(), '.shp') ,
                                                 fid_column_name = "OBJECTID")) )   }
     WQSs <- WQSs %>%
       # withProgress(message = 'Reading in Large Spatial File',
@@ -123,14 +128,14 @@ shinyServer(function(input, output, session) {
     
     if(length(basinCodes()) > 1){
       WQSsEL <- withProgress(message = 'Reading in Additional Estuarine Spatial File',
-                             st_zm(st_read(paste0('../GIS/processedWQS/',typeName[1],'_', basinCodes()[1], '.shp') , 
+                             st_zm(st_read(paste0('data/GIS/processedWQS/',typeName[1],'_', basinCodes()[1], '.shp') , 
                                            fid_column_name = "OBJECTID")) %>%
-                               rbind(st_zm(st_read(paste0('../GIS/processedWQS/',typeName[1],'_', basinCodes()[2], '.shp') , 
+                               rbind(st_zm(st_read(paste0('data/GIS/processedWQS/',typeName[1],'_', basinCodes()[2], '.shp') , 
                                                    fid_column_name = "OBJECTID"))) %>%
-                               rbind(st_zm(st_read(paste0('../GIS/processedWQS/',typeName[1],'_', basinCodes()[3], '.shp') , 
+                               rbind(st_zm(st_read(paste0('data/GIS/processedWQS/',typeName[1],'_', basinCodes()[3], '.shp') , 
                                                    fid_column_name = "OBJECTID"))) )
     } else { WQSsEL <- withProgress(message = 'Reading in Additional Estuarine Spatial File',
-                                    st_zm(st_read(paste0('../GIS/processedWQS/',typeName[1],'_', basinCodes(), '.shp') ,
+                                    st_zm(st_read(paste0('data/GIS/processedWQS/',typeName[1],'_', basinCodes(), '.shp') ,
                                                   fid_column_name = "OBJECTID")) )   }
     WQSsEL <- WQSsEL %>%
       #withProgress(message = 'Reading in Additional Estuarine Spatial File',
@@ -348,7 +353,7 @@ shinyServer(function(input, output, session) {
                                          preferCanvas = TRUE)) %>%
       setView(-78, 37.5, zoom=7)  %>% 
       addCircleMarkers(data = WQSreactive_objects$conventionals_DWQS_Region, color='blue', fillColor='yellow', radius = 4,
-                       fillOpacity = 0.5,opacity=0.8,weight = 1,stroke=T, group="Conventionals Stations in Basin",
+                       fillOpacity = 0.5,opacity=0.8,weight = 1,stroke=T, group="All Stations in Basin",
                        label = ~FDT_STA_ID, layerId = ~FDT_STA_ID) %>% 
       #      {if("sfc_MULTIPOLYGON" %in% class(st_geometry(WQSs()))) 
       #        addPolygons(., data = WQSs(),
@@ -382,15 +387,15 @@ shinyServer(function(input, output, session) {
       #          hideGroup("All WQS in selected Region/Basin") 
       #        else . } %>%
       inlmisc::AddHomeButton(raster::extent(-83.89, -74.80, 36.54, 39.98), position = "topleft") %>%
-      inlmisc::AddSearchButton(group = "Conventionals Stations in Basin", zoom = 15,propertyName = "label",
-                               textPlaceholder = "Search Conventionals Stations in Basin") %>%
+      inlmisc::AddSearchButton(group = "All Stations in Basin", zoom = 15,propertyName = "label",
+                               textPlaceholder = "Search All Stations in Basin") %>%
       addLayersControl(baseGroups=c("Topo","Imagery","Hydrography"),
-                       overlayGroups = c('Conventionals Stations in Basin',
+                       overlayGroups = c('All Stations in Basin',
                                          #"All WQS in selected Region/Basin",
                                          'Assessment Regions'),
                        options=layersControlOptions(collapsed=T),
                        position='topleft')  %>%
-      hideGroup("Conventionals Stations in Basin")    
+      hideGroup("All Stations in Basin")    
   })
   
   WQSmap_proxy <- leafletProxy("WQSmap")
@@ -440,7 +445,7 @@ shinyServer(function(input, output, session) {
                                            "Stations Snapped to > 1 WQS Segment",
                                            "WQS Segments of Stations Snapped to > 1 Segment",
                                            "Stations Snapped to 0 WQS Segments",
-                                           'Conventionals Stations in Basin',
+                                           'All Stations in Basin',
                                            #"All WQS in selected Region/Basin",
                                            'Assessment Regions'),
                          options=layersControlOptions(collapsed=T),
@@ -496,7 +501,7 @@ shinyServer(function(input, output, session) {
                                            "Stations Snapped to > 1 WQS Segment",
                                            "WQS Segments of Stations Snapped to > 1 Segment",
                                            "Stations Snapped to 0 WQS Segments",
-                                           'Conventionals Stations in Basin',
+                                           'All Stations in Basin',
                                            #"All WQS in selected Region/Basin",
                                            'Assessment Regions'),
                          options=layersControlOptions(collapsed=T),
@@ -522,7 +527,7 @@ shinyServer(function(input, output, session) {
                                            "Stations Snapped to > 1 WQS Segment",
                                            "WQS Segments of Stations Snapped to > 1 Segment",
                                            "Stations Snapped to 0 WQS Segments",
-                                           'Conventionals Stations in Basin',
+                                           'All Stations in Basin',
                                            #"All WQS in selected Region/Basin",
                                            'Assessment Regions'),
                          options=layersControlOptions(collapsed=T),
@@ -825,7 +830,7 @@ shinyServer(function(input, output, session) {
                                            "Stations Snapped to > 1 WQS Segment",
                                            "WQS Segments of Stations Snapped to > 1 Segment",
                                            "Stations Snapped to 0 WQS Segments",
-                                           'Conventionals Stations in Basin',
+                                           'All Stations in Basin',
                                            #"All WQS in selected Region/Basin",
                                            'Assessment Regions'),
                          options=layersControlOptions(collapsed=T),

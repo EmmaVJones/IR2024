@@ -471,6 +471,8 @@ rm(distinctSitesToDoWQS); rm(WQStable); rm(WQStableExisting);rm(WQStableMissing)
 ```
 
 
+Pin spatial data to the server with ../pinData.R so it can be sourced by multiple apps
+
 
 # Assessment Unit
 
@@ -592,6 +594,6 @@ nrow(distinctSites_AU) + nrow(distinctSites_AUtoDo) == nrow(distinctSites_AUall)
 
 ```
 
-That logic isnt' perfect but will work for now
+That logic isn't perfect but will work for now
 
 

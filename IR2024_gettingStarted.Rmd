@@ -18,6 +18,7 @@ This report is the first step for preparing the 2024 Integrated Report. This cyc
     + Cast wider net across assessment periods to include metals data outside the current window
 * Add 7Q10 6yr window flag by smallest scale feasible (VAHU6/HUC12?)
 * Begin Bookdown of R assessment guidance
+* pin spatial data (pinData.R) consumed by multiple applications to the server to avoid sending each layer up with multiple bundles since RSConnect cannot currently upload data/files above the working directory
 
 The major steps to prepare data for automated assessment and subsequently complete the assessment and rebuild WQA riverine and lacustrine applications are outlined below. These section names reference the directory where these processes are completed.
 1.preprocessData

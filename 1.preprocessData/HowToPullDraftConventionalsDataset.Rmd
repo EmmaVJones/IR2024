@@ -1,0 +1,71 @@
+---
+title: "Test Conventionals Dataset  "
+author: "Emma Jones"
+date: "8/24/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Background
+
+This script outlines the steps taken to create a working copy of the "conventionals" dataset that is required for any updates to the automated assessment process. Since this data is not officially provided until March of the assessment year, it is impossible to complete any updates with an official dataset. Instead, we will use the last cycle's official conventionals pull and tack on any new stations sampled to date.
+The most efficient way to get this new data is to use the monthly automated assessment pin on the R server. This is run monthly on the 15th. The version used for testing IR 2024 applications reflects data up until 8/15/2022.
+
+First, bring in official IR 2022 conventionals data from the R server.
+
+```{r connect to server}
+library(tidyverse)
+library(pins)
+library(config)
+library(purrr)
+library(lubridate)
+
+# Connect to server
+conn <- config::get("connectionSettings") # get configuration settings
+
+board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_KEY"),
+                         server = conn$CONNECT_SERVER)#Sys.getenv("CONNECT_SERVER"))
+
+```
+
+```{r}
+conventionals2022 <- pin_get("conventionals2022IRfinalWithSecchi", board = "rsconnect")
+conventionals2022_distinct <- pin_get("conventionals-distinct-final", board = "rsconnect")
+```
+
+Next pull stations sampled since the close of the 2022IR. The monthly pin operation already organizes the data into the appropriate "conventionals" schema for us to use. 
+
+```{r grab new station data}
+#pull monthly assessment data
+assessment <- pin_get("ejones/statewideResults", board = 'rsconnect')
+
+# Pull station Table for each region, 
+conventionalsNew <- assessment %>% 
+  map_df('Conventionals') 
+
+
+names(conventionals2022) == names(conventionalsNew)
+conventionals2024draft <- rbind(conventionals2022, conventionalsNew) %>% 
+  filter(FDT_DATE_TIME > as.Date('2017-01-01'))
+
+summary(conventionals$FDT_DATE_TIME)
+rm(conventionals2022); rm(conventionalsNew)
+
+# add newStations to distinctSites
+conventionals2024_distinct <- conventionals %>% 
+  distinct(FDT_STA_ID, .keep_all = T) %>% 
+  dplyr::select(names(conventionals2022_distinct))
+rm(conventionals2022_distinct); rm(assessment)
+```
+
+pin to server 
+
+```{r}
+pin(conventionals2024draft, name = 'conventionals2024draft', description = 'Working IR2024 conventionals dataset, pulled 8/15/2022', board = 'rsconnect')
+pin(conventionals2024_distinct,  name = 'conventionals2024_distinctdraft', description = 'Working IR2024 conventionals_distinct dataset, pulled 8/15/2022', board = 'rsconnect')
+
+```
+

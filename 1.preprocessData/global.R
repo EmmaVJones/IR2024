@@ -1,3 +1,6 @@
+# never forget this for apps on the server!
+httr::set_config(httr::config(ssl_verifypeer = FALSE, ssl_verifyhost = FALSE)) # never forget this for apps on the server!
+
 library(tidyverse)
 library(readxl)
 library(sf)
@@ -10,6 +13,16 @@ library(DT)
 library(writexl)
 library(shinycssloaders)
 library(shinyjqui)
+library(config)
+library(pins)
+
+# Connect to server
+conn <- config::get("connectionSettings") # get configuration settings
+
+board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_KEY"),
+                         server = conn$CONNECT_SERVER)#Sys.getenv("CONNECT_SERVER"))
+
+
 
 # WQS layer type to WQS_ID conversion
 #st_layers('GIS/WQS_layers_05082020.gdb')

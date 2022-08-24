@@ -53,12 +53,12 @@ for(i in 1:length(unique(riverineLB$BASIN_CODE))){
   #     # in case segment split between two regions, just keep one, we already have waht we need from regional data
   #     distinct(WQS_ID, .keep_all = T)
   #   if(nrow(z2) > 0){
-  #     st_write(z2, paste0('../GIS/processedWQS/RL_', 
+  #     st_write(z2, paste0('data/GIS/processedWQS/RL_', 
   #                         as.character(unique(z2$BASIN_CODE)),'_',
   #                         as.character(unique(z2$VAHUSB)), '.shp'), driver = "ESRI Shapefile")
   #   }
   
-  st_write(z1, paste0('../GIS/processedWQS/RL_', 
+  st_write(z1, paste0('data/GIS/processedWQS/RL_', 
                       as.character(unique(z1$BASIN_CODE)),'.shp'), driver = "ESRI Shapefile")
 
   
@@ -146,7 +146,7 @@ for(i in 1:length(unique(lakesLB$BASIN_CODE))){
   subbasinOptionsByWQStype <- bind_rows(subbasinOptionsByWQStype, subbasinAssessmentOptions)
   # in case segment split between two regions, just keep one, we already have waht we need from regional data
   z <- z %>% distinct(WQS_ID, .keep_all = T)
-  st_write(z, paste0('../GIS/processedWQS/LP_', 
+  st_write(z, paste0('data/GIS/processedWQS/LP_', 
                      unique(z$BASIN_CODE), '.shp'))
 }
 
@@ -195,7 +195,7 @@ for(i in 1:length(unique(estuaryLB$BASIN_CODE))){
   subbasinOptionsByWQStype <- bind_rows(subbasinOptionsByWQStype, subbasinAssessmentOptions)
   # in case segment split between two regions, just keep one, we already have waht we need from regional data
   z <- z %>% distinct(WQS_ID, .keep_all = T)
-  st_write(z, paste0('../GIS/processedWQS/EL_', 
+  st_write(z, paste0('data/GIS/processedWQS/EL_', 
                      unique(z$BASIN_CODE), '.shp'))
 }
 
@@ -244,7 +244,7 @@ for(i in 1:length(unique(estuaryPB$BASIN_CODE))){
   subbasinOptionsByWQStype <- bind_rows(subbasinOptionsByWQStype, subbasinAssessmentOptions)
   # in case segment split between two regions, just keep one, we already have waht we need from regional data
   z <- z %>% distinct(WQS_ID, .keep_all = T)
-  st_write(z, paste0('../GIS/processedWQS/EP_', 
+  st_write(z, paste0('data/GIS/processedWQS/EP_', 
                      unique(z$BASIN_CODE), '.shp'))
 }
 
