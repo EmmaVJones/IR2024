@@ -1,0 +1,182 @@
+---
+title: "Organize Station Metadata DRAFT"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(readxl)
+library(sf)
+library(pins)
+library(config)
+library(lubridate)
+
+# Connect to server
+conn <- config::get("connectionSettings") # get configuration settings
+
+board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_KEY"),
+                         server = conn$CONNECT_SERVER)#Sys.getenv("CONNECT_SERVER"))
+
+```
+
+## Overview
+
+This project picks up after regional assessment staff attribute WQS and AU information to each station identified for inclusion in a given assessment cycle. 
+
+This script combines the WQS and AU information archived by those applications (from the R Connect server) and attaches that information to all data associated with an assessment window.
+
+This script combines draft data, as opposed to final data. Future iterations use final data to  for final application testing upon data release. This version is meant to assist application rebuilding processes prior to final data release. 
+
+
+## Data Organization
+
+In order to link all data in the IR window to the appropriate station information, we need to bring in a few preliminary datasets.
+
+* Conventionals (final)
+* Last cycle AU information (still draft)
+* Station Attributes (from 1.preprocessingData steps)
+    + WQS information
+    + AU information (specifically for stations that did not exist in last cycle)
+* WQA CEDS Station table template (bulk data upload template)
+    + New for 2022IR cycle, DEQ is moving from ADB to a more ATTAINS-like system comprised of a module in CEDS known as CEDS WQA. The development team has released a template for the 'bulk data upload' component where assessors may upload station information (manually or automatically assessed) to expedite the population of the CEDS module. We need to use this new data model as a starting point as it contains information for AU attribution, critical to WQA CEDS and automated assessment tools.
+* PCB Data from Mark
+
+
+The following sections will detail bringing in these necessary data sources and organizing them in a format the automated scripts can digest.
+
+### Conventionals 
+
+This dataset is built using the ...\IR2024\1.preprocessData\HowToPullDraftConventionalsDataset.Rmd that combines final (March release) IR2022 conventionals data with the conventionals data pull taken from the monthly assessment analysis pinned on the R server (data in CEDS/ODS as of August 15, 2022). That dataset was then filtered to the current assessment window, 2017-2022. 
+
+This data is pulled from the R server and acts as "The" conventionals dataset for all IR2024 application testing/development.
+
+
+```{r}
+conventionals <- pin_get('ejones/conventionals2024draft', board = 'rsconnect')
+```
+
+#### Station Hit list
+
+These are the stations that assessors have asked to never see again in an assessment. They make it through the conventionals query but should not be assessed. 
+
+Remove the offenders marked by assessors during metadata attribution process that need to be cut from the conventionals pull and not assessed. 
+
+```{r station hit list}
+hitList <- read_csv('data/stationHitList.csv')
+
+conventionals <- filter(conventionals, ! FDT_STA_ID %in% toupper(hitList$`StationID to Remove`))
+rm(hitList)
+```
+
+#### Citmon/NonAgency Data
+
+Need to add in after talking to Reid.
+
+#### Conventionals Distinct
+
+And now let's make a dataset of all the unique stations that we need to organize.
+
+```{r conventionals_distinct}
+# conventionals_distinct <- conventionals %>%
+#   distinct(FDT_STA_ID, .keep_all = T) %>%
+#   # remove any data to avoid confusion
+#   dplyr::select(FDT_STA_ID:FDT_COMMENT, Latitude:Data_Source) %>%
+#   filter(!is.na(FDT_STA_ID))
+conventionals_distinct <- pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect') %>% 
+  filter(!is.na(Latitude) | !is.na(Longitude))
+
+
+# and make a spatial version
+conventionals_sf <- conventionals_distinct %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), 
+               remove = F, # don't remove these lat/lon cols from df
+               crs = 4326) # add projection, needs to be geographic for now bc entering lat/lng
+
+```
+
+
+
+#### Stations Bulk Upload Template 
+
+The biggest changes from the old stations table format to this new template is the addition of the 10 ID305B and station type columns as well as the lacustrine designation. 
+
+```{r bulk upload template}
+stationsTemplate <- read_excel('data/WQA_CEDS_templates/WQA_Bulk_Station_Upload_Final.xlsx',#'WQA_CEDS_templates/WQA_Bulk_Station_Upload (3).xlsx', 
+                               sheet = 'Stations', col_types = "text")[0,] # just want structure and not the draft data, force everything to character for now
+```
+
+
+#### Last cycle AU information (draft)
+
+Let's start by populating this template with draft 2022 stations table information. This will be the first time we pull this information from ODS instead of being supplied data from Cleo.
+
+Connect to ODS prod.
+
+```{r}
+library(pool)
+library(dbplyr)
+### Production Environment
+pool <- dbPool(
+  drv = odbc::odbc(),
+  Driver = "ODBC Driver 11 for SQL Server", #"SQL Server Native Client 11.0", 
+  Server= "DEQ-SQLODS-PROD,50000",
+  dbname = "ODS",
+  trusted_connection = "yes"
+)
+```
+
+Query stations in IR2020 and join in their STATION_TYPE and AU information.
+
+
+```{r}
+stations <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
+  filter(WSD_CYCLE == 2020) %>% 
+  as_tibble()
+
+AU <- pool %>% tbl(in_schema('wqa', '[WQA 305b]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
+  filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
+  as_tibble()
+
+
+```
+
+
+```{r}
+station <- '4AROA167.34'
+
+test <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
+  filter(WSD_STATION_ID %in% !! station ) %>% #& #
+           #between(as.Date(Fdt_Date_Time), "2014-12-31", "2020-12-31") &
+          # !is.na(Fdt_Secchi_Depth)) %>% # x >= left & x <= right
+  #dplyr::select(Fdt_Sta_Id, Fdt_Date_Time, Fdt_Depth, Fdt_Secchi_Depth) %>%
+  as_tibble()
+```
+
+
+
+
+```{r}
+#station <- '4AROA167.34'
+
+stationSecchiDepth <- pool %>% tbl(in_schema('wqm', "Wqm_Field_Data_View")) %>%
+  filter(Fdt_Sta_Id %in% !! conventionals_distinct$FDT_STA_ID & #station & #
+           between(as.Date(Fdt_Date_Time), "2014-12-31", "2020-12-31") &
+           !is.na(Fdt_Secchi_Depth)) %>% # x >= left & x <= right
+  dplyr::select(Fdt_Sta_Id, Fdt_Date_Time, Fdt_Depth, Fdt_Secchi_Depth) %>%
+  as_tibble() %>%
+  mutate(Date = as.Date(Fdt_Date_Time)) %>%
+    dplyr::select(FDT_STA_ID = Fdt_Sta_Id, Date, FDT_DEPTH = Fdt_Depth, Fdt_Secchi_Depth) # name conventionals format
+  #mutate(RMK_SECCHI_DEPTH = as.character(NA), LEVEL_SECCHI_DEPTH = as.factor(NA)) 
+```
+
+
+
+
+
+This is basically the best we can do for now given that 2022 spatial data is still not final as of late March 2021. This is just to get the assessors started, and Cleo has assured that most of this is final final information.
+
+```{r last cycle stations}
+lastCycleStation_sf <- st_read('data/GIS/2020_wqms.shp') %>%
+  mutate(STATION_ID = toupper(STATION_ID)) # fix messed up stationID names to prevent joining issues
+```

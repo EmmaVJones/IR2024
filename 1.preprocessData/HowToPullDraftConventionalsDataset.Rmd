@@ -55,9 +55,12 @@ summary(conventionals$FDT_DATE_TIME)
 rm(conventionals2022); rm(conventionalsNew)
 
 # add newStations to distinctSites
-conventionals2024_distinct <- conventionals %>% 
-  distinct(FDT_STA_ID, .keep_all = T) %>% 
-  dplyr::select(names(conventionals2022_distinct))
+conventionals2024_distinct <- conventionals_distinct <- conventionals %>%
+  distinct(FDT_STA_ID, .keep_all = T) %>%
+  # remove any data to avoid confusion
+  dplyr::select(FDT_STA_ID:FDT_COMMENT, Latitude:Data_Source) %>%
+  filter(!is.na(FDT_STA_ID))
+
 rm(conventionals2022_distinct); rm(assessment)
 ```
 

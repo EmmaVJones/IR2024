@@ -49,3 +49,6 @@ config.yml
 1.preprocessData/data_old/
 1.preprocessData/WQSlookupTable/
 1.preprocessData/AUlookupTable/
+
+2.organizeMetadata/data/
+2.organizeMetadata/config.yml
