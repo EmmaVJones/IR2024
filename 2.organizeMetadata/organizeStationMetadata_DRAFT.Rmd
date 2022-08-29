@@ -126,20 +126,109 @@ pool <- dbPool(
 )
 ```
 
-Query stations in IR2020 and join in their STATION_TYPE and AU information.
-
+Find all stations from the last IR cycle that should be carried forward for review this cycle, either impaired last time or with the comment field containing "carr%" string (e.g. carry over, carried over, etc.). Start by querying stations in IR2022 and join in their AU information and station parameters. The key to these joins is the 'WXA_STATION_DETAIL_ID'/'Station Detail Id' field.
 
 ```{r}
+# data prep
 stations <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
-  filter(WSD_CYCLE == 2020) %>% 
-  as_tibble()
+  filter(WSD_CYCLE == 2022) %>% 
+  as_tibble() %>% 
+  distinct(WXA_STATION_DETAIL_ID, .keep_all = T) # distinct on this variable for AU join or duplicated rows for stations
+
+# stationsGeospatial <- pool %>% tbl(in_schema('wqa', 'Wqa_Stations_Geospatial_Data_View')) %>% 
+#   filter(Station_Id %in% !! stations$STA_NAME) %>% #stations$WSD_STATION_ID) %>% 
+#   as_tibble()
+
+# using station geospatial info from WQM ODS bc more rows returned. apparently not all WQA stations are in WQA Wqa_Stations_Geospatial_Data_View?
+stationsGeospatial <- pool %>% tbl(in_schema('wqm', 'WQM_Sta_GIS_View')) %>% 
+  filter(Station_Id %in% !! stations$WSD_STATION_ID) %>% 
+  as_tibble() %>% 
+  dplyr::select(Station_Id, Latitude, Longitude)
 
 AU <- pool %>% tbl(in_schema('wqa', '[WQA 305b]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
   filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
   as_tibble()
 
+stationDetails <- pool %>% tbl(in_schema('wqa', '[WQA Station Parameters Pivot]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
+  filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
+  as_tibble()
+
+stationType <- pool %>% tbl(in_schema('wqa', '[WQA Station Detail Types]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
+  filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
+  as_tibble()
+
+stationsAU <- left_join(stations, AU, by = c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) %>% 
+  left_join(stationType, by =  c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) %>% 
+  left_join(stationsGeospatial, by = c('WSD_STATION_ID' = 'Station_Id')) %>% 
+  left_join(stationDetails,  by = c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) 
+
+# actual analysis
+impairedStations <- stationsAU %>% 
+  filter_at(.vars = vars(contains("Status Code")),
+            .vars_predicate = any_vars(str_detect(., 'IM')))
+carryoverStations <- stationsAU %>% 
+  filter(str_detect(WSD_COMMENTS, 'carr'))
+
+# combine and remove duplicates
+stationsFromLastCycle <- bind_rows(impairedStations, carryoverStations) %>% 
+  distinct(WXA_STATION_DETAIL_ID, .keep_all = T)
+
+# clean up workspace
+rm(list = c('stations','stationsAU', 'stationDetails', 'impairedStations', 'carryoverStations', 'AU', 'stationType', 'stationsGeospatial'))
+```
+
+Clean up this data to match the bulk upload data template. We will also strip out the data to not confuse anyone from cycle to cycle.
+
+```{r match bulk upload template}
+stationsTable2024begin <- stationsFromLastCycle %>% 
+  dplyr::select(STATION_ID = STA_NAME,  #### OR COULD USE WSD_STATION_ID
+                ID305B_1 = `ID305B 1`,
+                ID305B_2 = `ID305B 2`,
+                ID305B_3 = `ID305B 3`,
+                ID305B_4 = `ID305B 4`,
+                ID305B_5 = `ID305B 5`,
+                ID305B_6 = `ID305B 6`,
+                ID305B_7 = `ID305B 7`,
+                ID305B_8 = `ID305B 8`,
+                ID305B_9 = `ID305B 9`,
+                ID305B_10 = `ID305B 10`,
+                WATER_TYPE = WWT_WATER_TYPE_DESC,
+                SALINITY = WSC_DESCRIPTION,
+                LACUSTRINE = WSD_LAC_ZONE_YN,
+                REGION = STA_REGION,
+                TYPE_1 = `Station Type 1`,
+                TYPE_2 = `Station Type 2`,
+                TYPE_3 = `Station Type 3`,
+                TYPE_4 = `Station Type 4`,
+                TYPE_5 = `Station Type 5`,
+                TYPE_6 = `Station Type 6`,
+                TYPE_7 = `Station Type 7`,
+                TYPE_8 = `Station Type 8`,
+                TYPE_9 = `Station Type 9`,
+                TYPE_10 = `Station Type 10`,
+                LATITUDE = Latitude,
+                LONGITUDE = Longitude,
+                WATERSHED = STA_WATERSHED,
+                VAHU6 = STA_VA_HU6) %>% 
+  mutate(REGION = case_when(REGION == 'NVRO' ~ 'NRO',
+                            REGION == 'WCRO' ~ 'BRRO',
+                            TRUE~ as.character(REGION))) %>% 
+  dplyr::select(any_of(names(stationsTemplate)))
+
+stationsTable2024begin <- bind_rows(stationsTemplate %>% 
+                                      mutate(LATITUDE = as.numeric(LATITUDE),
+                                             LONGITUDE = as.numeric(LONGITUDE)), 
+                                    stationsTable2024begin) # add back in missing columns
 
 ```
+
+Still a lot of missing geospatial data. All citizen monitoring or non agency data. Where is this spatial information stored since these don't have records in CEDS????
+
+```{r}
+missingGeospatial <- filter(stationsTable2024begin, is.na(LATITUDE) | is.na(LONGITUDE))
+```
+
+
 
 
 ```{r}
