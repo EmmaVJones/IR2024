@@ -135,15 +135,24 @@ stations <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
   as_tibble() %>% 
   distinct(WXA_STATION_DETAIL_ID, .keep_all = T) # distinct on this variable for AU join or duplicated rows for stations
 
-# stationsGeospatial <- pool %>% tbl(in_schema('wqa', 'Wqa_Stations_Geospatial_Data_View')) %>% 
-#   filter(Station_Id %in% !! stations$STA_NAME) %>% #stations$WSD_STATION_ID) %>% 
-#   as_tibble()
+# WQA geospatial data only seems to have citmon/non agency station locations. All other stations (DEQ) need to be queried from the WQM side of ODS
+stationsGeospatial_wqa <- pool %>% tbl(in_schema('wqa', 'Wqa_Stations_Geospatial_Data_View')) %>%
+  filter(Station_Id %in% !! stations$STA_NAME) %>% #stations$WSD_STATION_ID) %>%
+  as_tibble() %>% 
+  dplyr::select(Station_Id, Latitude, Longitude)
 
-# using station geospatial info from WQM ODS bc more rows returned. apparently not all WQA stations are in WQA Wqa_Stations_Geospatial_Data_View?
-stationsGeospatial <- pool %>% tbl(in_schema('wqm', 'WQM_Sta_GIS_View')) %>% 
+# WQM geospatial data for DEQ stations
+stationsGeospatial_wqm <- pool %>% tbl(in_schema('wqm', 'WQM_Sta_GIS_View')) %>% 
   filter(Station_Id %in% !! stations$WSD_STATION_ID) %>% 
   as_tibble() %>% 
   dplyr::select(Station_Id, Latitude, Longitude)
+
+# combine geospatial data into one object for easier joining
+stationsGeospatial <- bind_rows(stationsGeospatial_wqa, stationsGeospatial_wqm) %>% 
+  distinct(Station_Id, .keep_all = T) %>% 
+  mutate(Station_Id = case_when(Station_Id == 'Griggs Pond' ~ toupper(Station_Id),
+                                Station_Id == 'Sims Metal 003' ~ 'SIMS METAL 003',
+                                TRUE ~ as.character(Station_Id))) # Joining problems later if we don't capitalize the names Griggs Pond and Simms Metal 003 as they are elsewhere in ODS
 
 AU <- pool %>% tbl(in_schema('wqa', '[WQA 305b]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
   filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
@@ -159,7 +168,7 @@ stationType <- pool %>% tbl(in_schema('wqa', '[WQA Station Detail Types]')) %>% 
 
 stationsAU <- left_join(stations, AU, by = c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) %>% 
   left_join(stationType, by =  c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) %>% 
-  left_join(stationsGeospatial, by = c('WSD_STATION_ID' = 'Station_Id')) %>% 
+  left_join(stationsGeospatial, by = c('STA_NAME' = 'Station_Id')) %>% # Make sure you join on STA_NAME and not WSD_STATION_ID here!!!
   left_join(stationDetails,  by = c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) 
 
 # actual analysis
@@ -174,7 +183,8 @@ stationsFromLastCycle <- bind_rows(impairedStations, carryoverStations) %>%
   distinct(WXA_STATION_DETAIL_ID, .keep_all = T)
 
 # clean up workspace
-rm(list = c('stations','stationsAU', 'stationDetails', 'impairedStations', 'carryoverStations', 'AU', 'stationType', 'stationsGeospatial'))
+rm(list = c('stations','stationsAU', 'stationDetails', 'impairedStations', 'carryoverStations', 
+            'AU', 'stationType', 'stationsGeospatial_wqa', 'stationsGeospatial_wqm'))
 ```
 
 Clean up this data to match the bulk upload data template. We will also strip out the data to not confuse anyone from cycle to cycle.
@@ -222,12 +232,21 @@ stationsTable2024begin <- bind_rows(stationsTemplate %>%
 
 ```
 
-Still a lot of missing geospatial data. All citizen monitoring or non agency data. Where is this spatial information stored since these don't have records in CEDS????
+Still missing geospatial data. Goose creek site that was moved still has wqa records that need to be fixed bc all other records of this site are gone from CEDS WQM.
 
 ```{r}
 missingGeospatial <- filter(stationsTable2024begin, is.na(LATITUDE) | is.na(LONGITUDE))
 ```
 
+Goose creek issue:
+
+```{r}
+goose <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
+     filter(WSD_STATION_ID == '4AGSE013.78' |
+                WSD_STATION_ID == '4AGSE013.45') %>% 
+     as_tibble() %>% 
+     arrange(WSD_CYCLE, WSD_STATION_ID)
+```
 
 
 
