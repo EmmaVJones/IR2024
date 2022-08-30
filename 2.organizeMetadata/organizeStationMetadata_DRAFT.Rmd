@@ -133,19 +133,20 @@ Find all stations from the last IR cycle that should be carried forward for revi
 stations <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
   filter(WSD_CYCLE == 2022) %>% 
   as_tibble() %>% 
-  distinct(WXA_STATION_DETAIL_ID, .keep_all = T) # distinct on this variable for AU join or duplicated rows for stations
+  distinct(WXA_STATION_DETAIL_ID, .keep_all = T) %>%  # distinct on this variable for AU join or duplicated rows for stations
+  filter(WSD_STATION_ID != '4AGSE013.78') # problem site OIS needs to deal with
 
 # WQA geospatial data only seems to have citmon/non agency station locations. All other stations (DEQ) need to be queried from the WQM side of ODS
 stationsGeospatial_wqa <- pool %>% tbl(in_schema('wqa', 'Wqa_Stations_Geospatial_Data_View')) %>%
   filter(Station_Id %in% !! stations$STA_NAME) %>% #stations$WSD_STATION_ID) %>%
   as_tibble() %>% 
-  dplyr::select(Station_Id, Latitude, Longitude)
+  dplyr::select(Station_Id, Latitude, Longitude) 
 
 # WQM geospatial data for DEQ stations
 stationsGeospatial_wqm <- pool %>% tbl(in_schema('wqm', 'WQM_Sta_GIS_View')) %>% 
   filter(Station_Id %in% !! stations$WSD_STATION_ID) %>% 
   as_tibble() %>% 
-  dplyr::select(Station_Id, Latitude, Longitude)
+  dplyr::select(Station_Id, Latitude, Longitude) 
 
 # combine geospatial data into one object for easier joining
 stationsGeospatial <- bind_rows(stationsGeospatial_wqa, stationsGeospatial_wqm) %>% 
@@ -232,22 +233,171 @@ stationsTable2024begin <- bind_rows(stationsTemplate %>%
 
 ```
 
-Still missing geospatial data. Goose creek site that was moved still has wqa records that need to be fixed bc all other records of this site are gone from CEDS WQM.
+QA check for any missing geospatial data. Goose creek site that was moved still has wqa records that need to be fixed bc all other records of this site are gone from CEDS WQM.
 
 ```{r}
 missingGeospatial <- filter(stationsTable2024begin, is.na(LATITUDE) | is.na(LONGITUDE))
+
+# #Goose creek issue:
+# goose <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
+#      filter(WSD_STATION_ID == '4AGSE013.78' |
+#                 WSD_STATION_ID == '4AGSE013.45') %>% 
+#      as_tibble() %>% 
+#      arrange(WSD_CYCLE, WSD_STATION_ID)
+
+# clean up workspace
+rm(list = c('stationsFromLastCycle','missingGeospatial'))
 ```
 
-Goose creek issue:
+
+Now we need to get the same metadata for all the stations from the conventionals (and citmon) dataset this cycle. We can make our lives easier by only doing this work for new stations from the conventionals dataset (i.e. dropping all stations from our "to do list" that already have this information from our last step).
 
 ```{r}
-goose <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
-     filter(WSD_STATION_ID == '4AGSE013.78' |
-                WSD_STATION_ID == '4AGSE013.45') %>% 
-     as_tibble() %>% 
-     arrange(WSD_CYCLE, WSD_STATION_ID)
+stationsToDo <- filter(conventionals_distinct, ! FDT_STA_ID %in% stationsTable2024begin$STATION_ID)
+
+# use the same method from above with a new station list
+stations <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
+  filter(WSD_STATION_ID %in% !! stationsToDo$FDT_STA_ID) %>% # pull all data from stations identified above
+  as_tibble() %>% # get that data local before doing more complicated things than SQL wants to handle
+  # keep only the most recent record for each station by grouping and then filtering
+  group_by(WSD_STATION_ID) %>% 
+  filter(WSD_CYCLE == max(WSD_CYCLE )) %>% 
+  distinct(WXA_STATION_DETAIL_ID, .keep_all = T) %>%  # still need only 1 record per site
+  ungroup() # ungroup so the WSD_STATION_ID column doesn't come along for the ride to future steps where not necessary
+  
+# WQA geospatial data only seems to have citmon/non agency station locations. All other stations (DEQ) need to be queried from the WQM side of ODS
+stationsGeospatial_wqa <- pool %>% tbl(in_schema('wqa', 'Wqa_Stations_Geospatial_Data_View')) %>%
+  filter(Station_Id %in% !! stations$STA_NAME) %>% #stations$WSD_STATION_ID) %>%
+  as_tibble() %>% 
+  dplyr::select(Station_Id, Latitude, Longitude) 
+
+# WQM geospatial data for DEQ stations
+stationsGeospatial_wqm <- pool %>% tbl(in_schema('wqm', 'WQM_Sta_GIS_View')) %>% 
+  filter(Station_Id %in% !! stations$WSD_STATION_ID) %>% 
+  as_tibble() %>% 
+  dplyr::select(Station_Id, Latitude, Longitude) 
+
+# combine geospatial data into one object for easier joining
+stationsGeospatial <- bind_rows(stationsGeospatial_wqa, stationsGeospatial_wqm) %>% 
+  distinct(Station_Id, .keep_all = T)
+
+AU <- pool %>% tbl(in_schema('wqa', '[WQA 305b]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
+  filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
+  as_tibble()
+
+stationDetails <- pool %>% tbl(in_schema('wqa', '[WQA Station Parameters Pivot]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
+  filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
+  as_tibble()
+
+stationType <- pool %>% tbl(in_schema('wqa', '[WQA Station Detail Types]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
+  filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
+  as_tibble()
+
+stationsAU <- left_join(stations, AU, by = c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) %>% 
+  left_join(stationType, by =  c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) %>% 
+  left_join(stationsGeospatial, by = c('STA_NAME' = 'Station_Id')) %>% # Make sure you join on STA_NAME and not WSD_STATION_ID here!!!
+  left_join(stationDetails,  by = c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) %>% 
+  # reorganize to fit the data template
+  dplyr::select(STATION_ID = STA_NAME,  #### OR COULD USE WSD_STATION_ID
+                ID305B_1 = `ID305B 1`,
+                ID305B_2 = `ID305B 2`,
+                ID305B_3 = `ID305B 3`,
+                ID305B_4 = `ID305B 4`,
+                ID305B_5 = `ID305B 5`,
+                ID305B_6 = `ID305B 6`,
+                ID305B_7 = `ID305B 7`,
+                ID305B_8 = `ID305B 8`,
+                ID305B_9 = `ID305B 9`,
+                ID305B_10 = `ID305B 10`,
+                WATER_TYPE = WWT_WATER_TYPE_DESC,
+                SALINITY = WSC_DESCRIPTION,
+                LACUSTRINE = WSD_LAC_ZONE_YN,
+                REGION = STA_REGION,
+                TYPE_1 = `Station Type 1`,
+                TYPE_2 = `Station Type 2`,
+                TYPE_3 = `Station Type 3`,
+                TYPE_4 = `Station Type 4`,
+                TYPE_5 = `Station Type 5`,
+                TYPE_6 = `Station Type 6`,
+                TYPE_7 = `Station Type 7`,
+                TYPE_8 = `Station Type 8`,
+                TYPE_9 = `Station Type 9`,
+                TYPE_10 = `Station Type 10`,
+                LATITUDE = Latitude,
+                LONGITUDE = Longitude,
+                WATERSHED = STA_WATERSHED,
+                VAHU6 = STA_VA_HU6) %>% 
+  mutate(REGION = case_when(REGION == 'NVRO' ~ 'NRO',
+                            REGION == 'WCRO' ~ 'BRRO',
+                            TRUE~ as.character(REGION))) %>% 
+  dplyr::select(any_of(names(stationsTemplate)))
+
+# Smash in with the rest of the sites already organized
+stationsTable2024begin <- bind_rows(stationsTable2024begin,
+                                    stationsAU) 
+
+# clean up workspace
+rm(list = c('stations', 'stationDetails', 'stationsAU',
+            'AU', 'stationType', 'stationsGeospatial_wqa', 'stationsGeospatial_wqm'))
+
 ```
 
+What stations do we have left? These are stations that are in the conventionals dataset but don't have any historical records in CEDS WQA. We will reorganize them into the tempate format we need and add AU information from the pinned data on the R server.
+
+```{r}
+stationsToDo <- filter(conventionals_distinct, ! FDT_STA_ID %in% stationsTable2024begin$STATION_ID) %>% 
+  # glean what we can to populate the data template
+  dplyr::select(STATION_ID = FDT_STA_ID,
+                WATER_TYPE = STA_LV1_CODE,
+                TYPE_1 = STA_LV2_CODE,
+                LATITUDE = Latitude,
+                LONGITUDE = Longitude) %>% 
+  mutate(# throw in a flag for swamp but still need to force it to a waterbody type the assessment tools understand
+         TYPE_1 =  case_when(WATER_TYPE == 'SWAMP' ~ paste(TYPE_1, 'SWAMP', sep = ': '),
+                             TRUE~ as.character(TYPE_1)),
+         WATER_TYPE = ifelse(WATER_TYPE == 'SWAMP', NA, WATER_TYPE)) %>% 
+  dplyr::select(any_of(names(stationsTemplate))) %>% 
+  # Spatially join info we don't trust from CEDS WQM, first turn this into a spatial object
+  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), 
+               remove = F, # don't remove these lat/lon cols from df
+               crs = 4326) # add projection, needs to be geographic for now bc entering lat/lng
+
+# get pinned AU data from the R server
+AUlookup <- pin_get('ejones/AUlookup', board = 'rsconnect') %>% 
+  filter(CYCLE == 2024) # only get sites attributed by assessors for this cycle
+
+# get spatial data from the R server
+vahu6 <- st_as_sf(pin_get("ejones/AssessmentRegions_VA84_basins", board = "rsconnect"))
+dcr11 <- st_as_sf(pin_get("ejones/dcr11", board = "rsconnect"))
+
+# Spatially join info we don't trust from CEDS WQM
+stationsLeft <- st_join(stationsToDo, vahu6) %>% 
+  dplyr::select(STATION_ID:LONGITUDE, VAHU6, REGION = ASSESS_REG) %>% 
+  st_join(dcr11) %>% 
+  dplyr::select(STATION_ID:REGION, WATERSHED = ANCODE) %>% 
+  st_drop_geometry() %>% # turn back into tibble
+  left_join(dplyr::select(AUlookup, FDT_STA_ID, ID305B_1 ), by = c('STATION_ID' = 'FDT_STA_ID'))
+
+# smash into template
+stationsTable2024begin <- bind_rows(stationsTable2024begin,
+                                     stationsLeft)
+
+# clean up workspace
+rm(list = c('stationsLeft', 'stationsToDo', 'stationsTemplate',
+            'stationsGeospatial', 'dcr11', 'vahu6', 'AUlookup'))
+```
+
+Now let's pin this to the R server so others can use the data.
+
+```{r}
+pin(stationsTable2024begin, description = 'DRAFT stationsTable2024begin for IR2024 development', board = 'rsconnect')
+```
+
+
+
+
+
+Now add in new 2024IR data from conventionals (and eventually citmon)
 
 
 ```{r}
