@@ -172,14 +172,16 @@ stationsAU <- left_join(stations, AU, by = c('WXA_STATION_DETAIL_ID' = 'Station 
   left_join(stationsGeospatial, by = c('STA_NAME' = 'Station_Id')) %>% # Make sure you join on STA_NAME and not WSD_STATION_ID here!!!
   left_join(stationDetails,  by = c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) 
 
-# actual analysis
+# actual analysis, find all stations with impaired parameters
 impairedStations <- stationsAU %>% 
   filter_at(.vars = vars(contains("Status Code")),
             .vars_predicate = any_vars(str_detect(., 'IM')))
+# Cast a wide net: string search for any stations that were carried over from more previous cycles by looking for 
+#  variations of the phrase "Carry" in the station comment field
 carryoverStations <- stationsAU %>% 
   filter(str_detect(WSD_COMMENTS, 'carr'))
 
-# combine and remove duplicates
+# combine lists and remove duplicates
 stationsFromLastCycle <- bind_rows(impairedStations, carryoverStations) %>% 
   distinct(WXA_STATION_DETAIL_ID, .keep_all = T)
 
@@ -250,7 +252,7 @@ rm(list = c('stationsFromLastCycle','missingGeospatial'))
 ```
 
 
-Now we need to get the same metadata for all the stations from the conventionals (and citmon) dataset this cycle. We can make our lives easier by only doing this work for new stations from the conventionals dataset (i.e. dropping all stations from our "to do list" that already have this information from our last step).
+Now we need to get the same metadata for all the stations from the conventionals (and citmon/non agency) dataset from the current cycle. We can make our lives easier by only doing this work for new stations from the conventionals dataset (i.e. dropping all stations from our "to do list" that already have this information from our last step).
 
 ```{r}
 stationsToDo <- filter(conventionals_distinct, ! FDT_STA_ID %in% stationsTable2024begin$STATION_ID)
@@ -342,7 +344,7 @@ rm(list = c('stations', 'stationDetails', 'stationsAU',
 
 ```
 
-What stations do we have left? These are stations that are in the conventionals dataset but don't have any historical records in CEDS WQA. We will reorganize them into the tempate format we need and add AU information from the pinned data on the R server.
+So what stations do we have left? These are stations that are in the conventionals dataset but don't have any historical records in CEDS WQA. We will reorganize them into the template format we that need and add AU information from the pinned data on the R server.
 
 ```{r}
 stationsToDo <- filter(conventionals_distinct, ! FDT_STA_ID %in% stationsTable2024begin$STATION_ID) %>% 
@@ -376,7 +378,7 @@ stationsLeft <- st_join(stationsToDo, vahu6) %>%
   st_join(dcr11) %>% 
   dplyr::select(STATION_ID:REGION, WATERSHED = ANCODE) %>% 
   st_drop_geometry() %>% # turn back into tibble
-  left_join(dplyr::select(AUlookup, FDT_STA_ID, ID305B_1 ), by = c('STATION_ID' = 'FDT_STA_ID'))
+  left_join(dplyr::select(AUlookup, FDT_STA_ID, ID305B_1 ), by = c('STATION_ID' = 'FDT_STA_ID')) # join in AU info from the pinned AUlookup dataset (populated by assessors in metadata attribution app)
 
 # smash into template
 stationsTable2024begin <- bind_rows(stationsTable2024begin,
@@ -394,47 +396,59 @@ pin(stationsTable2024begin, description = 'DRAFT stationsTable2024begin for IR20
 ```
 
 
+### PCB data
+
+Will likely need to be reorganized when it is receieved.
+
+scripts from last time
+
+```{r PCB data}
+# PCB <- read_excel('data/2022 IR PCBDatapull.xlsx', sheet = '2022IR Datapull')# had to manually combine date and time fields to avoid date time issues
+# source('PCBdataRework.R')
+# 
+# # be nice and save this as a sheet in dataset for others to use
+# write.csv(PCB, 'data/PCBfixed.csv', row.names = F) # dont write out a character NA in csv
+
+```
 
 
+### Fish Tissue Data
 
-Now add in new 2024IR data from conventionals (and eventually citmon)
+Fish tissue is a disaster. I ended up combining Gabe's final yearly products by hand in C:\HardDriveBackup\Assessment\IR2022\Fish Tissue\2015_2020_fish_tissue_data_WQA\FishTissuePCBsMetals_EVJ.xlsx
 
+2020 data still needs to be hand combined. This is not a long term solution but the VIMS raw data Gabe sent does not include species information so there is a good amount of hand work going on somewhere in his methods that we need access to to join in.
 
 ```{r}
-station <- '4AROA167.34'
+#source('fishTissueCleaning.R')
+```
 
-test <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
-  filter(WSD_STATION_ID %in% !! station ) %>% #& #
-           #between(as.Date(Fdt_Date_Time), "2014-12-31", "2020-12-31") &
-          # !is.na(Fdt_Secchi_Depth)) %>% # x >= left & x <= right
-  #dplyr::select(Fdt_Sta_Id, Fdt_Date_Time, Fdt_Depth, Fdt_Secchi_Depth) %>%
-  as_tibble()
+## Pin all data to the server so it can be used by apps/people
+
+
+Once the data is organized, we need to pin data used in assessment prerequisite steps to be available to the assessors and to the assessment scripts. 
+
+Repeat as necessary in order to access the most recent data available for assessment.
+
+```{r pin data}
+
+stations2020IR_sf_final <- lastCycleStation_sf
+
+
+# 2022 final metals data from Roger (not assessed)
+WCmetals_2022IRfinal <- read_excel('data/final2022data/CEDSWQM/WATER_METALS_2022_20210201.xlsx')
+Smetals_2022IRfinal <- read_excel('data/final2022data/CEDSWQM/SEDIMENT_2022_20210201.xlsx')
+
+# Pin data
+pin(conventionals2022IRfinalWithSecchi, description = "Final 2022IR conventionals dataset from Roger Stewart", board = "rsconnect")
+pin(conventionals_distinct_final, description = "Final 2022IR conventionals distinct stations from Roger Stewart", board = "rsconnect")
+
+
+
+pin(stations2020IR_sf_final, description = "Final 2020IR stations from Cleo Baker", board = "rsconnect")
+
+pin(WCmetals_2022IRfinal, description = "FINAL 2022IR water column metals data from Roger Stewart", board = "rsconnect")
+pin(Smetals_2022IRfinal, description = "FINAL 2022IR sediment metals data from Roger Stewart", board = "rsconnect")
+
 ```
 
 
-
-
-```{r}
-#station <- '4AROA167.34'
-
-stationSecchiDepth <- pool %>% tbl(in_schema('wqm', "Wqm_Field_Data_View")) %>%
-  filter(Fdt_Sta_Id %in% !! conventionals_distinct$FDT_STA_ID & #station & #
-           between(as.Date(Fdt_Date_Time), "2014-12-31", "2020-12-31") &
-           !is.na(Fdt_Secchi_Depth)) %>% # x >= left & x <= right
-  dplyr::select(Fdt_Sta_Id, Fdt_Date_Time, Fdt_Depth, Fdt_Secchi_Depth) %>%
-  as_tibble() %>%
-  mutate(Date = as.Date(Fdt_Date_Time)) %>%
-    dplyr::select(FDT_STA_ID = Fdt_Sta_Id, Date, FDT_DEPTH = Fdt_Depth, Fdt_Secchi_Depth) # name conventionals format
-  #mutate(RMK_SECCHI_DEPTH = as.character(NA), LEVEL_SECCHI_DEPTH = as.factor(NA)) 
-```
-
-
-
-
-
-This is basically the best we can do for now given that 2022 spatial data is still not final as of late March 2021. This is just to get the assessors started, and Cleo has assured that most of this is final final information.
-
-```{r last cycle stations}
-lastCycleStation_sf <- st_read('data/GIS/2020_wqms.shp') %>%
-  mutate(STATION_ID = toupper(STATION_ID)) # fix messed up stationID names to prevent joining issues
-```
