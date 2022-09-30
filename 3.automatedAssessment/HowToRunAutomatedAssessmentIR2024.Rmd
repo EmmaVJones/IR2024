@@ -68,16 +68,16 @@ stations2020IR <- pin_get("stations2020IR-sf-final", board = "rsconnect")
 WCmetals <- pin_get("WCmetals-2022IRfinal",  board = "rsconnect")
 Smetals <- pin_get("Smetals-2022IRfinal",  board = "rsconnect")
 
-markPCB <- read_excel('data/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ')
-fishPCB <- read_excel('data/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs')
-fishMetals <- read_excel('data/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals')
+markPCB <- read_excel('data/oldData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ')
+fishPCB <- read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs')
+fishMetals <- read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals')
 ```
 
 
 ## Bring in Station Table from two previous assessments 
 
 ```{r stations table 2018}
-historicalStationsTable2 <- read_excel('data/tbl_ir_mon_stations2018IRfinal.xlsx')
+historicalStationsTable2 <- read_excel('data/oldData/tbl_ir_mon_stations2018IRfinal.xlsx')
 ```
 
 
@@ -95,7 +95,9 @@ The following steps complete the automated assessment.
 
 ## Bring in user station table data
 
-This information communicates to the scripts which stations should be assessed and where they should be organized (AUs). It also has data from the last cycle to populate the historical station information table in the application
+This information communicates to the scripts which stations should be assessed and where they should be organized (AUs). It also has data from the last cycle to populate the historical station information table in the application.
+
+**To Note: The AU assignments in this table are valid as of the start of the assessment process. For any AU splits/reassignments, the assessors control that through local (.csv) copies of the output of this script that is uploaded to the relevant Assessment Application on the Connect Server (and subsequently uploaded to CEDS via the bulk data upload tool).**
 
 ```{r stationTable, echo = FALSE}
 stationTable <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect')
@@ -105,41 +107,58 @@ stationTable <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect')
 
 ```{r bulk upload template}
 stationsTemplate <- stationTable[0,] %>% 
+  mutate(across(matches(c("EXC", "SAMP")), as.numeric)) %>% 
   # new addition that breaks station table upload template but very helpful for assessors
   mutate(BACTERIADECISION = as.character(NA),
          BACTERIASTATS = as.character(NA),
-         `Date Last Sampled` = as.character(NA))
+         `Date Last Sampled` = as.character(NA)) 
 
 ```
 
 ## Attach WQS information
 
 
-Pull pinned WQS info saved on server and join to station table. Identify if any stations are missing WQS. 
+Pull pinned WQS info saved on server. Then perform a series of data manipulation steps that:
+
+1. Join WQS to station table by StationID
+2. Create a new variable that will correct for Class II pH differences for Tidal Waters
+3. Join actual WQS critera (object name WQSvalues) to each StationID
+4. Perform a little data cleanup to lose columns unnecessary for future steps
+5. Join station ecoregion information (for benthic analyses)
+6. Standardize lake names  (to match 187 lake names for future joining of criteria)
+    + Some problematic stations need manual steps to attach the correct lake name
+7. Join lake nutrient criteria to individual stations
+    + Lake Drummond requires some extra manual work
+8. Rearrange data schema to more useful format after all previous joins
+9. Correct units for nutrient criteria to match conventionals data format (ug/L to mg/L)
+
 
 ```{r pull WQS info}
 WQSlookup <- pin_get("WQSlookup-withStandards",  board = "rsconnect")
 
-
-stationTable <- left_join(stationTable, WQSlookup, by = c('STATION_ID'='StationID')) %>%
-  mutate(CLASS_BASIN = paste(CLASS,substr(BASIN, 1,1), sep="_")) %>%
-  mutate(CLASS_BASIN = ifelse(CLASS_BASIN == 'II_7', "II_7", as.character(CLASS))) %>%
+stationTable <- left_join(stationTable, WQSlookup, by = c('STATION_ID' = 'StationID')) %>% # (1)
   # Fix for Class II Tidal Waters in Chesapeake (bc complicated DO/temp/etc standard)
-  left_join(WQSvalues, by = 'CLASS_BASIN') %>%
-  dplyr::select(-c(CLASS.y,CLASS_BASIN)) %>%
-  rename('CLASS' = 'CLASS.x') %>%
-  left_join(dplyr::select(WQMstationFull, WQM_STA_ID, EPA_ECO_US_L3CODE, EPA_ECO_US_L3NAME) %>%
+  mutate(CLASS_BASIN = paste(CLASS,substr(BASIN, 1,1), sep="_")) %>% # (2)
+  mutate(CLASS_BASIN = ifelse(CLASS_BASIN == 'II_7', "II_7", as.character(CLASS))) %>% # (2)
+  # Join actual WQS criteria to each StationID
+  left_join(WQSvalues, by = 'CLASS_BASIN') %>% # (3)
+  # data cleanup
+  dplyr::select(-c(CLASS.y,CLASS_BASIN)) %>% # (4)
+  rename('CLASS' = 'CLASS.x') %>% # (4)
+  # Join station ecoregion information (for benthic analyses)
+  left_join(dplyr::select(WQMstationFull, WQM_STA_ID, EPA_ECO_US_L3CODE, EPA_ECO_US_L3NAME) %>% #(5)
               distinct(WQM_STA_ID, .keep_all = TRUE), by = c('STATION_ID' = 'WQM_STA_ID')) %>%
-  # last cycle had code to fix Class II Tidal Waters in Chesapeake (bc complicated DO/temp/etc standard) but not sure if necessary
-  lakeNameStandardization() %>% # standardize lake names
+  # Standardize lake names (to match 187 lake names for future joining of criteria)
+  lakeNameStandardization() %>% # standardize lake names (6)
   
    
-  # extra special step
+  # extra special step (6)
   mutate(Lake_Name = case_when(STATION_ID %in% c('2-TRH000.40') ~ 'Thrashers Creek Reservoir',
                                STATION_ID %in% c('2-LSL000.16') ~ 'Lone Star Lake F (Crystal Lake)',
                                STATION_ID %in% c('2-LSL000.04') ~ 'Lone Star Lake G (Crane Lake)',
                                STATION_ID %in% c('2-LSL000.20') ~ 'Lone Star Lake I (Butler Lake)',
-                               STATION_ID %in% c('2-NWB002.93','2-NWB004.67', '2-NWB006.06') ~ 'Western Branch Reservoir',
+                               STATION_ID %in% c('2-NWB002.93','2-NWB004.67',
+                                                 '2-NWB006.06') ~ 'Western Branch Reservoir',
                                STATION_ID %in% c('2-LDJ000.60') ~ 'Lake Nottoway (Lee Lake)',
                                TRUE ~ as.character(Lake_Name))) %>%
   
@@ -147,68 +166,70 @@ stationTable <- left_join(stationTable, WQSlookup, by = c('STATION_ID'='StationI
   #mutate(Lakes_187B = case_when(STATION_ID == '1BNTH043.48' ~ 'y',
   #                              TRUE ~ as.character(Lakes_187B))) %>% 
 
-  
+  # Join lake nutrient criteria to individual stations
   left_join(lakeNutStandards %>% 
               mutate(Lakes_187B = 'y'),  # special step to make sure the WQS designation for 187 are correct even when not
-            by = c('Lake_Name')) %>%
+            by = c('Lake_Name')) %>% # (7)
   # lake drummond special standards
   mutate(Lakes_187B = ifelse(is.na(Lakes_187B.y ), Lakes_187B.x, Lakes_187B.y), 
     `Chlorophyll a (ug/L)` = case_when(Lake_Name %in% c('Lake Drummond') ~ 35,
                                             TRUE ~ as.numeric(`Chlorophyll a (ug/L)`)),
          `Total Phosphorus (ug/L)` = case_when(Lake_Name %in% c('Lake Drummond') ~ 40,
-                                               TRUE ~ as.numeric(`Total Phosphorus (ug/L)`))) %>% 
-  dplyr::select(STATION_ID:StreamType, Lakes_187B, `Description Of Waters`:`Total Phosphorus (ug/L)`)%>% 
+                                               TRUE ~ as.numeric(`Total Phosphorus (ug/L)`))) %>% # (7)
+  dplyr::select(STATION_ID:StreamType, Lakes_187B, `Description Of Waters`:`Total Phosphorus (ug/L)`) %>% # (8)
   # match lake limit to TP data unit
-  mutate(`Total Phosphorus (mg/L)` = `Total Phosphorus (ug/L)` / 1000)
+  mutate(`Total Phosphorus (mg/L)` = `Total Phosphorus (ug/L)` / 1000) # (9)
 
 
-
+# Identify stations that are missing WQS
 missingWQS <- filter(stationTable, is.na(CLASS))
 ```
 
 
-We only want to run riverine methods on riverine stations right now, so drop all stations that have lake AU designations
+We only want to run riverine methods on riverine stations right now, so identify all stations that have lake AU designations. We will use this information later in the assessment analysis.
 
-```{r}
+```{r identify lake stations}
 lakeStations <- filter_at(stationTable,
                           .vars = vars(contains("ID305B")),
                           .vars_predicate = any_vars(str_detect(., 'L_')))
 
-# # make sure all 187 lakes have chla and tp standards
+# QA check: make sure all 187 lakes have chla and tp standards
 # lakeStationsImportant <- dplyr::select(lakeStations, STATION_ID:ID305B_3, NUT_TP_EXC:NUT_CHLA_STAT, WQS_ID, GNIS_Name, WATER_NAME, Lakes_187B, Lake_Name:`Total Phosphorus (ug/L)`) %>%
 #   filter(!is.na(WQS_ID))
 
 
 ```
 
-And drop estuarine stations as well.
+<!-- And drop estuarine stations as well. -->
 
-```{r}
-estuarineStations <- filter_at(stationTable,
-                          .vars = vars(contains("ID305B")),
-                          .vars_predicate = any_vars(str_detect(., 'E_')))
-bothTypesE <- filter_at(estuarineStations,
-                          .vars = vars(contains("ID305B")),
-                          .vars_predicate = any_vars(str_detect(., 'R_'))) 
-#View(dplyr::select(stationTable, STATION_ID, ID305B_1, WQS_ID, everything()))
+<!-- ```{r} -->
+<!-- estuarineStations <- filter_at(stationTable, -->
+<!--                           .vars = vars(contains("ID305B")), -->
+<!--                           .vars_predicate = any_vars(str_detect(., 'E_'))) -->
+<!-- bothTypesE <- filter_at(estuarineStations, -->
+<!--                           .vars = vars(contains("ID305B")), -->
+<!--                           .vars_predicate = any_vars(str_detect(., 'R_')))  -->
+<!-- #View(dplyr::select(stationTable, STATION_ID, ID305B_1, WQS_ID, everything())) -->
 
-# filter out estuarine stations for analysis
-# stationTable <- filter(stationTable, ! STATION_ID %in% estuarineStations$STATION_ID) %>%
-#   bind_rows(bothTypesE) # add northern station back in to be safe
-
-
-# for running only a few select sites
-# stationTable1 <- stationTable
-# stationTable <- filter(stationTable, str_detect(STATION_ID, '7-POQ' ))
-```
+<!-- # filter out estuarine stations for analysis -->
+<!-- # stationTable <- filter(stationTable, ! STATION_ID %in% estuarineStations$STATION_ID) %>% -->
+<!-- #   bind_rows(bothTypesE) # add northern station back in to be safe -->
 
 
+<!-- # for running only a few select sites -->
+<!-- # stationTable1 <- stationTable -->
+<!-- # stationTable <- filter(stationTable, str_detect(STATION_ID, '7-POQ' )) -->
+<!-- ``` -->
 
-# steps
-go through conventionals one station at a time, join stationTable, analyze by functions, report in WQA CEDS template
 
 
-```{r}
+# Automated Assessment Steps
+
+Finally, we are ready to analyze some data!  Go through conventionals one station at a time, join stationTable, analyze by functions, report in WQA CEDS template
+
+
+```{r Automated Assessment}
+# make placeholder objects to store data results
 stationTableResults <- stationsTemplate 
 # save ammonia results (based on default assessment information) for use in app to speed rendering
 ammoniaAnalysis <- tibble()
@@ -218,7 +239,7 @@ ammoniaAnalysis <- tibble()
 startTime <- Sys.time()
 
 # loop over all sites, not super efficient but get the job done in easy to follow format
-for(i in 1:nrow(stationTable)){
+for(i in 15:25){#nrow(stationTable)){
 #i = 1
   print(paste('Assessing station', i, 'of', nrow(stationTable), sep=' '))
 
