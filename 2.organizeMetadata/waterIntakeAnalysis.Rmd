@@ -1,0 +1,114 @@
+---
+title: "Water Intake Site Identification"
+author: "Emma Jones"
+date: "10/11/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(sf)
+library(pins)
+library(config)
+
+# get configuration settings
+conn <- config::get("connectionSettings")
+
+# use API key to register board
+board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_KEY"),
+                          server = conn$CONNECT_SERVER)#Sys.getenv("CONNECT_SERVER"))
+
+```
+
+
+This script shows the process for identifying all unique stations in an assessment window within distances of drinking water intakes for assessment purposes. This is important to know before an assessment so we can flag the station in the assessment app for assessors to consider more deeply.
+
+```{r unique sites}
+conventionals_distinct <- pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect') %>% 
+  filter(!is.na(Latitude) | !is.na(Longitude)) %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"), 
+               remove = F, # don't remove these lat/lon cols from df
+               crs = 4326) # add projection, needs to be geographic for now bc entering lat/lng
+
+```
+
+Bring in water intake layer from GIS REST service
+
+```{r intakes}
+library(httr)
+library(sf)
+url <- parse_url("https://gis.deq.virginia.gov/arcgis/rest/services/staff")
+url$path <- paste(url$path, "VDH_Data/MapServer/0/query", sep = "/")
+url$query <- list(where = "OBJECTID > 0",
+                  outFields = "",
+                  returnGeometry = "true",
+                  f = "geojson")
+request <- build_url(url)
+VDHintakes <- st_read(request)
+st_crs(VDHintakes)
+```
+
+Transform intake layer to so we can buffer by meters
+
+```{r transform}
+VDHintakes <- st_transform(VDHintakes, '+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs')
+st_crs(VDHintakes)
+```
+
+
+Buffer intake points. 
+
+```{r intake buffer}
+VDHintakesBuffer500m <- st_buffer(VDHintakes, dist = 500) %>%
+    mutate(bufferWidth = 'Site within 500m VDH Intake Buffer') %>% 
+  st_transform(st_crs(conventionals_distinct)) # transform back to desired crs
+
+# how to quickly check out results
+#library(mapview)
+#mapview(VDHintakesBuffer500m)
+```
+
+
+Now identify stations within said buffer 
+
+```{r intersect and review}
+sites500m <- st_intersection(conventionals_distinct, VDHintakesBuffer500m)
+
+#mapview(VDHintakesBuffer500m) + mapview(sites500m)
+```
+
+and visually explore results.
+
+```{r}
+library(leaflet)
+library(inlmisc)
+
+
+CreateWebMap(maps = c("Topo","Imagery","Hydrography"), collapsed = TRUE,
+             options= leafletOptions(zoomControl = TRUE,minZoom = 5, maxZoom = 20,
+                                     preferCanvas = TRUE)) %>%
+  setView(-79.1, 37.7, zoom=7)  %>%
+  addCircleMarkers(data = sites500m, color='gray', fillColor='gray', radius = 4,
+                   fillOpacity = 0.8,opacity=0.8,weight = 2,stroke=T, group="IR2024 sites within 500m VDH intake buffer",
+                   label = ~FDT_STA_ID)  %>% 
+    addPolygons(data= VDHintakesBuffer500m,  color = 'black', weight = 1,
+              fillColor= 'blue', fillOpacity = 0.5,stroke=0.1,
+              group="VHD intakes buffered 500m", label = ~sysname) %>% 
+  addLayersControl(baseGroups=c("Topo","Imagery","Hydrography"),
+                   overlayGroups = c("IR2024 sites within 500m VDH intake buffer","VHD intakes buffered 500m"),
+                   options=layersControlOptions(collapsed=T),
+                   position='topleft')
+
+```
+
+Tabular results.
+
+```{r}
+DT::datatable(sites500m %>% st_drop_geometry(), rownames = F, extensions = 'Buttons',
+              options = list(dom = 'Bt', scrollX= TRUE, scrollY = '300px',
+                             pageLength = nrow(sites500m),
+                             buttons=list('copy','csv'))) 
+```
+

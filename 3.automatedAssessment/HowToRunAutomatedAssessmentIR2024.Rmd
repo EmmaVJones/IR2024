@@ -128,7 +128,7 @@ Pull pinned WQS info saved on server. Then perform a series of data manipulation
 6. Standardize lake names  (to match 187 lake names for future joining of criteria)
     + Some problematic stations need manual steps to attach the correct lake name
 7. Join lake nutrient criteria to individual stations
-    + Lake Drummond requires some extra manual work
+    + Lake Drummond requires some extra manual work per hh special standard https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section310/
 8. Rearrange data schema to more useful format after all previous joins
 9. Correct units for nutrient criteria to match conventionals data format (ug/L to mg/L)
 
@@ -172,7 +172,8 @@ stationTable <- left_join(stationTable, WQSlookup, by = c('STATION_ID' = 'Statio
             by = c('Lake_Name')) %>% # (7)
   # lake drummond special standards
   mutate(Lakes_187B = ifelse(is.na(Lakes_187B.y ), Lakes_187B.x, Lakes_187B.y), 
-    `Chlorophyll a (ug/L)` = case_when(Lake_Name %in% c('Lake Drummond') ~ 35,
+         # dd. For Lake Drummond, located within the boundaries of Chesapeake and Suffolk in the Great Dismal Swamp, chlorophyll a shall not exceed 35 µg/L and total phosphorus shall not exceed 40 µg/L at a depth of one meter or less. https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section310/
+         `Chlorophyll a (ug/L)` = case_when(Lake_Name %in% c('Lake Drummond') ~ 35,
                                             TRUE ~ as.numeric(`Chlorophyll a (ug/L)`)),
          `Total Phosphorus (ug/L)` = case_when(Lake_Name %in% c('Lake Drummond') ~ 40,
                                                TRUE ~ as.numeric(`Total Phosphorus (ug/L)`))) %>% # (7)
@@ -245,8 +246,11 @@ for(i in 15:25){#nrow(stationTable)){
 
   # pull one station data
   stationData <- filter(conventionals, FDT_STA_ID %in% stationTable$STATION_ID[i]) %>%
+    #stationData <- filter(conventionals, FDT_STA_ID == "4ATKR000.08") %>%# test a specific station
     left_join(stationTable, by = c('FDT_STA_ID' = 'STATION_ID')) %>%
+    # Special Standards Correction step. This is done on the actual data bc some special standards have temporal components
     pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
+    temperatureSpecialStandardsCorrection() %>% # correct temperature special standards where necessary
     # special lake steps
     {if(stationTable$STATION_ID[i] %in% lakeStations$STATION_ID)
       suppressWarnings(suppressMessages(

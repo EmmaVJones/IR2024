@@ -208,6 +208,17 @@ tempExceedances <- function(x){
 # tempExceedances(x) %>%
 #  quickStats('TEMP')
 
+# temperature special standards adjustment function
+# this is applied to the actual monitoring data because there is a temporal component to these criteria
+temperatureSpecialStandardsCorrection <- function(x){
+  # ee. Maximum temperature for these seasonally stockable trout waters is 26°C and applies May 1 through October 31. https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section310/
+  # ff. Maximum temperature for these seasonally stockable trout waters is 28°C and applies May 1 through October 31. https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section310/
+  # hh. Maximum temperature for these seasonally stockable trout waters is 31°C and applies May 1 through October 31. https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section310/
+  mutate(x, `Max Temperature (C)` = case_when(str_detect(as.character(SPSTDS), 'ee') & month(FDT_DATE_TIME) %in% 5:10 ~ 26,
+                                              str_detect(as.character(SPSTDS), 'ff') & month(FDT_DATE_TIME) %in% 5:10 ~ 28,
+                                              str_detect(as.character(SPSTDS), 'hh') & month(FDT_DATE_TIME) %in% 5:10 ~ 31,
+                                              TRUE ~ `Max Temperature (C)`)) 
+}
 
 
 # Minimum DO Exceedance function
@@ -260,13 +271,10 @@ DO_Assessment_DailyAvg <- function(x){
 
 # pH range Exceedance Function
 pHSpecialStandardsCorrection <- function(x){
-  z <- filter(x, str_detect(as.character(SPSTDS), '6.5-9.5'))
-  if(nrow(z) > 0){
-    return(
-      mutate(x, `pH Min` = case_when(str_detect(as.character(SPSTDS), '6.5-9.5') ~ 6.5, TRUE ~ `pH Min`),
-             `pH Max` = case_when(str_detect(as.character(SPSTDS), '6.5-9.5') ~ 9.5, TRUE ~ `pH Max`)))
-    }else{return(x)}
+  mutate(x, `pH Min` = case_when(str_detect(as.character(SPSTDS), '6.5-9.5') ~ 6.5, TRUE ~ `pH Min`),
+         `pH Max` = case_when(str_detect(as.character(SPSTDS), '6.5-9.5') ~ 9.5, TRUE ~ `pH Min`))
 }
+  
 
 pHExceedances <- function(x){
   # special step for lake stations, remove samples based on lake assessment guidance 
