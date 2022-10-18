@@ -61,22 +61,22 @@ st_crs(VDHintakes)
 Buffer intake points. 
 
 ```{r intake buffer}
-VDHintakesBuffer500m <- st_buffer(VDHintakes, dist = 500) %>%
-    mutate(bufferWidth = 'Site within 500m VDH Intake Buffer') %>% 
+VDHintakesBuffer250m <- st_buffer(VDHintakes, dist = 250) %>%
+    mutate(bufferWidth = 'Site within 250m VDH Intake Buffer') %>% 
   st_transform(st_crs(conventionals_distinct)) # transform back to desired crs
 
 # how to quickly check out results
 #library(mapview)
-#mapview(VDHintakesBuffer500m)
+#mapview(VDHintakesBuffer100m)
 ```
 
 
 Now identify stations within said buffer 
 
 ```{r intersect and review}
-sites500m <- st_intersection(conventionals_distinct, VDHintakesBuffer500m)
+sites250m <- st_intersection(conventionals_distinct, VDHintakesBuffer250m)
 
-#mapview(VDHintakesBuffer500m) + mapview(sites500m)
+#mapview(VDHintakesBuffer100m) + mapview(sites100m)
 ```
 
 and visually explore results.
@@ -90,14 +90,14 @@ CreateWebMap(maps = c("Topo","Imagery","Hydrography"), collapsed = TRUE,
              options= leafletOptions(zoomControl = TRUE,minZoom = 5, maxZoom = 20,
                                      preferCanvas = TRUE)) %>%
   setView(-79.1, 37.7, zoom=7)  %>%
-  addCircleMarkers(data = sites500m, color='gray', fillColor='gray', radius = 4,
-                   fillOpacity = 0.8,opacity=0.8,weight = 2,stroke=T, group="IR2024 sites within 500m VDH intake buffer",
+  addCircleMarkers(data = sites100m, color='gray', fillColor='gray', radius = 4,
+                   fillOpacity = 0.8,opacity=0.8,weight = 2,stroke=T, group="IR2024 sites within 100m VDH intake buffer",
                    label = ~FDT_STA_ID)  %>% 
-    addPolygons(data= VDHintakesBuffer500m,  color = 'black', weight = 1,
+    addPolygons(data= VDHintakesBuffer100m,  color = 'black', weight = 1,
               fillColor= 'blue', fillOpacity = 0.5,stroke=0.1,
-              group="VHD intakes buffered 500m", label = ~sysname) %>% 
+              group="VHD intakes buffered 100m", label = ~sysname) %>% 
   addLayersControl(baseGroups=c("Topo","Imagery","Hydrography"),
-                   overlayGroups = c("IR2024 sites within 500m VDH intake buffer","VHD intakes buffered 500m"),
+                   overlayGroups = c("IR2024 sites within 100m VDH intake buffer","VHD intakes buffered 100m"),
                    options=layersControlOptions(collapsed=T),
                    position='topleft')
 
@@ -106,9 +106,9 @@ CreateWebMap(maps = c("Topo","Imagery","Hydrography"), collapsed = TRUE,
 Tabular results.
 
 ```{r}
-DT::datatable(sites500m %>% st_drop_geometry(), rownames = F, extensions = 'Buttons',
+DT::datatable(sites100m %>% st_drop_geometry(), rownames = F, extensions = 'Buttons',
               options = list(dom = 'Bt', scrollX= TRUE, scrollY = '300px',
-                             pageLength = nrow(sites500m),
+                             pageLength = nrow(sites100m),
                              buttons=list('copy','csv'))) 
 ```
 

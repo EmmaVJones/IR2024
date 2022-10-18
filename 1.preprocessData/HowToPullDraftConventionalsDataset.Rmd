@@ -51,11 +51,11 @@ names(conventionals2022) == names(conventionalsNew)
 conventionals2024draft <- rbind(conventionals2022, conventionalsNew) %>% 
   filter(FDT_DATE_TIME > as.Date('2017-01-01'))
 
-summary(conventionals$FDT_DATE_TIME)
+summary(conventionals2024draft$FDT_DATE_TIME)
 rm(conventionals2022); rm(conventionalsNew)
 
 # add newStations to distinctSites
-conventionals2024_distinct <- conventionals_distinct <- conventionals %>%
+conventionals2024_distinct <- conventionals2024draft %>%
   distinct(FDT_STA_ID, .keep_all = T) %>%
   # remove any data to avoid confusion
   dplyr::select(FDT_STA_ID:FDT_COMMENT, Latitude:Data_Source) %>%
@@ -67,8 +67,8 @@ rm(conventionals2022_distinct); rm(assessment)
 pin to server 
 
 ```{r}
-pin(conventionals2024draft, name = 'conventionals2024draft', description = 'Working IR2024 conventionals dataset, pulled 8/15/2022', board = 'rsconnect')
-pin(conventionals2024_distinct,  name = 'conventionals2024_distinctdraft', description = 'Working IR2024 conventionals_distinct dataset, pulled 8/15/2022', board = 'rsconnect')
+pin(conventionals2024draft, name = 'conventionals2024draft', description = 'Working IR2024 conventionals dataset, pulled 10/15/2022', board = 'rsconnect')
+pin(conventionals2024_distinct,  name = 'conventionals2024_distinctdraft', description = 'Working IR2024 conventionals_distinct dataset, pulled 10/15/2022', board = 'rsconnect')
 
 ```
 

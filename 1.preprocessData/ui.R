@@ -2,66 +2,66 @@
 shinyUI(fluidPage(theme= "yeti.css",
                   includeJqueryUI(),
                   navbarPage("Regional Assessment Metadata Validation",
-                             # navbarMenu("Assessment Unit QA",
-                             #            tabPanel("Watershed Selection",
-                             #                     h4('Assessment Unit QA'),
-                             #                     sidebarPanel(
-                             #                       selectInput('assessmentType','Assessment Type', choices = c('Riverine','Lacustrine','Estuarine')),
-                             #                       uiOutput('AUDEQregionSelection_'),
-                             #                       uiOutput('AUsubbasinSelection_'),
-                             #                       #dynamicSelectInput("DEQregionSelection", "Select DEQ Assessment Region", multiple = FALSE),
-                             #                       #dynamicSelectInput("basinSelection", "Select Major Basin", multiple = FALSE),
-                             #                       br(),
-                             #                       actionButton('begin', HTML("Begin Review With Selection <br/>(Clears Cached Results)"),class='btn-block')),
-                             #                     mainPanel(
-                             #                       leafletOutput('VAmap'),
-                             #                       br(),
-                             #                       h5(strong('Preprocessing Data Recap for Selected Region/Basin/Type Combination')),
-                             #                       fluidRow(column(4, textOutput('singleSnapSummary1')),
-                             #                                column(4, textOutput('snapTooManySummary1')),
-                             #                                column(4, textOutput('noSnapSummary1'))),
-                             #                       br(), br(), br(), # a little breathing room
-                             #                       verbatimTextOutput('test'),
-                             #                       verbatimTextOutput('test2')
-                             #                     )),
-                             #            tabPanel("Manual Review",
-                             #                     h4('Assessment Unit QA'),
-                             #                     wellPanel(
-                             #                       fluidRow(column(4, textOutput('singleSnapSummary2'),
-                             #                                       actionButton('plotSingleSnapSummary', HTML('Plot stations that snapped <br/>to 1 AU Segment'))),
-                             #                                column(4, textOutput('snapTooManySummary2'),
-                             #                                       actionButton('plotSnapTooManySummary', HTML('Plot stations that snapped <br/>to > 1 AU Segment'))),
-                             #                                column(4, textOutput('noSnapSummary2'),
-                             #                                       actionButton('plotNoSnapSummary', HTML('Plot stations that snapped <br/>to 0 AU segments'))))),
-                             #                     leafletOutput('AUmap'),
-                             #                     fluidRow(
-                             #                       actionButton('clear_allAU', 'Clear Selection', style='color: #fff; background-color: #337ab7; border-color: #2e6da4%', icon=icon('backspace')),
-                             #                       actionButton('acceptAU', 'Accept', style='color: #fff; background-color: #337ab7; border-color: #2e6da4%', icon=icon('check-circle')),
-                             #                       actionButton('changeAU', 'Manual AU Adjustment', style='color: #fff; background-color: #337ab7; border-color: #2e6da4%', icon=icon('exchange')),
-                             #                       #actionButton('checkMeOut', 'Check Me Out', style='color: #fff; background-color: #337ab7; border-color: #2e6da4%', icon=icon('exchange')),
-                             #                       actionButton('saveAU', label = "Export reviews",style='color: #fff; background-color: #228b22; border-color: #134e13')        ),
-                             #                     br(),
-                             #                     #verbatimTextOutput('testAU'),
-                             #                     
-                             #                     tabsetPanel(
-                             #                       tabPanel(strong('Original User Uploaded and Existing Stations Data'),
-                             #                                br(),
-                             #                                h5(strong('Selected Station Information')),
-                             #                                DT::dataTableOutput('selectedSiteTableAU'),
-                             #                                h5(strong('Associated AU Information')),
-                             #                                DT::dataTableOutput('associatedAUTable'),
-                             #                                br(), br(), br()),
-                             #                       tabPanel(strong('Updated Stations Data'),
-                             #                                br(),
-                             #                                fluidRow(
-                             #                                  h5(strong('Adjusted Station Data')),
-                             #                                  div(DT::dataTableOutput("adjustedStationsTableAU"), style = "font-size:80%")),
-                             #                                fluidRow(
-                             #                                  h5(strong('Manually QAed AU Information')),
-                             #                                  div(DT::dataTableOutput("associatedAUTableAUQA"), style = "font-size:80%")),
-                             #                                
-                             #                                br(), br(), br()
-                             #                       )))),
+                             navbarMenu("Assessment Unit QA",
+                                        tabPanel("Watershed Selection",
+                                                 h4('Assessment Unit QA'),
+                                                 sidebarPanel(
+                                                   selectInput('assessmentType','Assessment Type', choices = c('Riverine','Lacustrine','Estuarine')),
+                                                   uiOutput('AUDEQregionSelection_'),
+                                                   uiOutput('AUsubbasinSelection_'),
+                                                   #dynamicSelectInput("DEQregionSelection", "Select DEQ Assessment Region", multiple = FALSE),
+                                                   #dynamicSelectInput("basinSelection", "Select Major Basin", multiple = FALSE),
+                                                   br(),
+                                                   actionButton('begin', HTML("Begin Review With Selection <br/>(Clears Cached Results)"),class='btn-block')),
+                                                 mainPanel(
+                                                   leafletOutput('VAmap'),
+                                                   br(),
+                                                   h5(strong('Preprocessing Data Recap for Selected Region/Basin/Type Combination')),
+                                                   fluidRow(column(4, textOutput('singleSnapSummary1')),
+                                                            column(4, textOutput('snapTooManySummary1')),
+                                                            column(4, textOutput('noSnapSummary1'))),
+                                                   br(), br(), br(), # a little breathing room
+                                                   verbatimTextOutput('test'),
+                                                   verbatimTextOutput('test2')
+                                                 )),
+                                        tabPanel("Manual Review",
+                                                 h4('Assessment Unit QA'),
+                                                 wellPanel(
+                                                   fluidRow(column(4, textOutput('singleSnapSummary2'),
+                                                                   actionButton('plotSingleSnapSummary', HTML('Plot stations that snapped <br/>to 1 AU Segment'))),
+                                                            column(4, textOutput('snapTooManySummary2'),
+                                                                   actionButton('plotSnapTooManySummary', HTML('Plot stations that snapped <br/>to > 1 AU Segment'))),
+                                                            column(4, textOutput('noSnapSummary2'),
+                                                                   actionButton('plotNoSnapSummary', HTML('Plot stations that snapped <br/>to 0 AU segments'))))),
+                                                 leafletOutput('AUmap'),
+                                                 fluidRow(
+                                                   actionButton('clear_allAU', 'Clear Selection', style='color: #fff; background-color: #337ab7; border-color: #2e6da4%', icon=icon('backspace')),
+                                                   actionButton('acceptAU', 'Accept', style='color: #fff; background-color: #337ab7; border-color: #2e6da4%', icon=icon('check-circle')),
+                                                   actionButton('changeAU', 'Manual AU Adjustment', style='color: #fff; background-color: #337ab7; border-color: #2e6da4%', icon=icon('exchange')),
+                                                   #actionButton('checkMeOut', 'Check Me Out', style='color: #fff; background-color: #337ab7; border-color: #2e6da4%', icon=icon('exchange')),
+                                                   actionButton('saveAU', label = "Export reviews",style='color: #fff; background-color: #228b22; border-color: #134e13')        ),
+                                                 br(),
+                                                 #verbatimTextOutput('testAU'),
+
+                                                 tabsetPanel(
+                                                   tabPanel(strong('Original User Uploaded and Existing Stations Data'),
+                                                            br(),
+                                                            h5(strong('Selected Station Information')),
+                                                            DT::dataTableOutput('selectedSiteTableAU'),
+                                                            h5(strong('Associated AU Information')),
+                                                            DT::dataTableOutput('associatedAUTable'),
+                                                            br(), br(), br()),
+                                                   tabPanel(strong('Updated Stations Data'),
+                                                            br(),
+                                                            fluidRow(
+                                                              h5(strong('Adjusted Station Data')),
+                                                              div(DT::dataTableOutput("adjustedStationsTableAU"), style = "font-size:80%")),
+                                                            fluidRow(
+                                                              h5(strong('Manually QAed AU Information')),
+                                                              div(DT::dataTableOutput("associatedAUTableAUQA"), style = "font-size:80%")),
+
+                                                            br(), br(), br()
+                                                   )))),
                              navbarMenu("Water Quality Standards QA",
                                         tabPanel("Watershed Selection",
                                                  h4('Water Quality Standards QA'),

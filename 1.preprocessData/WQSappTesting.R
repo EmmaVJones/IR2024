@@ -116,7 +116,7 @@ conventionals_DWQS_Region <- st_intersection(conventionals_DWQS,
 
 
 
-snap_input <- readRDS('data/WQStable07262022.RDS') %>% # July 2022 effort with expected DEQ sites
+snap_input <- readRDS('data/WQStable10182022.RDS') %>% # Oct 2022 effort with expected DEQ sites
   #  readRDS('data/WQStable.RDS') %>% # original effort
   filter(str_extract(WQS_ID, "^.{2}") %in% filter(WQSlayerConversion, waterbodyType %in% WQSwaterbodyType1)$WQS_ID) %>%
   filter(gsub("_","",str_extract(WQS_ID, ".{3}_")) %in% 
