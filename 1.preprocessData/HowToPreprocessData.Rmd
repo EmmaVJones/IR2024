@@ -504,7 +504,8 @@ This significantly speeds up app rendering.
 
 The logical starting point is to take all the unique stations that need to be assessed (distinctSites_sf from above) and join AU information by StationID where possible before going to more computationally intensive methods. 
 
-First, bring in Cleo's final stations data from 2022 cycle. 
+First, bring in the final Stations Table from the most recently completed IR cycle. For this example, we are sourcing the IR2022 final Stations Table (presented as a spatial object in a file geodatabase). We are also going to rename the friendly publication field names to a more standardized format that the automated assessment functions were built upon (read: we are changing field names to match previous versions of the Stations Table schema since the assessment functions were built on that data schema).
+
 
 ```{r 2022 final stations}
 
@@ -524,7 +525,9 @@ final2022 <- st_read('C:/HardDriveBackup/GIS/Assessment/2022IR_final/2022IR_GISD
          ID305B_10 = Assessment_Unit_ID_10, TYPE_10 = Station_Type_10)
 ```
 
-Join distinct sites to AU information to get all available free data.
+Now we will join distinct sites to AU information to get all available data to start the assessment process. Note: Assessors may attribute stations to different VAHU6's compared to strictly where the site is located spatially to communicate that said stations (usually that lie close to VAHU6 border) are used to make assessment decisions about the designated VAHU6. For this reason, we use the VAHU6 designation from the previous assessment cycle over the VAHU6 retrieved from CEDS. If the station does not have a record in the previous assessment cycle Stations Table, the VAHU6 designation stored in CEDS is used. 
+
+The last rows of the below chunk ensure that each station is only listed once in the resultant table. In previous assessment cycles, stations could be assessed for multiple waterbody types (e.g. riverine and lacustrine assessment uses). Since the assessment database was moved from MS Access to CEDS WQA, this duplication is no longer allowed and thus each station should only have one record.
 
 ```{r AU join}
 distinctSites_AUall <- distinctSites_sf %>% 
@@ -557,15 +560,15 @@ distinctSites_AUtoDo <- filter(distinctSites_AUall, is.na(ID305B_1)) %>%
            remove = F, # don't remove these lat/lon cols from df
            crs = 4326)
 
-# All good for assessment app (once we join WQS info from lookup table)
+# These sites are all good for automated assessment  (once we join WQS info from WQSlookup table)
 distinctSites_AU <- filter(distinctSites_AUall, !is.na(ID305B_1)) 
 
-# double check the math works out
+# Quick QA: double check the math works out
 nrow(distinctSites_AU) + nrow(distinctSites_AUtoDo) == nrow(distinctSites_AUall)
 ```
 
 
-Next we need to side step to join 1a stations (from final IR2022 spatial layer) that really are in CEDS as 1A.
+Next we need to side step to join 1a stations (from final IR2022 spatial layer) that really are in CEDS as 1A. **Note: this step isn't presented in the assessment bookdown bc above the level of understanding needed for most users but it is a very important step and still needs to be done in real life.**
 
 ```{r 1A fix}
 distinctSites_AUtoDoFix <- filter(distinctSites_sf, FDT_STA_ID %in% distinctSites_AUtoDo$FDT_STA_ID) %>%
@@ -677,7 +680,7 @@ nrow(distinctSites_AU) + nrow(distinctSites_AUtoDo) == nrow(distinctSites_AUall)
 
 
 
-###_______________________
+###___END Skip____________________
 
 
 ## Recap: what has been done so far
@@ -759,7 +762,7 @@ rm(lakesPolyAU) # clean up workspace
 
 Add lake stations to distinctSites_AU.
 
-```{r add estuary AU sites}
+```{r add lake AU sites}
 distinctSites_AU <- bind_rows(distinctSites_AU, lakesPolysAUjoin %>% st_drop_geometry())
 ```
 

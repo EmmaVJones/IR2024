@@ -52,6 +52,7 @@ if(length(basinCodesAU1) > 1){ # in case more than 1 basin code in basin
     st_read(paste0('data/GIS/processedAUs/AU_', typeName1[1],'_',basinCodesAU1,'.shp' ))) %>%           # change to final
     st_transform(4326) }
 
+# update link to latest version when available in staff app
 
 if(assessmentType1 == 'Riverine'){otherLayers <- ";2020%20ADB%20WQA%20Layers;2020%20Rivers%20(Any%20Use)"}
 if(assessmentType1 == 'Lacustrine'){otherLayers <- ";2020%20ADB%20WQA%20Layers;2020%20Reservoirs%20(Any%20Use)"}
