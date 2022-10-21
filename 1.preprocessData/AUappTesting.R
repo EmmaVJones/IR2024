@@ -14,12 +14,12 @@ subbasins <- st_read('../GIS/DEQ_VAHUSB_subbasins_EVJ.shp') %>%
 
 
 
-assessmentType1 <- 'Riverine' #'Estuarine'#
+assessmentType1 <- 'Lacustrine'#'Riverine' #'Estuarine'#
 AUDEQregionSelection1 <- "BRRO"#"TRO"#"NRO"##"CO"#
 # filter(subbasinOptionsByWQStype, waterbodyType %in% assessmentType1) %>%
 # distinct(AssessmentRegion) %>% 
 # pull()
-AUsubbasinSelection1 <-  "James-Middle"#"York"#"Potomac-Lower"#"Roanoke"# 'Small Coastal'#"James-Middle"#"James-Middle"
+AUsubbasinSelection1 <-  "Roanoke"#"James-Middle"#"York"#"Potomac-Lower"# 'Small Coastal'#"James-Middle"#"James-Middle"
 filter(subbasinOptionsByWQStype, waterbodyType %in% assessmentType1) %>%
   filter(AssessmentRegion %in% AUDEQregionSelection1) %>%
   {if(AUDEQregionSelection1 == 'TRO') # no AU polygons in this combo even though in WQS

@@ -1,0 +1,127 @@
+---
+title: "7Q10 analysis for assessment staff"
+author: "Emma Jones"
+date: "10/21/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(zoo)
+library(dataRetrieval)
+library(e1071)
+library(sf)
+library(leaflet)
+library(inlmisc)
+library(DT)
+
+source('DFLOW_CoreFunctions_EVJ.R')
+```
+
+## Background
+
+This project identifies the 7Q10 low flow statistic for all available gages in VA based on the last 50 years of water data. The functions called to analyze the xQy flow statistics are identical to DEQ's Water Permitting protocols and were written by Connor Brogan. The water data is provided by the USGS NWIS data repository and is called in the xQy function by the USGS dataRetreival package.
+
+Once flow statistics are generated for all available gages statewide, this information is compared to available flow data during a given assessment window. Any gages identified below the 7Q10 statistic are flagged for the appropriate time period. This information is spatially joined to the assessment watersheds (VAHU6) to extrapolate available flow data to areas without gaging stations. This is not an ideal extrapolation of flow data, but it serves as a decent initial flag for assessors to know when/where to investigate further. 
+
+These temporal low flow flags are joined to individual site monitoring data by VAHU6. If parameters used to assess aquatic life condition are collected during low flow periods, then the data are flagged inside the assessment applications, indicating further review is necessary prior to accepting the automated assessment exceedance calculations for that site.
+
+## Data Gathering
+
+All USGS gage information sampled in the last 50 years need to be collected from USGS NWIS. We can use the whatNWISsites() function to identify which sites have daily discharge data (00060) in a designated area (stateCd = 'VA').
+
+```{r pull available gage numbers}
+sites <- whatNWISsites(stateCd="VA",
+                       parameterCd="00060",
+                       hasDataTypeCd="dv")
+
+sites_sf <- sites %>% 
+   st_as_sf(coords = c("dec_long_va", "dec_lat_va"), 
+               remove = F, # don't remove these lat/lon cols from df
+               crs = 4326) # add projection, needs to be geographic for now bc entering lat/lng
+
+```
+
+Now we will pull daily flow data for each site identified and calculate 7Q10.
+
+Notes: "02066500","01656102","0167300055","0204228301","01644290","0164578734","0164579522","01657885","0167891721"
+issue with time period: Error in 1:WYE_Vector[length(WYE_Vector)] : argument of length 0
+
+```{r 7Q10}
+# store it somewhere
+flowAnalysis <- list()
+
+for(i in unique(sites$site_no)){#[303:409]){
+  print(i)
+  siteFlow <- xQy_EVJ(i,#USGS Gage ID
+    DS="1972-03-31",#Date to limit the lower end of usgs gage data download in yyyy-mm-dd
+    DE="2022-04-01",#Date to limit the upper end of USGS gage data download in yyyy-mm-dd
+    WYS="04-01",#The start of the analysis season in mm-dd. Defaults to April 1.
+    WYE="03-31",#The end of the analysis season in mm-dd. Defaults to March 31.
+    x=7,#If you want to include a different xQY then the defaults, enter x here
+    y=10)
+  
+  flowAnalysis[i] <- list(siteFlow)
+}
+#saveRDS(flowAnalysis, 'flowAnalysis.RDS')
+
+# extract 7Q10 by gageNo
+x7Q10 <- map_df(flowAnalysis, "Flows") # EVJ added in gageNo to xQy_EVJ()
+
+# now to extract flow data already pulled by function
+flows <- map_df(flowAnalysis, "outdat") 
+
+# now just grab flow data in assessment window, join in 7Q10, identify any measures below 7Q10
+assessmentFlows <- map_df(flowAnalysis, "outdat") %>% 
+  filter(between(Date, as.Date("2017-01-01"), as.Date("2022-12-31"))) %>% 
+  left_join(x7Q10, by = c('Gage ID' = "gageNo")) %>% 
+  mutate(`7Q10 Flag` = case_when(Flow <= n7Q10 ~ '7Q10 Flag',
+                                 TRUE ~ as.character(NA)))
+
+# anything blowing 7Q10?
+lowAssessmentFlows <- filter(assessmentFlows, `7Q10 Flag` == '7Q10 Flag')
+unique(lowAssessmentFlows$`Gage ID`)
+
+# show these spatially
+lowFlowSites <- lowAssessmentFlows %>% 
+  distinct(`Gage ID`) %>% 
+  left_join(sites_sf, by = c('Gage ID' = 'site_no')) %>% 
+  st_as_sf()
+```
+
+
+
+
+
+```{r}
+vahu6 <- st_read('../data/GIS/VA_SUBWATERSHED_6TH_ORDER_STG.shp') # this version of vahu6 layer goes outside state boundary
+vahu5 <- vahu6 %>% 
+  group_by(VAHU5) %>% 
+  summarise()
+```
+
+```{r}
+CreateWebMap(maps = c("Topo","Imagery","Hydrography"), collapsed = TRUE,
+             options= leafletOptions(zoomControl = TRUE,minZoom = 5, maxZoom = 20,
+                                     preferCanvas = TRUE)) %>%
+  setView(-79.1, 37.7, zoom=7)  %>%
+  addCircleMarkers(data = lowFlowSites, color='gray', fillColor='red', radius = 4,
+                   fillOpacity = 0.8,opacity=0.8,weight = 2,stroke=T, group="Low Flow USGS sites",
+                   label = ~`Gage ID`)  %>% 
+  addCircleMarkers(data = sites_sf, color='gray', fillColor='gray', radius = 4,
+                   fillOpacity = 0.8,opacity=0.8,weight = 2,stroke=T, group="USGS sites",
+                   label = ~site_no)  %>% 
+  addPolygons(data= vahu5,  color = 'black', weight = 1,
+              fillColor= 'blue', fillOpacity = 0.5,stroke=0.1,
+              group="vahu5", label = ~VAHU5) %>% 
+    addPolygons(data= vahu6,  color = 'black', weight = 1,
+              fillColor= 'blue', fillOpacity = 0.5,stroke=0.1,
+              group="vahu6", label = ~VAHU6) %>% 
+  addLayersControl(baseGroups=c("Topo","Imagery","Hydrography"),
+                   overlayGroups = c("Low Flow USGS sites","USGS sites","vahu5","vahu6"),
+                   options=layersControlOptions(collapsed=T),
+                   position='topleft')
+```
+
