@@ -84,15 +84,23 @@ assessmentFlows <- map_df(flowAnalysis, "outdat") %>%
 lowAssessmentFlows <- filter(assessmentFlows, `7Q10 Flag` == '7Q10 Flag')
 unique(lowAssessmentFlows$`Gage ID`)
 
-# show these spatially
+# organize low flow events by Gage ID
+View(lowAssessmentFlows %>% 
+  arrange(`Gage ID`, Date))
+  
+
+# see where spatially
 lowFlowSites <- lowAssessmentFlows %>% 
   distinct(`Gage ID`) %>% 
   left_join(sites_sf, by = c('Gage ID' = 'site_no')) %>% 
   st_as_sf()
 ```
 
-
-
+Next steps:
+What scale? VAHU5, VAHU6?
+Go outside state boundaries?
+Pin to server so can be joined in to conventionals dataset by HUC and SampleDate
+April 3 (Monday): Need to repull this data (will be provisional) at end of 2022 water year, pin that to server so app/scripts can rerun
 
 
 ```{r}
