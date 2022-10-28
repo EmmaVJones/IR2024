@@ -130,7 +130,7 @@ xQyComp<-function(xQy_ann,ndays,timecheck,leapYearinSeason,febLDsameCY,dat,y,dat
   xQy_pctg<-NA
   
   #If there is sufficient data in xQy_ann, proceed with low flow identification
-  if(length(xQy_ann)>2){
+  if(length(xQy_ann)>9){
     #Take the log of annual low flows
     logFlows<-log(xQy_ann)
     n<-length(logFlows)
@@ -181,7 +181,9 @@ xQy_EVJ<-function(gageID,#USGS Gage ID
               WYS="04-01",#The start of the analysis season in mm-dd. Defaults to April 1.
               WYE="03-31",#The end of the analysis season in mm-dd. Defaults to March 31.
               x=7,#If you want to include a different xQY then the defaults, enter x here
-              y=10){#If you want to include a different xQY then the defaults, enter y here
+              y=10,#If you want to include a different xQY then the defaults, enter y here
+              onlyUseAcceptedData = T # EVJ edit: option to allow provisional data into analysis, important for assessment timelines
+              ){
   #Use Zoo package for rollapply for easy calculation of rolling means
   require(zoo)
   require(dataRetrieval)
@@ -194,7 +196,8 @@ xQy_EVJ<-function(gageID,#USGS Gage ID
   
   #Check for provisional flow data
   indx<-grep("P",dat$X_00060_00003_cd)
-  if(length(indx) > 0){
+  # Filter out Provisional flow data if argument to only use accepted data is selected by user
+  if(length(indx) > 0 & onlyUseAcceptedData == T){
     #Filter for provisional data
     dat<-dat[-indx,]
   }
@@ -284,6 +287,12 @@ xQy_EVJ<-function(gageID,#USGS Gage ID
   if(dat$WY[1] < DS || gsub("^.*[-]+?","",dat$Date[1]) != WYS){
     WYS_Vector<-gsub("^.*[-]+?","",dat$Date)
     WYS_Vector<-grep(WYS,WYS_Vector)
+    #If the analysis start date WYE is not in the dataset, WYE_Vector will be
+    #empty implying less than one year of data is available after filtering for
+    #DS and DE above. 
+    if(length(WYS_Vector) == 0){
+      return(paste0("Insufficient gage data found for ",gageID," within selected time period."))
+    }
     dat<-dat[WYS_Vector[1]:length(dat$Date),]
   }
   
@@ -291,7 +300,14 @@ xQy_EVJ<-function(gageID,#USGS Gage ID
      gsub("^.*[-]+?","",dat$Date[length(dat$WY)]) != WYE){
     WYE_Vector<-gsub("^.*[-]+?","",dat$Date)
     WYE_Vector<-grep(WYE,WYE_Vector)
+    #If the analysis end date WYE is not in the dataset, WYE_Vector will be
+    #empty implying less than one year of data is available after filtering for
+    #DS and DE above
+    if(length(WYE_Vector) == 0){
+      return(paste0("Insufficient gage data found for ",gageID," within selected time period."))
+    }
     dat<-dat[1:WYE_Vector[length(WYE_Vector)],]
+    
   }
   
   #Extract the seasonal data (if any)

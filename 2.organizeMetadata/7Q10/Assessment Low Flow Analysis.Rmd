@@ -35,7 +35,8 @@ All USGS gage information sampled in the last 50 years need to be collected from
 ```{r pull available gage numbers}
 sites <- whatNWISsites(stateCd="VA",
                        parameterCd="00060",
-                       hasDataTypeCd="dv")
+                       hasDataTypeCd="dv") %>% 
+  filter(site_tp_cd %in% c('ST', 'SP')) # only keep ST (stream) and SP (spring) sites
 
 sites_sf <- sites %>% 
    st_as_sf(coords = c("dec_long_va", "dec_lat_va"), 
@@ -44,51 +45,73 @@ sites_sf <- sites %>%
 
 ```
 
-Now we will pull daily flow data for each site identified and calculate 7Q10.
-
-Notes: "02066500","01656102","0167300055","0204228301","01644290","0164578734","0164579522","01657885","0167891721"
-issue with time period: Error in 1:WYE_Vector[length(WYE_Vector)] : argument of length 0
+Now we will pull daily flow data for each site identified and calculate 7Q10. This is saved as a list object with each gage a unique list element.
 
 ```{r 7Q10}
 # store it somewhere
 flowAnalysis <- list()
 
-for(i in unique(sites$site_no)){#[303:409]){
+for(i in unique(sites$site_no)){
   print(i)
-  siteFlow <- xQy_EVJ(i,#USGS Gage ID
+  siteFlow <- xQy_EVJ(gageID = i,#USGS Gage ID
     DS="1972-03-31",#Date to limit the lower end of usgs gage data download in yyyy-mm-dd
-    DE="2022-04-01",#Date to limit the upper end of USGS gage data download in yyyy-mm-dd
+    DE="2023-04-01",#Date to limit the upper end of USGS gage data download in yyyy-mm-dd
     WYS="04-01",#The start of the analysis season in mm-dd. Defaults to April 1.
     WYE="03-31",#The end of the analysis season in mm-dd. Defaults to March 31.
     x=7,#If you want to include a different xQY then the defaults, enter x here
-    y=10)
+    y=10,
+    onlyUseAcceptedData = F )
   
   flowAnalysis[i] <- list(siteFlow)
 }
+# save a record of results to call up later much faster
 #saveRDS(flowAnalysis, 'flowAnalysis.RDS')
+#flowAnalysis <- readRDS('../7Q10/data/flowAnalysis.RDS')
+```
 
+Using the purrr library, we can extract just the flow metric information for each gage and store in a tibble for use later.
+
+```{r 7Q10 extraction}
 # extract 7Q10 by gageNo
 x7Q10 <- map_df(flowAnalysis, "Flows") # EVJ added in gageNo to xQy_EVJ()
 
+x7Q10 %>% 
+    DT::datatable(rownames = F, options = list(dom = 'lftip', pageLength = 5, scrollX = TRUE))
+```
+
+And we need the actual daily flow data to compare to the low flow metrics, so we will extract that next. 
+
+```{r extract flow data}
 # now to extract flow data already pulled by function
 flows <- map_df(flowAnalysis, "outdat") 
+```
 
+Since we only really care about flow data from our assessment window, let's extract just the flow data and filter to our IR window of interest. We can then join the low flow metrics by gage number and flag any daily average flow data that falls below the gage's 7Q10 metric.
+
+```{r assessment window}
 # now just grab flow data in assessment window, join in 7Q10, identify any measures below 7Q10
 assessmentFlows <- map_df(flowAnalysis, "outdat") %>% 
   filter(between(Date, as.Date("2017-01-01"), as.Date("2022-12-31"))) %>% 
   left_join(x7Q10, by = c('Gage ID' = "gageNo")) %>% 
   mutate(`7Q10 Flag` = case_when(Flow <= n7Q10 ~ '7Q10 Flag',
                                  TRUE ~ as.character(NA)))
+```
 
-# anything blowing 7Q10?
+Here we limit our assessmentFlows object to just the rows where a 7Q10 flag is encountered. We can review these low flow events by organizing them by gage and date. 
+
+```{r 7Q10 flag}
+# anything below 7Q10?
 lowAssessmentFlows <- filter(assessmentFlows, `7Q10 Flag` == '7Q10 Flag')
-unique(lowAssessmentFlows$`Gage ID`)
+unique(lowAssessmentFlows$`Gage ID`) # what gages do these occur at?
 
 # organize low flow events by Gage ID
 View(lowAssessmentFlows %>% 
   arrange(`Gage ID`, Date))
-  
+```  
 
+Next, let's review the low flow gages visually on a map. First, we need to transform this low flow information into a spatial object. 
+
+```{r low flow sites}
 # see where spatially
 lowFlowSites <- lowAssessmentFlows %>% 
   distinct(`Gage ID`) %>% 
@@ -96,21 +119,18 @@ lowFlowSites <- lowAssessmentFlows %>%
   st_as_sf()
 ```
 
-Next steps:
-What scale? VAHU5, VAHU6?
-Go outside state boundaries?
-Pin to server so can be joined in to conventionals dataset by HUC and SampleDate
-April 3 (Monday): Need to repull this data (will be provisional) at end of 2022 water year, pin that to server so app/scripts can rerun
+We will bring in assessment watersheds to better understand how these low flow events happen across the landscape.
 
-
-```{r}
+```{r watersheds}
 vahu6 <- st_read('../data/GIS/VA_SUBWATERSHED_6TH_ORDER_STG.shp') # this version of vahu6 layer goes outside state boundary
 vahu5 <- vahu6 %>% 
   group_by(VAHU5) %>% 
   summarise()
 ```
 
-```{r}
+And here is a map of the assessment watersheds (VAHU5 and VAHU6) with all Virginia USGS gages (`USGS sites`), just USGS gages with low flow events in the IR window (`Low Flow USGS sites`). 
+
+```{r map}
 CreateWebMap(maps = c("Topo","Imagery","Hydrography"), collapsed = TRUE,
              options= leafletOptions(zoomControl = TRUE,minZoom = 5, maxZoom = 20,
                                      preferCanvas = TRUE)) %>%
@@ -133,3 +153,56 @@ CreateWebMap(maps = c("Topo","Imagery","Hydrography"), collapsed = TRUE,
                    position='topleft')
 ```
 
+Now we need to join the watershed information to the low flow analysis so we can easily incorporate this information to all monitoring sites that fall in the watershed. 
+
+```{r low flow watershed}
+lowFlowSitesHUC <- st_intersection(lowFlowSites, vahu6) %>%  # this layer incorporates VAHU5 and VAHU6 information so dont need to join twice
+  st_drop_geometry() %>% # for this analysis we don't actually need the spatial information
+  dplyr::select(`Gage ID` = `Gage.ID`, # spatial joins change tibble names, changing back to name we want
+                agency_cd:dec_long_va, VAHU5, VAHU6)
+
+lowAssessmentFlows <- left_join(lowAssessmentFlows, lowFlowSitesHUC, by = 'Gage ID') %>% 
+  dplyr::select(Agency, `Gage ID`, `Station Name` = station_nm, `Site Type` = site_tp_cd,
+                Latitude = dec_lat_va, Longitude = dec_long_va, Date:Status, 
+                `Water Year` = WY, n7Q10, `7Q10 Flag`, VAHU5, VAHU6)
+```
+
+
+Pin this information to the server so we can use it during the automated assessment process.
+
+```{r pin}
+library(pins)
+library(config)
+
+# Connect to server
+conn <- config::get("connectionSettings") # get configuration settings
+
+board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_KEY"),
+                         server = conn$CONNECT_SERVER)#Sys.getenv("CONNECT_SERVER"))
+
+pin(lowAssessmentFlows, name = 'AssessmentWindowLowFlows', 
+    description = 'IR 2024 7Q10 low flow gage information by VAHU5 and VAHU6', 
+    board = 'rsconnect')
+```
+
+
+
+## Important 7Q10 Calculation Notes:
+
+Information from the chief flow statistic programmer (Connor Brogan) about the assumptions of the 7Q10 function used in this analysis:
+
+1. Desired exceedance probability evaluation in check.fs() must be between 0 and 1 (line 19)
+2. Only complete analysis years are included for calculation of both the Harmonic Mean and all low flows. Years with minimum flow of 0 are removed, but compensated for via USGS probability adjustment (lines 122 – 126 and 144-148 for xQy flows and lines 588 - 589 for HM)
+3. Must have at least 2 analysis years of complete data (line 133) to calculate xQy flows (not necessary for Harmonic Mean)
+4. Provisional gage flow data is removed on lines 196-200
+5. Negative flows (e.g. tidally reversed) are treated as NA following the USGS SW Toolbox (line 207)
+6. Function only uses gage data where the water year is within the range of the years of DS and DE (line 281)
+7. The gage data is filtered to only include data after the first date of the first analysis season and before the last date of the last analysis season. For instance, if WYS = “04-01” and WYE = “03-31” and DS and DE were 1972 to 2022, then the gage data would be limited to the dates between and including 1972-04-01 and 2022-03-31
+8. The start and end dates of the data must include one at least one instance of WYE (line 295)
+9. The last few days in the analysis season are removed to ensure statistical independence between years (lines 498 – 500 and throughout for loop on line 503)
+10. Analysis season must have sufficient days to calculate a minimum flow such that at least 7-days are required to calculate a 7-day flow (loop on line 503)
+
+Based on the changes Emma Jones made to the original function for Water Quality Assessment purposes, here are important assumptions to know (numbered according to system above) :
+
+3. Must have at least 10 analysis years of complete data (line 133) to calculate xQy flows 
+4. Provisional gage flow data is accepted on lines 196-200. This is important so water years can be calculated as soon as possible for assessment purposes. Waiting until all data are approved will result in too little time for assessors to review the data. Storm events usually are corrected in the provisional to accepted stage in the USGS QA process, so since we are interested in low flow events, this is not a major concern when using provisional data.
