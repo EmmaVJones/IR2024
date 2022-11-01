@@ -98,11 +98,16 @@ lakeNameStandardization <- function(x){
 
 
 quickStats <- function(parameterDataset, parameter){
+  # Drop any 7Q10 flagged data from exceedance analyses for appropriate parameters
+  if(parameter %in% c("TEMP", "DO", "DO_Daily_Avg", "PH")){
+    parameterDataset <- dplyr::filter(parameterDataset, is.na(`7Q10 Flag`)) # only assess on assessable dataset
+  }
+  
   if(nrow(parameterDataset) > 0 & any(!is.na(parameterDataset$limit))){
-    results <- data.frame(EXC = nrow(filter(parameterDataset, exceeds == TRUE)),
+    results <- data.frame(EXC = nrow(dplyr::filter(parameterDataset, exceeds == TRUE)),
                           SAMP = nrow(parameterDataset)) %>%
       # Implement Round to Even on Exceedance Frequency
-      mutate(exceedanceRate = as.numeric(round::roundAll((EXC/SAMP)*100,digits=0, "r0.C"))) # round to nearest whole number per Memo to Standardize Rounding for Assessment Guidance
+      dplyr::mutate(exceedanceRate = as.numeric(round::roundAll((EXC/SAMP)*100,digits=0, "r0.C"))) # round to nearest whole number per Memo to Standardize Rounding for Assessment Guidance
     
     if(results$EXC >= 1){outcome <- 'Review'} # for Mary
     if(results$EXC >= 1 & results$exceedanceRate < 10.5){outcome <- 'Review'}
@@ -113,7 +118,7 @@ quickStats <- function(parameterDataset, parameter){
     if(results$EXC < 1 & results$SAMP <= 10 & results$SAMP == 1){outcome <- 'Review'} # & results$SAMP >1 new 12/21/2020 can't say supporting on 1 sample
     
     
-    results <- mutate(results, STAT = outcome)
+    results <- dplyr::mutate(results, STAT = outcome)
     names(results) <- c(paste(parameter,names(results)[1], sep = '_'),
                         paste(parameter,names(results)[2], sep = '_'),
                         paste(parameter,names(results)[3], sep = '_'),
@@ -135,20 +140,13 @@ quickStats <- function(parameterDataset, parameter){
 }
 
 
-StationTableStartingData <- function(x){
-  x %>%
+StationTableStartingData <- function(stationData){
+  stationData %>%
     dplyr::select(FDT_STA_ID, ID305B_1:VAHU6) %>%
-    rename('STATION_ID' = 'FDT_STA_ID') %>%
-    distinct(STATION_ID, .keep_all = T)
+    dplyr::rename('STATION_ID' = 'FDT_STA_ID') %>%
+    dplyr::distinct(STATION_ID, .keep_all = T)
 }
 
-#stations <- unique(estuarineStations$STATION_ID)#unique(stationData$FDT_STA_ID)
-#x <- estuarineStations#stationData
-#previousStationTable <-  stationTable
-#previousStationTableCycle <- 2020
-#previousStationTable2 <- historicalStationsTable2
-#previousStationTable2Cycle <- 2018
-#rm(previousStationTable); rm(previousStationTable2); rm(previousStationTable2Cycle);rm(previousStationTableCycle); rm(lastComment); rm(lastComment2)
 
 stationTableComments <- function(stations, previousStationTable, 
                                  previousStationTableCycle,
@@ -194,18 +192,22 @@ thermoclineDepth <- function(stationData){
 
 
 #Max Temperature Exceedance Function
-tempExceedances <- function(x){
-  dplyr::select(x, FDT_DATE_TIME, FDT_DEPTH, contains('TEMP_CELCIUS'), `Max Temperature (C)`) %>% # Just get relevant columns 
-    filter(! (LEVEL_FDT_TEMP_CELCIUS %in% c('Level II', 'Level I'))) %>% # get lower levels out
-    filter(! is.na(FDT_TEMP_CELCIUS))%>% # get rid of NA's
+tempExceedances <- function(stationData){
+  dplyr::select(stationData, FDT_DATE_TIME, FDT_DEPTH, tidyselect::contains('TEMP_CELCIUS'), `Max Temperature (C)`, `7Q10 Flag`) %>% # Just get relevant columns 
+    dplyr::filter(! (LEVEL_FDT_TEMP_CELCIUS %in% c('Level II', 'Level I'))) %>% # get lower levels out
+    dplyr::filter(! is.na(FDT_TEMP_CELCIUS)) %>% # get rid of NA's
     # rename columns to make exceedance analyses easier to apply
-    rename(parameter = !! names(.[3]),
+    dplyr::rename(parameter = !! names(.[3]),
            limit = !! names(.[6])) %>% 
     # Apply Round to Even Rule before testing for exceedances
-    mutate(parameterRound = signif(parameter, digits = 2), # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section50/
-           exceeds = ifelse(parameterRound > limit, T, F)) # Identify where above max Temperature
+    dplyr::mutate(parameterRound = signif(parameter, digits = 2), # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section50/
+                  exceeds = case_when(parameterRound > limit & is.na(`7Q10 Flag`) ~ TRUE, # exceedance if above limit and no 7Q10 Flag
+                                      parameterRound > limit & `7Q10 Flag` == "7Q10 Flag" ~ FALSE,  # exceedance if above limit and 7Q10 Flag
+                                      parameterRound <= limit ~ FALSE, # no exceedance
+                                      TRUE ~ NA))
+                   # ifelse(parameterRound > limit, T, F)) # Identify where above max Temperature
 }
-# tempExceedances(x) %>%
+# tempExceedances(stationData) %>%
 #  quickStats('TEMP')
 
 # temperature special standards adjustment function
@@ -222,90 +224,118 @@ temperatureSpecialStandardsCorrection <- function(x){
 
 
 # Minimum DO Exceedance function
-DOExceedances_Min <- function(x){
+DOExceedances_Min <- function(stationData){
   # special step for lake stations, remove samples based on lake assessment guidance 
-  if(unique(x$lakeStation) == TRUE){
-    if(!is.na(unique(x$Lakes_187B)) & unique(x$Lakes_187B) == 'y'){
-      x <- filter(x, LakeStratification %in% c("Epilimnion", NA)) %>% # only use epilimnion or unstratified samples for analysis
-        dplyr::select(FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, DO_mg_L, LEVEL_DO, `Dissolved Oxygen Min (mg/L)`, LakeStratification) # Just get relevant columns,
+  if(unique(stationData$lakeStation) == TRUE){
+    if(!is.na(unique(stationData$Lakes_187B)) & unique(stationData$Lakes_187B) == 'y'){
+      DOdata <- dplyr::filter(stationData, LakeStratification %in% c("Epilimnion", NA)) %>% # only use epilimnion or unstratified samples for analysis
+        dplyr::select(FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, DO_mg_L, RMK_DO, LEVEL_DO, 
+                      `Dissolved Oxygen Min (mg/L)`, LakeStratification, `7Q10 Flag`) # Just get relevant columns,
     } else {
-      x <- dplyr::select(x, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, DO_mg_L, LEVEL_DO, `Dissolved Oxygen Min (mg/L)`, LakeStratification) }# Just get relevant columns,
+      DOdata <- dplyr::select(stationData, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, DO_mg_L, RMK_DO, LEVEL_DO,
+                              `Dissolved Oxygen Min (mg/L)`, LakeStratification, `7Q10 Flag`) }# Just get relevant columns,
   } else {
-    x <- dplyr::select(x, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, DO_mg_L, LEVEL_DO, `Dissolved Oxygen Min (mg/L)`) # Just get relevant columns, 
+    DOdata <- dplyr::select(stationData, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, DO_mg_L, RMK_DO, LEVEL_DO, 
+                            `Dissolved Oxygen Min (mg/L)`, `7Q10 Flag`) # Just get relevant columns, 
   }
   
-  x %>%
-    filter(!(LEVEL_DO %in% c('Level II', 'Level I'))) %>% # get lower levels out
-    filter(!is.na(DO_mg_L)) %>% 
-    rename(parameter = !!names(.[4]), limit = !!names(.[6])) %>% # rename columns to make functions easier to apply
+  DOdata %>%
+    dplyr::filter(!(LEVEL_DO %in% c('Level II', 'Level I'))) %>% # get lower levels out
+    dplyr::filter(!is.na(DO_mg_L)) %>% 
+    dplyr::rename(parameter = !!names(.[4]), limit = !!names(.[7])) %>% # rename columns to make functions easier to apply
     # Round to Even Rule
-    mutate(parameterRound = signif(parameter, digits = 2), # two significant figures based on  https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section50/
-           exceeds = ifelse(parameterRound < limit, T, F))# Identify where below min DO 
+    dplyr::mutate(parameterRound = signif(parameter, digits = 2), # two significant figures based on  https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section50/
+                  exceeds = case_when(parameterRound < limit & is.na(`7Q10 Flag`) ~ TRUE, # exceedance if above limit and no 7Q10 Flag
+                                      parameterRound < limit & `7Q10 Flag` == "7Q10 Flag" ~ FALSE,  # exceedance if above limit and 7Q10 Flag
+                                      parameterRound >= limit ~ FALSE, # no exceedance
+                                      TRUE ~ NA))
+  # exceeds = ifelse(parameterRound < limit, T, F))# Identify where below min DO 
 }
-#DOExceedances_Min(x) %>% quickStats('DO')
+#DOExceedances_Min(stationData) %>% quickStats('DO')
 
 
 # Daily Average exceedance function
-DO_Assessment_DailyAvg <- function(x){ 
-  # Don't apply this function to lake stations
-  #if(unique(x$lakeStation) == FALSE){
-  ### special step for lake stations, remove samples based on lake assessment guidance 
-  ###if(!is.na(unique(x$Lakes_187B)) & unique(x$Lakes_187B) == 'y'){
-  ###  x <- filter(x, LakeStratification %in% c("Epilimnion", NA)) } # only use epilimnion or unstratified samples for analysis
-    
-    dplyr::select(x,FDT_STA_ID,FDT_DATE_TIME, FDT_DEPTH,DO_mg_L,LEVEL_DO,`Dissolved Oxygen Min (mg/L)`,`Dissolved Oxygen Daily Avg (mg/L)`)%>% # Just get relevant columns, 
-      filter(!(LEVEL_DO %in% c('Level II', 'Level I'))) %>% # get lower levels out
-      filter(!is.na(DO_mg_L)) %>% #get rid of NA's
-      mutate(date = as.Date(FDT_DATE_TIME, format="%m/%d/%Y"), 
-             limit = `Dissolved Oxygen Daily Avg (mg/L)`) %>% 
-      group_by(date) %>%
-      mutate(n_Samples_Daily = n()) %>% # how many samples per day?
-      filter(n_Samples_Daily > 1) %>%
+DO_Assessment_DailyAvg <- function(stationData){ 
+  # special step for lake stations, remove samples based on lake assessment guidance 
+  if(unique(stationData$lakeStation) == TRUE){
+    if(!is.na(unique(stationData$Lakes_187B)) & unique(stationData$Lakes_187B) == 'y'){
+      DOdata <- dplyr::filter(stationData, LakeStratification %in% c("Epilimnion", NA)) %>% # only use epilimnion or unstratified samples for analysis
+        dplyr::select(FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, DO_mg_L, RMK_DO, LEVEL_DO, 
+                      `Dissolved Oxygen Daily Avg (mg/L)`, LakeStratification, `7Q10 Flag`) # Just get relevant columns,
+    } else {
+      DOdata <- dplyr::select(stationData, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, DO_mg_L, RMK_DO, LEVEL_DO,
+                              `Dissolved Oxygen Daily Avg (mg/L)`, LakeStratification, `7Q10 Flag`) }# Just get relevant columns,
+  } else {
+    DOdata <- dplyr::select(stationData, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, DO_mg_L, RMK_DO, LEVEL_DO, 
+                            `Dissolved Oxygen Daily Avg (mg/L)`, `7Q10 Flag`) # Just get relevant columns, 
+  }
+  
+  
+  DOdata %>% 
+    dplyr::filter(!(LEVEL_DO %in% c('Level II', 'Level I'))) %>% # get lower levels out
+    dplyr::filter(!is.na(DO_mg_L)) %>% #get rid of NA's
+    dplyr::mutate(date = as.Date(FDT_DATE_TIME, format="%m/%d/%Y"), 
+                  limit = `Dissolved Oxygen Daily Avg (mg/L)`) %>% 
+    dplyr::group_by(date) %>%
+    dplyr::mutate(n_Samples_Daily = n()) %>% # how many samples per day?
+    dplyr::filter(n_Samples_Daily > 1) %>%
       # Daily average with average rounded to even
-      mutate(DO_DailyAverage = signif(mean(DO_mg_L), digits = 2),  # two significant figures based on  https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section50/
-             exceeds = ifelse(DO_DailyAverage < `Dissolved Oxygen Daily Avg (mg/L)`,T,F)) %>% 
-      ungroup() %>% 
-      dplyr::select(-c(FDT_DATE_TIME, `Dissolved Oxygen Min (mg/L)`)) 
+    dplyr::mutate(DO_DailyAverage = signif(mean(DO_mg_L), digits = 2),  # two significant figures based on  https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section50/
+                  exceeds =  case_when(DO_DailyAverage < limit & is.na(`7Q10 Flag`) ~ TRUE, # exceedance if above limit and no 7Q10 Flag
+                                       DO_DailyAverage < limit & `7Q10 Flag` == "7Q10 Flag" ~ FALSE,  # exceedance if above limit and 7Q10 Flag
+                                       DO_DailyAverage >= limit ~ FALSE, # no exceedance
+                                       TRUE ~ NA)) %>% 
+                    #ifelse(DO_DailyAverage < `Dissolved Oxygen Daily Avg (mg/L)`,T,F)) %>% 
+    dplyr::ungroup() %>%
+    distinct(date, .keep_all = T) %>% 
+    dplyr::select(-c(FDT_DATE_TIME)) 
 }
-#DO_Assessment_DailyAvg(x) %>% quickStats(., 'DO_Daily_Avg') 
+#DO_Assessment_DailyAvg(stationData) %>% quickStats('DO_Daily_Avg') 
 
 # pH range Exceedance Function
-pHSpecialStandardsCorrection <- function(x){
-  mutate(x, `pH Min` = case_when(str_detect(as.character(SPSTDS), '6.5-9.5') ~ 6.5, TRUE ~ `pH Min`),
-         `pH Max` = case_when(str_detect(as.character(SPSTDS), '6.5-9.5') ~ 9.5, TRUE ~ `pH Min`))
+pHSpecialStandardsCorrection <- function(stationData){
+  mutate(stationData, `pH Min` = case_when(str_detect(as.character(SPSTDS), '6.5-9.5') ~ 6.5, TRUE ~ `pH Min`),
+         `pH Max` = case_when(str_detect(as.character(SPSTDS), '6.5-9.5') ~ 9.5, TRUE ~ `pH Max`))
 }
   
 
-pHExceedances <- function(x){
+pHExceedances <- function(stationData){
   # special step for lake stations, remove samples based on lake assessment guidance 
-  if(unique(x$lakeStation) == TRUE){
-    if(!is.na(unique(x$Lakes_187B)) & unique(x$Lakes_187B) == 'y'){
-      x <- filter(x, LakeStratification %in% c("Epilimnion", NA)) %>% # only use epilimnion or unstratified samples for analysis
-        dplyr::select(FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_FIELD_PH, LEVEL_FDT_FIELD_PH, `pH Min`, `pH Max`, LakeStratification) # Just get relevant columns,
+  if(unique(stationData$lakeStation) == TRUE){
+    if(!is.na(unique(stationData$Lakes_187B)) & unique(stationData$Lakes_187B) == 'y'){
+      pHdata <- filter(stationData, LakeStratification %in% c("Epilimnion", NA)) %>% # only use epilimnion or unstratified samples for analysis
+        dplyr::select(FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_FIELD_PH, RMK_FDT_FIELD_PH, LEVEL_FDT_FIELD_PH, 
+                      `pH Min`, `pH Max`, LakeStratification, `7Q10 Flag`) # Just get relevant columns,
     } else {
-      x <- dplyr::select(x, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_FIELD_PH, LEVEL_FDT_FIELD_PH, `pH Min`, `pH Max`, LakeStratification) }# Just get relevant columns,
+      pHdata <- dplyr::select(stationData, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_FIELD_PH, RMK_FDT_FIELD_PH, LEVEL_FDT_FIELD_PH,
+                              `pH Min`, `pH Max`, LakeStratification, `7Q10 Flag`) }# Just get relevant columns,
   } else {
-    x <- dplyr::select(x, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_FIELD_PH, LEVEL_FDT_FIELD_PH, `pH Min`, `pH Max`) }# Just get relevant columns, 
+    pHdata <- dplyr::select(stationData, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_FIELD_PH, RMK_FDT_FIELD_PH, LEVEL_FDT_FIELD_PH, 
+                            `pH Min`, `pH Max`, `7Q10 Flag`) }# Just get relevant columns, 
   
-  pH <- filter(x, !(LEVEL_FDT_FIELD_PH %in% c('Level II', 'Level I'))) %>% # get lower levels out
+  pHdata <- filter(pHdata, !(LEVEL_FDT_FIELD_PH %in% c('Level II', 'Level I'))) %>% # get lower levels out
     filter(!is.na(FDT_FIELD_PH)) #get rid of NA's
     
   # only run analysis if WQS exist for station
-    if(any(is.na(pH$`pH Min`)) | any(is.na(pH$`pH Max`))){
-      pH <- mutate(pH, interval = 1, exceeds = FALSE, limit = `pH Min`) # placeholder to run quickStats() without any WQS
+    if(any(is.na(pHdata$`pH Min`)) | any(is.na(pHdata$`pH Max`))){
+      pH <- mutate(pHdata, interval = 1, exceeds = FALSE, limit = `pH Min`) # placeholder to run quickStats() without any WQS
     } else {
-      pH <- pH %>%
+      pH <- pHdata %>%
         rowwise() %>% 
         # Round to Even Rule
         mutate(parameterRound = signif(FDT_FIELD_PH, digits = 2)) %>% # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section50/
         mutate(interval=findInterval(parameterRound,c(`pH Min`,`pH Max`), left.open=TRUE, rightmost.closed = TRUE)) %>% # Identify where pH outside of assessment range with round to even
         ungroup()%>%
-        mutate(exceeds=ifelse(interval == 1, F, T), # Highlight where pH doesn't fall into assessment range
+        mutate(exceeds = case_when(interval != 1 & is.na(`7Q10 Flag`) ~ TRUE, # exceedance if outside limit and no 7Q10 Flag
+                                   interval != 1 & `7Q10 Flag` == "7Q10 Flag" ~ FALSE,  # no exceedance if outside limit and 7Q10 Flag
+                                   interval == 1 ~ FALSE,  # no exceedance if inside limit
+                                   TRUE ~ NA),
+               #ifelse(interval == 1, F, T)), # Highlight where pH doesn't fall into assessment range
                limit = `pH Min`) # placeholder for quickStats function, carries over whether or not station has WQS attributed
     }
   return(pH)
 }
-#pHExceedances(x) %>% quickStats('PH')
+#pHExceedances(stationData) %>% quickStats('PH')
 
 
 

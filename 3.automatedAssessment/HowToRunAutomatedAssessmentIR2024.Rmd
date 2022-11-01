@@ -51,13 +51,14 @@ conventionals_distinct <- pin_get('ejones/conventionals2024_distinctdraft', boar
   filter(!is.na(Latitude) | !is.na(Longitude))
 
 
-WQMstationFull <- pin_get("WQM-Station-Full", board = "rsconnect")
-VSCIresults <- pin_get("VSCIresults", board = "rsconnect") %>%
+WQMstationFull <- pin_get("ejones/WQM-Station-Full", board = "rsconnect")
+VSCIresults <- pin_get("ejones/VSCIresults", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
-VCPMI63results <- pin_get("VCPMI63results", board = "rsconnect") %>%
+VCPMI63results <- pin_get("ejones/VCPMI63results", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
-VCPMI65results <- pin_get("VCPMI65results", board = "rsconnect") %>%
+VCPMI65results <- pin_get("ejones/VCPMI65results", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) ) 
+assessmentWindowLowFlows <- pin_get('ejones/AssessmentWindowLowFlows', board = 'rsconnect')
 ```
 
 Placeholders until data window sorted
@@ -186,8 +187,30 @@ stationTable <- left_join(stationTable, WQSlookup, by = c('STATION_ID' = 'Statio
 missingWQS <- filter(stationTable, is.na(CLASS))
 ```
 
+## Bring in Low Flow Information
 
-We only want to run riverine methods on riverine stations right now, so identify all stations that have lake AU designations. We will use this information later in the assessment analysis.
+We also need to bring in the previously analyzed low flow periods for the assessment window. These USGS stream gages are analyzed using the 7Q10 methodology consistent with the DEQ Water Permitting Program with two assumption changes:
+
+1. Provisional data are accepted (due to the expedited assessment timeline). QA/QC changes from Provision to Accepted data generally involve storm event corrections, so using Provisional data should not affect low flow analyses.
+2. Gages analyzed for low flow statistics require 10 or more valid water years for inclusion in analyses.
+
+This gage-specific information is spatially joined to VAHU5 watersheds to extrapolate low flow conditions to stations that fall into said watersheds. The temporal windows where low flow events were recorded in a watershed are joined to stations that fall into said watershed. Parameters that should not be analyzed during low flow events are flagged during the automated assessment process and presented to the assessment staff in the assessment applications.
+
+```{r low flow}
+conventionals <- conventionals %>% 
+  mutate(SampleDate = as.Date(FDT_DATE_TIME)) %>% 
+  left_join(dplyr::select(assessmentWindowLowFlows, Date, `7Q10 Flag`, VAHU5),
+            by = c('SampleDate' = 'Date', 'Huc6_Vahu5' = 'VAHU5')) %>% 
+  dplyr::select(-SampleDate) # rm unnecessary column
+
+View(filter(conventionals, `7Q10 Flag` == "7Q10 Flag"))
+```
+
+
+
+## Identify Station Type
+
+We only want to run riverine methods on riverine stations and only lake methods on lake stations, so identify all stations that have lake AU designations. We will use this information later to determine how to analyze certain parameters that have different methods based on waterbody type. 
 
 ```{r identify lake stations}
 lakeStations <- filter_at(stationTable,
@@ -246,7 +269,7 @@ for(i in 15:25){#nrow(stationTable)){
 
   # pull one station data
   stationData <- filter(conventionals, FDT_STA_ID %in% stationTable$STATION_ID[i]) %>%
-    #stationData <- filter(conventionals, FDT_STA_ID == "4ATKR000.08") %>%# test a specific station
+    #stationData <- filter(conventionals, FDT_STA_ID == "4ACRV006.19") %>% #"1ABIR000.76") %>%# test a specific station
     left_join(stationTable, by = c('FDT_STA_ID' = 'STATION_ID')) %>%
     # Special Standards Correction step. This is done on the actual data bc some special standards have temporal components
     pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
@@ -327,13 +350,13 @@ for(i in 15:25){#nrow(stationTable)){
           mutate(NUT_CHLA_STAT = NA) } # don't show a real assessment decision
     
     # run DO daily average status for riverine and tuck results into comments later
-    if(unique(stationData$lakeStation) == TRUE){
-      DO_Daily_Avg_STAT <- ''
-    } else {
+   # if(unique(stationData$lakeStation) == TRUE){
+  #    DO_Daily_Avg_STAT <- ''
+  #  } else {
       DO_Daily_Avg_STAT <- paste0('DO_Daily_Avg_STAT: ', 
                                        DO_Assessment_DailyAvg(stationData) %>% 
                                          quickStats('DO_Daily_Avg') %>% 
-                                         dplyr::select(DO_Daily_Avg_STAT) %>% pull())}
+                                         dplyr::select(DO_Daily_Avg_STAT) %>% pull())#}
     
     results <- cbind(
       StationTableStartingData(stationData),
