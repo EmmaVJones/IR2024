@@ -45,6 +45,7 @@ rsconnect/
 data/
 GIS/
 config.yml
+AssessorQuestions.txt
 
 1.preprocessData/data/
 1.preprocessData/config.yml

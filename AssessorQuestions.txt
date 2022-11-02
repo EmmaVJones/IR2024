@@ -1,8 +1,0 @@
-Assessor questions:
-- 7Q10 flag applied at VAHUC6 or VAHU5 level?
-- 7Q10 flag dropped for lake data?
-- 7Q10 flag: how do we count samples? 
-   - current fix is to drop samples from quickStats() 
-      so not included in X/Y analysis but 7Q10 samples
-      carry through parameter analysis with special logic
-      to not flag for exceedances
