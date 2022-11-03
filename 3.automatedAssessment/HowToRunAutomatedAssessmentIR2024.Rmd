@@ -353,6 +353,8 @@ for(i in 15:25){#nrow(stationTable)){
    # if(unique(stationData$lakeStation) == TRUE){
   #    DO_Daily_Avg_STAT <- ''
   #  } else {
+    
+    # Run DO Daily Avg for everyone!
       DO_Daily_Avg_STAT <- paste0('DO_Daily_Avg_STAT: ', 
                                        DO_Assessment_DailyAvg(stationData) %>% 
                                          quickStats('DO_Daily_Avg') %>% 

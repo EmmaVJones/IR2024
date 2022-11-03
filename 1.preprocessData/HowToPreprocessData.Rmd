@@ -161,13 +161,85 @@ rm(distinctSites1);rm(WQMstations)
 
 Stations pulled from other sources with Lat/Lng info could be run through the WQS steps if uploaded and reorganized here.
 
+Bring in and organize BRRO citmonNonagency sites.
+
+```{r BRRO citmonNonagency}
+# Tried to operationalize it but schema different between sheets so require manual work in excel
+# path <- "data/CitizenMonitoringNonAgencyFromRegions/ALL_BRRO_CitMon_Stn_IDs_FINAL.xlsx"
+# citmon <- path %>% 
+#   excel_sheets() %>% 
+#   set_names() %>% 
+#   map_df(read_excel, path = path)
+
+path <- "data/CitizenNonAgencyStations.xlsx"
+
+citmonNonAgency <- path %>% 
+  excel_sheets() %>%
+  set_names() %>%
+  map_df(read_excel, path = path)
+```
+
+Organize data to match distinctSites_sf format
+
+```{r citmonNonagency spatial}
+citmonNonAgency_sf <- citmonNonAgency %>% 
+  dplyr::select(FDT_STA_ID = `DEQ Station ID`,
+                STA_DESC = `Station Description`, 
+                Data_Source = `Data Source`,
+                Latitude, Longitude) %>% 
+   st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = F, # don't remove these lat/lon cols from df
+           crs = 4326)
+```
 
 
+Need to add spatial metadata to make next steps work more efficiently.
+
+```{r citmonNonagency spatial metadata}
+#Bring in extra large ecoregion and assessment region files. By extra large we mean that they are continuous outside the state boundary such that stations that fall outside the state are not removed when spatially intersected
+ecoregion4Large <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VA_level4ecoregion_WGS84.shp')
+county <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VACountyBoundaries.shp')
+vahu6 <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VA_SUBWATERSHED_6TH_ORDER_STG.shp') # this version of vahu6 layer goes outside state boundary
+subbasinConversion <- read_csv('C:/HardDriveBackup/R/GitHub/pinData/data/subbasinToVAHU6conversion.csv')
+unrestrictedAssessmentRegionVAHU6Subbasin <- left_join(vahu6, subbasinConversion, by = c('VAHU6', 'VAHU5'))
+
+# need this if running just citmon
+distinctSites_sf <- readRDS('./data/distinctSites_sf.RDS')
 
 
+# Add Level 3 and 4 Ecoregion Info
+citmonNonAgency_sf1 <- citmonNonAgency_sf %>% 
+  st_intersection(dplyr::select(ecoregion4Large, US_L3CODE, US_L3NAME, US_L4CODE, US_L4NAME)) %>%
+  st_intersection(dplyr::select(county, CountyCityName = NAME, FIPS)) %>% 
+  st_intersection(unrestrictedAssessmentRegionVAHU6Subbasin) 
 
+# QA step
+filter(citmonNonAgency_sf, ! FDT_STA_ID %in% citmonNonAgency_sf1$FDT_STA_ID)
 
+distinctSites_sf <- bind_rows(distinctSites_sf %>% st_drop_geometry(),
+                              citmonNonAgency_sf1 %>% st_drop_geometry() %>% 
+                                dplyr::select(any_of(names(distinctSites_sf)))) %>%
+   st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = F, # don't remove these lat/lon cols from df
+           crs = 4326)
 
+# Clean up workspace
+rm(list = c('ecoregion4Large','county', 'vahu6','subbasinConversion','unrestrictedAssessmentRegionVAHU6Subbasin',
+            'citmonNonAgency_sf1', 'path'))
+```
+
+for next steps just running citmon
+
+```{r}
+# distinctSites_sf <- bind_rows(distinctSites_sf %>% st_drop_geometry(),
+#                               citmonNonAgency_sf %>% st_drop_geometry()) %>% 
+#    st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+#            remove = T, # don't remove these lat/lon cols from df
+#            crs = 4326)
+
+# for next steps just running 
+distinctSites_sf <- filter(distinctSites_sf, FDT_STA_ID %in% citmonNonAgency_sf$FDT_STA_ID)
+```
 
 
 
@@ -324,7 +396,7 @@ riverine <- st_read('../GIS/draft_WQS_shapefiles_2022/riverine_draft2022.shp',
 WQStable <- snapAndOrganizeWQS(distinctSitesToDoWQS, 'FDT_STA_ID', riverine, 
                                bufferDistances = seq(20,80,by=20),  # buffering by 20m from 20 - 80 meters
                                WQStable)
-#saveRDS(WQStable, 'data/WQStable.RDS')
+#saveRDS(WQStable, 'data/WQStableBRROCitmon.RDS')
 
 rm(riverine)
 ```
@@ -377,7 +449,7 @@ WQStable <- snapAndOrganizeWQS(filter(distinctSitesToDoWQS, SUBBASIN %in% c("Pot
                                'StationID', estuarineLines, 
                                bufferDistances = seq(20,80,by=20),  # buffering by 20m from 20 - 80 meters
                                WQStable)
-saveRDS(WQStable, 'WQStable2.RDS')
+#saveRDS(WQStable, 'WQStable2.RDS')
 rm(estuarineLines)
 ```
 
@@ -467,7 +539,7 @@ skipped some stuff. double check when have citmon etc if needed
 
 Save WQStable for manual review in application. 
 ```{r save WQS for app review}
-saveRDS(WQStable, './data/WQStable10182022.RDS')
+saveRDS(WQStable, './data/WQStable11032022.RDS')
 
 # clean up workspace
 rm(list = c('distinctSitesToDoWQS','WQStable', 'WQStableExisting','WQStableMissing'))
