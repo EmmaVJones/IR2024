@@ -5,6 +5,8 @@ date: "7/22/2022"
 output: html_document
 ---
 
+# Intro
+
 After an update to lwgeom, this entire script needs to be run in R4.0.3 or you run into 'C Stack limit' errors at geospatial processes. Likely this has to do with updates to geospatial operations in underlying system dependencies with sf0.8 to sf 0.9, but not entirely sure.
 
 All other scripts should be performed in R 3.6.2 to ensure they work on the server (which is still running GDAL 2.2X and PROJ4)
@@ -161,9 +163,9 @@ rm(distinctSites1);rm(WQMstations)
 
 Stations pulled from other sources with Lat/Lng info could be run through the WQS steps if uploaded and reorganized here.
 
-Bring in and organize BRRO citmonNonagency sites.
+Bring in and organize citmonNonagency sites.
 
-```{r BRRO citmonNonagency}
+```{r all citmonNonagency}
 # Tried to operationalize it but schema different between sheets so require manual work in excel
 # path <- "data/CitizenMonitoringNonAgencyFromRegions/ALL_BRRO_CitMon_Stn_IDs_FINAL.xlsx"
 # citmon <- path %>% 
@@ -177,7 +179,37 @@ citmonNonAgency <- path %>%
   excel_sheets() %>%
   set_names() %>%
   map_df(read_excel, path = path)
+
+View(citmonNonAgency %>% group_by(`DEQ Station ID`) %>% mutate(n = n()) %>%  arrange(desc(n), `DEQ Station ID`))
 ```
+
+Reduce to just the sites in the last assessment cycle as to not attribute unnecessary sites. 
+
+```{r limit citmonnonagency}
+# library(pool)
+# library(dbplyr)
+# 
+# pool <- dbPool(
+#   drv = odbc::odbc(),
+#   Driver = "ODBC Driver 11 for SQL Server", #"SQL Server", ##"SQL Server Native Client 11.0", 
+#   Server= "DEQ-SQLODS-PROD,50000",
+#   database = "ODS",
+#   trusted_connection = "yes"
+# )
+#
+# had to run below in R4.1.2 bc issue in driver or ODBC in 3.6.2?
+# stations <-  pool %>% 
+#   tbl(in_schema('wqa', 'WQA Station Details')) %>% 
+#   filter(`Assessment Cycle` == 2022) %>% 
+#   as_tibble()
+stations <- readRDS('data/2022stations.RDS')
+
+citmonNonAgency <- filter(citmonNonAgency, `DEQ Station ID` %in% stations$`Station Id`)
+
+
+rm(pool);rm(stations)
+```
+
 
 Organize data to match distinctSites_sf format
 
@@ -198,10 +230,19 @@ Need to add spatial metadata to make next steps work more efficiently.
 ```{r citmonNonagency spatial metadata}
 #Bring in extra large ecoregion and assessment region files. By extra large we mean that they are continuous outside the state boundary such that stations that fall outside the state are not removed when spatially intersected
 ecoregion4Large <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VA_level4ecoregion_WGS84.shp')
-county <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VACountyBoundaries.shp')
 vahu6 <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VA_SUBWATERSHED_6TH_ORDER_STG.shp') # this version of vahu6 layer goes outside state boundary
 subbasinConversion <- read_csv('C:/HardDriveBackup/R/GitHub/pinData/data/subbasinToVAHU6conversion.csv')
-unrestrictedAssessmentRegionVAHU6Subbasin <- left_join(vahu6, subbasinConversion, by = c('VAHU6', 'VAHU5'))
+
+subbasinLayer <- st_read('../GIS/DEQ_VAHUSB_subbasins_EVJ.shp')  %>% 
+  st_drop_geometry() %>% 
+  rename('SUBBASIN' = 'SUBBASIN_1') %>% 
+  distinct(subbasin, .keep_all = T) %>%  # don't need this by Assessment Region right now so simplify dataset to make next join cleaner
+  dplyr::select(BASIN_NAME, BASIN_CODE, SUBBASIN, subbasin)
+
+unrestrictedAssessmentRegionVAHU6Subbasin <- left_join(vahu6, subbasinConversion, by = c('VAHU6', 'VAHU5')) %>% 
+  left_join(subbasinLayer, by = c('BASIN_CODE' = 'BASIN_CODE',
+                                  'VAHUSB' = 'subbasin'))
+#View(unrestrictedAssessmentRegionVAHU6Subbasin %>% st_drop_geometry())
 
 # need this if running just citmon
 distinctSites_sf <- readRDS('./data/distinctSites_sf.RDS')
@@ -209,23 +250,40 @@ distinctSites_sf <- readRDS('./data/distinctSites_sf.RDS')
 
 # Add Level 3 and 4 Ecoregion Info
 citmonNonAgency_sf1 <- citmonNonAgency_sf %>% 
-  st_intersection(dplyr::select(ecoregion4Large, US_L3CODE, US_L3NAME, US_L4CODE, US_L4NAME)) %>%
-  st_intersection(dplyr::select(county, CountyCityName = NAME, FIPS)) %>% 
-  st_intersection(unrestrictedAssessmentRegionVAHU6Subbasin) 
+  st_intersection(unrestrictedAssessmentRegionVAHU6Subbasin) %>% 
+  st_intersection(dplyr::select(ecoregion4Large, US_L3CODE, US_L3NAME, US_L4CODE, US_L4NAME)) 
 
-# QA step
-filter(citmonNonAgency_sf, ! FDT_STA_ID %in% citmonNonAgency_sf1$FDT_STA_ID)
-
-distinctSites_sf <- bind_rows(distinctSites_sf %>% st_drop_geometry(),
-                              citmonNonAgency_sf1 %>% st_drop_geometry() %>% 
-                                dplyr::select(any_of(names(distinctSites_sf)))) %>%
+# add back in sites that could have been lost in spatial joins
+citmonNonAgency_sf2 <- bind_rows(citmonNonAgency_sf1 %>% st_drop_geometry(), # drop geom so bind_rows will work instead of rbind
+                                 filter(citmonNonAgency_sf, ! FDT_STA_ID %in% citmonNonAgency_sf1$FDT_STA_ID) %>% 
+                                   st_drop_geometry()) %>% 
+  # change back to spatial object
    st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
            remove = F, # don't remove these lat/lon cols from df
            crs = 4326)
 
+
+
+# QA step
+# filter(citmonNonAgency_sf, ! FDT_STA_ID %in% citmonNonAgency_sf2$FDT_STA_ID)
+# mapview::mapview(filter(citmonNonAgency_sf, ! FDT_STA_ID %in% citmonNonAgency_sf1$FDT_STA_ID))+
+#   mapview::mapview(ecoregion4Large)
+
+distinctSites_sf <- bind_rows(distinctSites_sf %>% st_drop_geometry(),
+                              citmonNonAgency_sf2 %>% st_drop_geometry() %>% 
+                                dplyr::select(any_of(names(distinctSites_sf)))) %>%
+  dplyr::select(names(distinctSites_sf)) %>% # once you have the right column names, reorder to correct order
+  st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = F, # don't remove these lat/lon cols from df
+           crs = 4326) %>% 
+  distinct(FDT_STA_ID, .keep_all = T)
+
+# Save for use in metadata app
+saveRDS(distinctSites_sf, 'data/distinctSites_sf_withCitmon.RDS')
+
 # Clean up workspace
 rm(list = c('ecoregion4Large','county', 'vahu6','subbasinConversion','unrestrictedAssessmentRegionVAHU6Subbasin',
-            'citmonNonAgency_sf1', 'path'))
+            'citmonNonAgency_sf1', 'citmonNonAgency_sf2', 'path', 'subbasinLayer'))
 ```
 
 for next steps just running citmon
@@ -239,6 +297,11 @@ for next steps just running citmon
 
 # for next steps just running 
 distinctSites_sf <- filter(distinctSites_sf, FDT_STA_ID %in% citmonNonAgency_sf$FDT_STA_ID)
+distinctSitesToDo <- distinctSites_sf 
+
+filter(citmonNonAgency_sf, ! FDT_STA_ID %in% distinctSites_sf$FDT_STA_ID)
+
+#View(distinctSites_sf %>% group_by(FDT_STA_ID) %>% mutate(n = n()) %>% dplyr::select(n, everything()) %>%  arrange(desc(n), FDT_STA_ID))
 ```
 
 
@@ -396,7 +459,7 @@ riverine <- st_read('../GIS/draft_WQS_shapefiles_2022/riverine_draft2022.shp',
 WQStable <- snapAndOrganizeWQS(distinctSitesToDoWQS, 'FDT_STA_ID', riverine, 
                                bufferDistances = seq(20,80,by=20),  # buffering by 20m from 20 - 80 meters
                                WQStable)
-#saveRDS(WQStable, 'data/WQStableBRROCitmon.RDS')
+#saveRDS(WQStable, 'data/WQStableCitmon.RDS')
 
 rm(riverine)
 ```
@@ -484,6 +547,7 @@ We don't want to give everyone all the stations that didn't snap to something, s
 If a station snapped to nothing, we will assigning it a RL WQS_ID and subbasin it falls into by default.
 
 ```{r blank WQS_ID partially filled in}
+# for DEQ stations!
 WQStableMissing <- filter(WQStable, is.na(WQS_ID)) %>%
   # drop from list if actually fixed by snap to another segment
   filter(! StationID %in% filter(WQStable, str_extract(WQS_ID, "^.{2}") %in% c('EL','LP','EP'))$StationID) %>%
@@ -498,9 +562,28 @@ WQStableMissing <- filter(WQStable, is.na(WQS_ID)) %>%
     WQS_ID = paste0('RL_', BASIN_CODE2,'_NA')) %>%
   dplyr::select(-c(BASIN_CODE, BASIN_CODE1, BASIN_CODE2))
 
+# for citmon/nonAgency stations that don't have correct basin info
+subbasinLayer <- st_read('../GIS/DEQ_VAHUSB_subbasins_EVJ.shp') 
+WQStableMissing1 <- WQStableMissing %>% 
+  left_join(dplyr::select(distinctSites_sf, FDT_STA_ID, Latitude, Longitude) %>% st_drop_geometry(),
+            by = c('StationID' = 'FDT_STA_ID')) %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = F, # don't remove these lat/lon cols from df
+           crs = 4326) %>% 
+  st_intersection(subbasinLayer) %>% 
+  dplyr::select(StationID, WQS_ID, `Buffer Distance` = "Buffer.Distance", BASIN_CODE) %>% 
+  mutate(WQS2 = paste0(str_extract(WQS_ID, "^.{2}"),
+                       '_', 
+                       str_pad(BASIN_CODE, width = 2, side = 'left', pad = '0'),
+                      '_NA')) %>% 
+  dplyr::select(StationID, WQS_ID = WQS2, `Buffer Distance`) %>% 
+  st_drop_geometry()
+
 WQStable <- filter(WQStable, !is.na(WQS_ID)) %>% 
-  filter(! StationID %in% WQStableMissing$StationID) %>%
+  filter(! StationID %in% WQStableMissing1$StationID) %>%
   bind_rows(WQStableMissing)
+
+saveRDS(WQStable, 'data/WQStableCitmonAll.RDS')
 ```
 
 
@@ -543,6 +626,15 @@ saveRDS(WQStable, './data/WQStable11032022.RDS')
 
 # clean up workspace
 rm(list = c('distinctSitesToDoWQS','WQStable', 'WQStableExisting','WQStableMissing'))
+```
+
+Add citmon to all DEQ stations needing WQS.
+
+```{r}
+WQSog <- readRDS('./data/WQStable10182022.RDS')# last time pre citmon
+
+WQStogether <- bind_rows(WQSog, WQStable)
+#saveRDS(WQStogether, 'data/WQStableWithCitmon11142022.RDS')
 ```
 
 
@@ -958,5 +1050,20 @@ Save your work!
 ```{r sites ready for app review}
 write.csv(distinctSites_AU , 'data/preAnalyzedAUdata.csv', row.names = F)
 ```
+
+
+
+### Intermediate app updates
+
+Throughout the metadata process, there will be times when you need to grab the attributed data from teh server, organize it, and push an app update. You first need to go to the server and grab all data attributed so far from the AUlookupTable and WQSlookupTable directories in the currently active application instance (see below for more info).
+
+**This is not for when the assessors have completed all attribution, just for intermediate updates!**
+
+Then you need to move these to the current working directory (manually using File Explorer) and parse the multiple csv's into a single csv.
+
+```{r}
+#source('organizeMetadataFromServer.R')
+```
+
 
 

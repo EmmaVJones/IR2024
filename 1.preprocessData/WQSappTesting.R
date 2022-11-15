@@ -1,6 +1,6 @@
 source('global.R')
 
-conventionals_DWQS <- readRDS('data/distinctSites_sf.RDS') %>% #conventionals_D.RDS') %>%
+conventionals_DWQS <- readRDS('data/distinctSites_sf_withCitmon.RDS') %>% ##'data/distinctSites_sf.RDS') %>% #conventionals_D.RDS') %>%
   st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
            remove = F, # don't remove these lat/lon cols from df
            crs = 4326) %>%
@@ -16,12 +16,12 @@ subbasins <- st_read('../GIS/DEQ_VAHUSB_subbasins_EVJ.shp') %>%
 
 WQSwaterbodyType1 <- 'Riverine' # "Lacustrine"# 'Estuarine'#
 
-WQSDEQregionSelection1 <- 'BRRO'#"PRO"#"TRO"#"CO"#"SWRO"#
+WQSDEQregionSelection1 <- 'BRRO'#"NRO"#'BRRO'#"PRO"#"TRO"#"CO"#"SWRO"#
   #filter(subbasinOptionsByWQStype, waterbodyType %in% WQSwaterbodyType1) %>%
   #distinct(AssessmentRegion) %>% 
   #pull()
 
-WQSsubbasinSelection1 <- "James-Middle"# "Small Coastal"#"Small Coastal"#"New"#'Chowan-Albermarle'# "Small Coastal"#
+WQSsubbasinSelection1 <-"James-Middle"# "Rappahannock"#"James-Middle"# "Small Coastal"#"Small Coastal"#"New"#'Chowan-Albermarle'# "Small Coastal"#
   #filter(subbasinOptionsByWQStype, waterbodyType %in% WQSwaterbodyType1) %>%
   #filter(AssessmentRegion %in% WQSDEQregionSelection1) %>%
   #distinct(Basin_Code) %>% 
@@ -40,13 +40,13 @@ typeName1 <- filter(WQSlayerConversion, waterbodyType %in% WQSwaterbodyType1) %>
   pull() 
 
 if(length(basinCodes1) > 1){
-  WQSs1 <- st_zm(st_read(paste0('../GIS/processedWQS/',typeName1[1],'_', basinCodes1[1], '.shp') , 
+  WQSs1 <- st_zm(st_read(paste0('data/GIS/processedWQS/',typeName1[1],'_', basinCodes1[1], '.shp') , 
                         fid_column_name = "OBJECTID")) %>%
-    rbind(st_zm(st_read(paste0('../GIS/processedWQS/',typeName1[1],'_', basinCodes1[2], '.shp') , 
+    rbind(st_zm(st_read(paste0('data/GIS/processedWQS/',typeName1[1],'_', basinCodes1[2], '.shp') , 
                         fid_column_name = "OBJECTID"))) %>%
-    rbind(st_zm(st_read(paste0('../GIS/processedWQS/',typeName1[1],'_', basinCodes1[3], '.shp') , 
+    rbind(st_zm(st_read(paste0('data/GIS/processedWQS/',typeName1[1],'_', basinCodes1[3], '.shp') , 
                         fid_column_name = "OBJECTID")))
-} else { WQSs1 <- st_zm(st_read(paste0('../GIS/processedWQS/',typeName1[1],'_', basinCodes1, '.shp') ,
+} else { WQSs1 <- st_zm(st_read(paste0('data/GIS/processedWQS/',typeName1[1],'_', basinCodes1, '.shp') ,
                         fid_column_name = "OBJECTID"))    }
 WQSs1 <- WQSs1 %>%
     st_transform(4326) %>%
@@ -72,9 +72,9 @@ WQSs1 <- WQSs1 %>%
 if(WQSwaterbodyType1 == "Estuarine"){
 if(length(basinCodes1) > 1){
   WQSsEL1 <- #withProgress(message = 'Reading in Additional Estuarine Spatial File',
-               st_zm(st_read(paste0('../GIS/processedWQS/',typeName1[2],'_', basinCodes1[1], '.shp') , fid_column_name = "OBJECTID")) %>%
-               rbind(st_zm(st_read(paste0('../GIS/processedWQS/',typeName1[2],'_', basinCodes1[2], '.shp') , fid_column_name = "OBJECTID"))) %>%
-                 rbind(st_zm(st_read(paste0('../GIS/processedWQS/',typeName1[2],'_', basinCodes1[3], '.shp') , fid_column_name = "OBJECTID")))
+               st_zm(st_read(paste0('data/GIS/processedWQS/',typeName1[2],'_', basinCodes1[1], '.shp') , fid_column_name = "OBJECTID")) %>%
+               rbind(st_zm(st_read(paste0('data/GIS/processedWQS/',typeName1[2],'_', basinCodes1[2], '.shp') , fid_column_name = "OBJECTID"))) %>%
+                 rbind(st_zm(st_read(paste0('data/GIS/processedWQS/',typeName1[2],'_', basinCodes1[3], '.shp') , fid_column_name = "OBJECTID")))
                #) 
   } else {WQSsEL1 <- #withProgress(message = 'Reading in Additional Estuarine Spatial File',
                                st_zm(
@@ -116,7 +116,7 @@ conventionals_DWQS_Region <- st_intersection(conventionals_DWQS,
 
 
 
-snap_input <- readRDS('data/WQStable10182022.RDS') %>% # Oct 2022 effort with expected DEQ sites
+snap_input <- readRDS('data/WQStableWithCitmon11142022.RDS') %>% #readRDS('data/WQStable10182022.RDS') %>% # Oct 2022 effort with expected DEQ sites
   #  readRDS('data/WQStable.RDS') %>% # original effort
   filter(str_extract(WQS_ID, "^.{2}") %in% filter(WQSlayerConversion, waterbodyType %in% WQSwaterbodyType1)$WQS_ID) %>%
   filter(gsub("_","",str_extract(WQS_ID, ".{3}_")) %in% 

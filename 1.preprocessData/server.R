@@ -2,7 +2,7 @@ source('global.R')
 
 ### All conventionals sites
 ####conventionals_D <- st_read('GIS/conventionals_D.shp') %>%
-conventionals_DWQS <- readRDS('data/distinctSites_sf.RDS') %>% #conventionals_D.RDS') %>%
+conventionals_DWQS <- readRDS('data/distinctSites_sf_withCitmon.RDS') %>% ##'data/distinctSites_sf.RDS') %>% #conventionals_D.RDS') %>%
   st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
            remove = F, # don't remove these lat/lon cols from df
            crs = 4326) %>%
@@ -1004,7 +1004,7 @@ shinyServer(function(input, output, session) {
       dplyr::select(`DEQ GIS Web App Link`, everything())
     
     # All sites limited to waterbody type and subbasin
-    WQSreactive_objects$snap_input <- readRDS('data/WQStable10182022.RDS') %>% # Oct 2022 effort with expected DEQ sites
+    WQSreactive_objects$snap_input <- readRDS('data/WQStableWithCitmon11142022.RDS') %>%  #readRDS('data/WQStable10182022.RDS') %>% # Oct 2022 effort with expected DEQ sites
       #  readRDS('data/WQStable.RDS') %>% # original effort
       filter(str_extract(WQS_ID, "^.{2}") %in% filter(WQSlayerConversion, waterbodyType %in% input$WQSwaterbodyType)$WQS_ID) %>%
       filter(gsub("_","",str_extract(WQS_ID, ".{3}_")) %in% 

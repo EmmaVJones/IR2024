@@ -2,7 +2,42 @@
 shinyUI(fluidPage(theme= "yeti.css",
                   includeJqueryUI(),
                   navbarPage("Regional Assessment Metadata Validation",
+                             tabPanel("About",
+                                      h3('Application Purpose'),
+                                      p('This app was created to help assessors attach the correct AU and WQS information to
+                                                   stations for each assessment cycle.'),
+                                      p(strong('This application is intended only for Regional Assessment Staff. All other
+                                                          users are encouraged to seek other applications to meet data analysis needs.')),
+                                      
+                                      h3('Application Last Updated'),
+                                      p('November 15, 2022'),
+                                      
+                                      h3('Detailed Application Instructions:'),
+                                      a(href="https://rconnect.deq.virginia.gov/WQAautomatedAssessmentUserManual/regional-metadata-validation-tool-how-to.html#regional-metadata-validation-tool-how-to",
+                                        "Please see Chapter 4 of the DEQ Water Quality Automated Assessment User Guide", target="_blank"),
+                                      
+                                      h3("Notes for Assessment Staff"),
+                                      p('- The Assessment Data Analyst has already run the joining and snapping scripts such
+                                                   that the assessor is simply identifying the correct AU/WQS per the spatial snapping 
+                                                   suggestion.'),
+                                      p(strong('- New for IR2024: Citizen Monitoring and Non Agency stations are available for 
+                                                          WQS review inside this application. Because this review process largely occurs prior to
+                                                          data solicitation deadlines, the IR2022 citizen monitoring/non agency stations were
+                                                          provided for WQS review. At present, there is no standardized
+                                                          dataset to verify which IR2022 stations will be sampled in IR2024, so the provided stations
+                                                          may not include data in IR2024. However, archiving this WQS information will expedite
+                                                          future assessment processes should the station contain data in future assessment cycles.')),
+                                      p('- The next expected application update will occur in March 2023 after the DEQ and citizen/non agency
+                                                   monitoring data solicitation deadline. Stations provided in that update will include any DEQ stations 
+                                                   that were sampled for the first time between October 15, 2022 and the data cutoff (December 31, 2022) 
+                                                   as well as all Citizen/Non Agency monitoring stations sampled in 2021 and 2022 that were submitted 
+                                                   through established data submission channels prior to the data solicitation deadline.'),
+                                      h3("Questions?"),
+                                      p("Please reach out to Emma Jones (emma.jones@deq.virginia.gov) should you have any questions regarding this
+                                                   application or analysis.")
+                             ),
                              navbarMenu("Assessment Unit QA",
+                                        
                                         tabPanel("Watershed Selection",
                                                  h4('Assessment Unit QA'),
                                                  sidebarPanel(
@@ -119,12 +154,6 @@ shinyUI(fluidPage(theme= "yeti.css",
                                                                         div(DT::dataTableOutput("associatedWQSTableWQSQA"), style = "font-size:80%")),
                                                                       
                                                                       
-                                                                      br(), br(), br() )))),
-                             tabPanel("About",
-                                      p('This app was created to help assessors attach correct AU and WQS information to 
-                                              stations for each assessment cycle.'),
-                                      p('Emma has already run the joining and snapping scripts such that the assessor
-                                              is just identifying the correct AU/WQS where more than one segment snapped to a site 
-                                              or no segments snapped to a site in addition to reviewing all metadata prior
-                                              to assessing stations.'))
+                                                                      br(), br(), br() ))))
+                             
                   )))
