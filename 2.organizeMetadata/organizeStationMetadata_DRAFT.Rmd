@@ -395,10 +395,29 @@ Now let's pin this to the R server so others can use the data.
 pin(stationsTable2024begin, description = 'DRAFT stationsTable2024begin for IR2024 development', board = 'rsconnect')
 ```
 
+### Pull Final Stations table from last cycle for application
+
+Must run this in R 4.2.1 bc issues with trailing columns with friendly name views in older R versions
+
+```{r}
+stationsTable2022 <-  pool %>% tbl(in_schema('wqa', 'WQA Station Details')) %>% 
+  filter(`Assessment Cycle` == 2022) %>% 
+  as_tibble() 
+
+stationsTable2020 <-  pool %>% tbl(in_schema('wqa', 'WQA Station Details')) %>% 
+  filter(`Assessment Cycle` == 2020) %>% 
+  as_tibble() 
+
+saveRDS(stationsTable2022, 'data/stationsTable2022.RDS')
+saveRDS(stationsTable2020, 'data/stationsTable2020.RDS')
+
+```
+
+
 
 ### PCB data
 
-Will likely need to be reorganized when it is receieved.
+Will likely need to be reorganized when it is received.
 
 scripts from last time
 

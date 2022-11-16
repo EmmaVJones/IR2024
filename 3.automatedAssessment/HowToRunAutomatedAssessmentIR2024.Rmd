@@ -78,7 +78,8 @@ fishMetals <- read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'M
 ## Bring in Station Table from two previous assessments 
 
 ```{r stations table 2018}
-historicalStationsTable2 <- read_excel('data/oldData/tbl_ir_mon_stations2018IRfinal.xlsx')
+stationsTable2022 <- readRDS('../2.organizeMetadata/data/stationsTable2022.RDS')
+stationsTable2020 <- readRDS('../2.organizeMetadata/data/stationsTable2020.RDS')
 ```
 
 
@@ -282,7 +283,7 @@ for(i in 15:25){#nrow(stationTable)){
       else mutate(., lakeStation = FALSE) }
 
   # Previous station table comments
-  comments <- stationTableComments(stationTable$STATION_ID[i], stationTable, '2020', historicalStationsTable2, '2018')
+  comments <- stationTableComments(stationTable$STATION_ID[i], stationsTable2022, '2022', stationsTable2020, '2020')
   
   # Date last sampled
   if(nrow(stationData) > 0){
