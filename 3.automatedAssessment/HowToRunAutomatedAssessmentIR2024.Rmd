@@ -270,13 +270,14 @@ for(i in 15:25){#nrow(stationTable)){
 
   # pull one station data
   stationData <- filter(conventionals, FDT_STA_ID %in% stationTable$STATION_ID[i]) %>%
-    #stationData <- filter(conventionals, FDT_STA_ID == "4ACRV006.19") %>% #"1ABIR000.76") %>%# test a specific station
+    #stationData <- filter(conventionals, FDT_STA_ID == '1AACO014.57') %>% #"4ACRV006.19") %>% #"1ABIR000.76") %>%# test a specific station
     left_join(stationTable, by = c('FDT_STA_ID' = 'STATION_ID')) %>%
     # Special Standards Correction step. This is done on the actual data bc some special standards have temporal components
     pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
     temperatureSpecialStandardsCorrection() %>% # correct temperature special standards where necessary
     # special lake steps
     {if(stationTable$STATION_ID[i] %in% lakeStations$STATION_ID)
+    #{if('1AACO014.57' %in% lakeStations$STATION_ID)
       suppressWarnings(suppressMessages(
         mutate(., lakeStation = TRUE) %>%
         thermoclineDepth())) # adds thermocline information and SampleDate
@@ -297,11 +298,10 @@ for(i in 15:25){#nrow(stationTable)){
   # trout presence is determined by WQS class, this can be changed in the app but is forced to be what the station
   # is attributed to in the automated assessment scripts
   
-  # PWS stuff
+  # PWS Criteria
   if(nrow(stationData) > 0){
     if(is.na(unique(stationData$PWS))  ){
-      PWSconcat <- tibble(#STATION_ID = unique(stationData$FDT_STA_ID),
-                          PWS= NA)
+      PWSconcat <- tibble(PWS= NA)
    } else {
      PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData$FDT_STA_ID)),
                          assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10, 'PWS_Nitrate'),

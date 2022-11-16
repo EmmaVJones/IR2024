@@ -21,7 +21,7 @@ WQSDEQregionSelection1 <- 'BRRO'#"NRO"#'BRRO'#"PRO"#"TRO"#"CO"#"SWRO"#
   #distinct(AssessmentRegion) %>% 
   #pull()
 
-WQSsubbasinSelection1 <-"James-Middle"# "Rappahannock"#"James-Middle"# "Small Coastal"#"Small Coastal"#"New"#'Chowan-Albermarle'# "Small Coastal"#
+WQSsubbasinSelection1 <- "Roanoke"#"James-Middle"# "Rappahannock"#"James-Middle"# "Small Coastal"#"Small Coastal"#"New"#'Chowan-Albermarle'# "Small Coastal"#
   #filter(subbasinOptionsByWQStype, waterbodyType %in% WQSwaterbodyType1) %>%
   #filter(AssessmentRegion %in% WQSDEQregionSelection1) %>%
   #distinct(Basin_Code) %>% 

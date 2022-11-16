@@ -375,11 +375,11 @@ PCBmetalsDataExists <- function(x, parameterType){
 # The app doesn't use this function for modules because you need to be able to toggle assessment on/off with WQS adjustment on the
 # fly, but the automated functions need PWS filter programmed in to ease automating over thousands of sites
 
-assessPWS <- function(x, fieldName, commentName, PWSlimit, outputName){
-  if(unique(x$PWS) %in% c("Yes")){
+assessPWS <- function(stationData, fieldName, commentName, PWSlimit, outputName){
+  if(unique(stationData$PWS) %in% c("Yes")){
     fieldName_ <- enquo(fieldName)
     commentName_ <- enquo(commentName)
-    parameterData <- dplyr::select(x, FDT_DATE_TIME, !! fieldName_, !! commentName_) %>%
+    parameterData <- dplyr::select(stationData, FDT_DATE_TIME, !! fieldName_, !! commentName_) %>%
       filter(!( !! commentName_ %in% c('Level II', 'Level I'))) %>% # get lower levels out
       filter(!is.na(!!fieldName_ )) %>% #get rid of NA's
       mutate(`Parameter Rounded to WQS Format` = signif(!! fieldName_, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
@@ -391,9 +391,9 @@ assessPWS <- function(x, fieldName, commentName, PWSlimit, outputName){
   return(quickStats(tibble(limit = NA), outputName))
   }
 
-#assessPWS(x, NITRATE_mg_L, LEVEL_NITRATE, 10, 'PWS_Nitrate')
-#assessPWS(x, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250, 'PWS_Chloride')
-#assessPWS(x, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250, 'PWS_Total_Sulfate')
+#assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10, 'PWS_Nitrate')
+#assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250, 'PWS_Chloride')
+#assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250, 'PWS_Total_Sulfate')
 
 
 # Nutrients pseudo-assessment functions (for Riverine applications)
@@ -1271,15 +1271,51 @@ metalsAssessmentFunction <- function(metalsAnalysisResults){
 }
 
 
+
+
+
+
 # Single station chloride assessment
+# analyze results by 3 year windows
+
+# dataToAnalyze <- acuteCriteriaResults %>%     filter(!is.na(FDT_STA_ID)) # drop placeholder rows
+# yearsToRoll <- 3
+
+rollingExceedanceAnalysis <- function(dataToAnalyze,
+                                      yearsToRoll){
+  # place to store results
+  dataWindowResults <- tibble(FDT_STA_ID = as.character(NA), `Window Begin` = as.POSIXct(NA),
+                              FDT_DEPTH = as.numeric(NA), `Criteria Type` = as.character(NA),
+                              `Years Analysis Rolled Over`= as.numeric(NA), 
+                              `Exceedances in Rolled Window` = as.numeric(NA), 
+                              associatedData = list())
+  for(i in unique(dataToAnalyze$WindowDateTimeStart)){ #i = unique(dataToAnalyze$WindowDateTimeStart)[1]
+    # print(i)
+    dataWindow <- filter(dataToAnalyze, between(WindowDateTimeStart, i, i + years(yearsToRoll))) 
+    dataWindowAnalysis <- dataWindow %>% 
+      group_by(FDT_STA_ID, FDT_DEPTH, `Criteria Type`) %>%
+      summarise(`Criteria Type` = unique(`Criteria Type`),
+                `Window Begin` = min(WindowDateTimeStart),
+                `Years Analysis Rolled Over` = yearsToRoll, 
+                `Exceedances in Rolled Window` = sum(Exceedance)) %>% 
+      bind_cols(tibble(associatedData = list(dataWindow)))
+    dataWindowResults <- bind_rows(dataWindowResults, dataWindowAnalysis) 
+  }
+  return(filter(dataWindowResults, `Exceedances in Rolled Window` >= 2))
+}
+
+# rollingExceedanceAnalysis(acuteCriteriaResults %>%    filter(!is.na(FDT_STA_ID)), 3)
+
+
+
 chlorideFreshwaterAnalysis <- function(stationData){
   # doesn't apply in class II transition zone
-  stationData <- filter(stationData, CLASS %in% c('III', "IV","V","VI","VII") |
+  stationDataCHL <- filter(stationData, CLASS %in% c('III', "IV","V","VI","VII") |
                           CLASS ==  "II" & ZONE == 'Tidal Fresh') %>% 
     filter(!(LEVEL_CHLORIDE %in% c('Level II', 'Level I'))) %>% # get lower levels out
     filter(!is.na(CHLORIDE_mg_L)) #get rid of NA's
   
-  if(nrow(stationData) > 0){
+  if(nrow(stationDataCHL) > 0){
     
     # make a place to store analysis results
     acuteCriteriaResults <- tibble(FDT_STA_ID = as.character(NA), WindowDateTimeStart = as.POSIXct(NA), FDT_DEPTH = as.numeric(NA),
@@ -1289,9 +1325,9 @@ chlorideFreshwaterAnalysis <- function(stationData){
     chronicCriteriaResults <- acuteCriteriaResults
     
     # loop through each row of data to correctly calculate criteria and find any chronic scenarios
-    for(k in stationData$FDT_DATE_TIME){  #k = stationData$FDT_DATE_TIME[1]
-      acuteDataWindow <- filter(stationData,  between(FDT_DATE_TIME, k, k + hours(1)))
-      chronicDataWindow <- filter(stationData,  between(FDT_DATE_TIME, k, k + days(4)))
+    for(k in stationDataCHL$FDT_DATE_TIME){  #k = stationDataCHL$FDT_DATE_TIME[1]
+      acuteDataWindow <- filter(stationDataCHL,  between(FDT_DATE_TIME, k, k + hours(1)))
+      chronicDataWindow <- filter(stationDataCHL,  between(FDT_DATE_TIME, k, k + days(4)))
       
       # Run acute analysis if data exists
       if(nrow(acuteDataWindow) > 0){
@@ -1327,7 +1363,7 @@ chlorideFreshwaterAnalysis <- function(stationData){
         chronicCriteriaResults <- bind_rows(chronicCriteriaResults, chronicDataCriteriaAnalysis) 
       } else {chronicCriteriaResults <- chronicCriteriaResults }
     }
-    #summarise results
+    # summarize results
     stationCriteriaResults <- bind_rows( acuteCriteriaResults, chronicCriteriaResults) %>% 
       filter(!is.na(FDT_STA_ID)) %>% # drop placeholder rows
       distinct(FDT_STA_ID, WindowDateTimeStart, FDT_DEPTH, `Criteria Type`, .keep_all = T) %>% # remove duplicates in case > 1 depth per datetime
@@ -1338,7 +1374,9 @@ chlorideFreshwaterAnalysis <- function(stationData){
                         `Criteria Type` = as.character(NA), CriteriaValue = as.numeric(NA), 
                         parameterRound = as.numeric(NA), Exceedance = as.numeric(NA)) ) }
 }
-#chlorideFreshwaterAnalysis(stationData)
+# z <- chlorideFreshwaterAnalysis(stationData) %>% 
+# rollingExceedanceAnalysis( 3)
+
 
 
 
