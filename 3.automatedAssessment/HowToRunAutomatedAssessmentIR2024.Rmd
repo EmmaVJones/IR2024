@@ -204,7 +204,7 @@ conventionals <- conventionals %>%
             by = c('SampleDate' = 'Date', 'Huc6_Vahu5' = 'VAHU5')) %>% 
   dplyr::select(-SampleDate) # rm unnecessary column
 
-View(filter(conventionals, `7Q10 Flag` == "7Q10 Flag"))
+#View(filter(conventionals, `7Q10 Flag` == "7Q10 Flag"))
 ```
 
 

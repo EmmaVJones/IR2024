@@ -1276,42 +1276,13 @@ metalsAssessmentFunction <- function(metalsAnalysisResults){
 
 
 # Single station chloride assessment
-# analyze results by 3 year windows
-
-# dataToAnalyze <- acuteCriteriaResults %>%     filter(!is.na(FDT_STA_ID)) # drop placeholder rows
-# yearsToRoll <- 3
-
-rollingExceedanceAnalysis <- function(dataToAnalyze,
-                                      yearsToRoll){
-  # place to store results
-  dataWindowResults <- tibble(FDT_STA_ID = as.character(NA), `Window Begin` = as.POSIXct(NA),
-                              FDT_DEPTH = as.numeric(NA), `Criteria Type` = as.character(NA),
-                              `Years Analysis Rolled Over`= as.numeric(NA), 
-                              `Exceedances in Rolled Window` = as.numeric(NA), 
-                              associatedData = list())
-  for(i in unique(dataToAnalyze$WindowDateTimeStart)){ #i = unique(dataToAnalyze$WindowDateTimeStart)[1]
-    # print(i)
-    dataWindow <- filter(dataToAnalyze, between(WindowDateTimeStart, i, i + years(yearsToRoll))) 
-    dataWindowAnalysis <- dataWindow %>% 
-      group_by(FDT_STA_ID, FDT_DEPTH, `Criteria Type`) %>%
-      summarise(`Criteria Type` = unique(`Criteria Type`),
-                `Window Begin` = min(WindowDateTimeStart),
-                `Years Analysis Rolled Over` = yearsToRoll, 
-                `Exceedances in Rolled Window` = sum(Exceedance)) %>% 
-      bind_cols(tibble(associatedData = list(dataWindow)))
-    dataWindowResults <- bind_rows(dataWindowResults, dataWindowAnalysis) 
-  }
-  return(filter(dataWindowResults, `Exceedances in Rolled Window` >= 2))
-}
-
-# rollingExceedanceAnalysis(acuteCriteriaResults %>%    filter(!is.na(FDT_STA_ID)), 3)
 
 
 
 chlorideFreshwaterAnalysis <- function(stationData){
   # doesn't apply in class II transition zone
   stationDataCHL <- filter(stationData, CLASS %in% c('III', "IV","V","VI","VII") |
-                          CLASS ==  "II" & ZONE == 'Tidal Fresh') %>% 
+                             CLASS ==  "II" & ZONE == 'Tidal Fresh') %>% 
     filter(!(LEVEL_CHLORIDE %in% c('Level II', 'Level I'))) %>% # get lower levels out
     filter(!is.na(CHLORIDE_mg_L)) #get rid of NA's
   
@@ -1321,6 +1292,7 @@ chlorideFreshwaterAnalysis <- function(stationData){
     acuteCriteriaResults <- tibble(FDT_STA_ID = as.character(NA), WindowDateTimeStart = as.POSIXct(NA), FDT_DEPTH = as.numeric(NA),
                                    Value = as.numeric(NA), ValueType = as.character(NA), 
                                    `Criteria Type` = as.character(NA), CriteriaValue = as.numeric(NA), 
+                                   `Sample Count` = as.numeric(NA), 
                                    parameterRound = as.numeric(NA), Exceedance = as.numeric(NA))
     chronicCriteriaResults <- acuteCriteriaResults
     
@@ -1331,9 +1303,11 @@ chlorideFreshwaterAnalysis <- function(stationData){
       
       # Run acute analysis if data exists
       if(nrow(acuteDataWindow) > 0){
-        acuteDataCriteriaAnalysis <- dplyr::select(acuteDataWindow, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, CHLORIDE_mg_L) %>% 
+        acuteDataCriteriaAnalysis <- suppressMessages( 
+          dplyr::select(acuteDataWindow, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, CHLORIDE_mg_L) %>% 
           group_by(FDT_STA_ID, FDT_DEPTH) %>% # can't group by datetime or summary can't happen
-          summarise(Value = mean(CHLORIDE_mg_L, na.rm=T)) %>%  # get hourly average
+          summarise(Value = mean(CHLORIDE_mg_L, na.rm=T),  # get hourly average
+                    `Sample Count` = length(CHLORIDE_mg_L)) %>%  #count sample that made up average
           mutate(ValueType = 'Hourly Average',
                  ID = paste( FDT_STA_ID, FDT_DEPTH, sep = '_'), # make a uniqueID in case >1 sample for given datetime
                  `Criteria Type` = 'Acute', 
@@ -1341,16 +1315,18 @@ chlorideFreshwaterAnalysis <- function(stationData){
           mutate(parameterRound = signif(Value, digits = 2), # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
                  Exceedance = ifelse(parameterRound > CriteriaValue, 1, 0 ), # use 1/0 to easily summarize multiple results later
                  WindowDateTimeStart = min(acuteDataWindow$FDT_DATE_TIME)) %>% 
-          dplyr::select(FDT_STA_ID, WindowDateTimeStart, everything(), -ID)
+          dplyr::select(FDT_STA_ID, WindowDateTimeStart, everything(), -ID) )
         # Save the results for viewing later
         acuteCriteriaResults <- bind_rows(acuteCriteriaResults, acuteDataCriteriaAnalysis) 
       } else {acuteCriteriaResults <- acuteCriteriaResults }
       
       # Run chronic analysis if data exists
       if(nrow(chronicDataWindow) > 0){
-        chronicDataCriteriaAnalysis <- dplyr::select(chronicDataWindow, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, CHLORIDE_mg_L) %>% 
+        chronicDataCriteriaAnalysis <- suppressMessages( 
+          dplyr::select(chronicDataWindow, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, CHLORIDE_mg_L) %>% 
           group_by(FDT_STA_ID, FDT_DEPTH) %>% # can't group by datetime or summary can't happen
-          summarise(Value = mean(CHLORIDE_mg_L, na.rm=T)) %>%  # get hourly average
+          summarise(Value = mean(CHLORIDE_mg_L, na.rm=T),  # get hourly average
+                    `Sample Count` = length(CHLORIDE_mg_L)) %>%  #count sample that made up average
           mutate(ValueType = 'Four Day Average',
                  ID = paste( FDT_STA_ID, FDT_DEPTH, sep = '_'), # make a uniqueID in case >1 sample for given datetime
                  `Criteria Type` = 'Chronic', 
@@ -1358,7 +1334,7 @@ chlorideFreshwaterAnalysis <- function(stationData){
           mutate(parameterRound = signif(Value, digits = 2), # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
                  Exceedance = ifelse(parameterRound > CriteriaValue, 1, 0 ), # use 1/0 to easily summarize multiple results later
                  WindowDateTimeStart = min(chronicDataWindow$FDT_DATE_TIME)) %>% 
-          dplyr::select(FDT_STA_ID, WindowDateTimeStart, everything(), -ID)
+          dplyr::select(FDT_STA_ID, WindowDateTimeStart, everything(), -ID) )
         # Save the results for viewing later
         chronicCriteriaResults <- bind_rows(chronicCriteriaResults, chronicDataCriteriaAnalysis) 
       } else {chronicCriteriaResults <- chronicCriteriaResults }
@@ -1372,10 +1348,81 @@ chlorideFreshwaterAnalysis <- function(stationData){
   } else {return(tibble(FDT_STA_ID = as.character(NA), WindowDateTimeStart = as.POSIXct(NA), FDT_DEPTH = as.numeric(NA),
                         Value = as.numeric(NA), ValueType = as.character(NA), 
                         `Criteria Type` = as.character(NA), CriteriaValue = as.numeric(NA), 
+                        `Sample Count` = as.numeric(NA), 
                         parameterRound = as.numeric(NA), Exceedance = as.numeric(NA)) ) }
 }
-# z <- chlorideFreshwaterAnalysis(stationData) %>% 
-# rollingExceedanceAnalysis( 3)
+# dataToAnalyze <- chlorideFreshwaterAnalysis(stationData) 
+
+# fake data for testing
+#dataToAnalyze$`Sample Count`[1:77] <- rep(3, 77)
+
+# analyze results by 3 year windows, not a strict rolling window, roll by year
+annualRollingExceedanceAnalysis <- function(dataToAnalyze,
+                                      yearsToRoll){
+  # place to store results
+  dataWindowResults <- tibble(FDT_STA_ID = as.character(NA), `Window Begin` = as.numeric(NA),
+                              FDT_DEPTH = as.numeric(NA), `Criteria Type` = as.character(NA),
+                              `Years Analysis Rolled Over`= as.numeric(NA), 
+                              `Exceedances in Rolled Window` = as.numeric(NA), 
+                              `Valid Chronic Window` = NA, 
+                              associatedData = list())
+  dataToAnalyze <- dataToAnalyze %>% 
+    mutate(Year = year(WindowDateTimeStart),
+           `Valid Chronic Window` = case_when(`Criteria Type` == "Chronic"  & `Sample Count` > 1 ~ TRUE,
+                                              TRUE ~ NA))
+  
+  # need to run depths separately bc can get wonky results if only group by this for summarise step
+  for(k in unique(dataToAnalyze$FDT_DEPTH)){# k =  unique(dataToAnalyze$FDT_DEPTH)[1]
+    dataToAnalyzeDepth <- filter(dataToAnalyze, FDT_DEPTH == k)
+    
+    # stop loop from repeating windows
+    windowRange <- unique(year(dataToAnalyzeDepth$WindowDateTimeStart))
+    #min(windowRange):(max(windowRange)- (yearsToRoll- 1))
+    
+    for(i in min(windowRange):(max(windowRange)- (yearsToRoll- 1))){ #i = min(min(windowRange):(max(windowRange)- (yearsToRoll- 1))[1])
+      # print(i)}
+      dataWindow <- filter(dataToAnalyzeDepth, Year %in% i:(i + yearsToRoll- 1) ) # minus 1 year for math to work
+      dataWindowAnalysis <- suppressMessages( dataWindow %>% 
+        group_by(FDT_STA_ID, FDT_DEPTH, `Criteria Type`) %>%
+        summarise(`Criteria Type` = unique(`Criteria Type`),
+                  `Window Begin` = year(min(WindowDateTimeStart)),
+                  `Years Analysis Rolled Over` = yearsToRoll, 
+                  `Exceedances in Rolled Window` = sum(Exceedance),
+                  `Valid Chronic Window` = all(`Valid Chronic Window` == T)) %>% 
+        bind_cols(tibble(associatedData = list(dataWindow))) ) 
+      dataWindowResults <- bind_rows(dataWindowResults, dataWindowAnalysis) 
+    }
+  }
+  
+  
+  return(dataWindowResults)
+}
+
+
+# Flag if more windows exceeding than not
+# rolledAnalysis <- annualRollingExceedanceAnalysis(dataToAnalyze, 3)
+annualRollingExceedanceSummary <- function(rolledAnalysis){
+  # make a valid dataset for this analysis
+  validDataForExceedanceSummary <- bind_rows(
+    rolledAnalysis %>% 
+      filter(`Criteria Type` == 'Chronic' & `Valid Chronic Window` == TRUE),
+    rolledAnalysis %>% 
+      filter(`Criteria Type` == 'Acute')  )
+  
+  suppressMessages(
+    validDataForExceedanceSummary %>% 
+    group_by(FDT_STA_ID, FDT_DEPTH, `Criteria Type`) %>% 
+    summarise(`n Windows Fine` = sum(`Exceedances in Rolled Window` < 2),
+              `n Windows Exceeding` = sum(`Exceedances in Rolled Window` >= 2)) %>% 
+    mutate(`Suggested Result` = case_when(`n Windows Fine` > `n Windows Exceeding` ~ "Supporting",
+                                          `n Windows Fine` < `n Windows Exceeding` ~ "Review",
+                                          `n Windows Fine` == `n Windows Exceeding` ~ "Review",
+                                          TRUE ~ as.character(NA))))
+    
+}
+
+# annualRollingExceedanceSummary(annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData), 3) )
+
 
 
 
