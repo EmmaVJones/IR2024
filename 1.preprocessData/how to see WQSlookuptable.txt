@@ -1,4 +1,4 @@
-sudo  ls -l /app/rstudio-connect/apps/336/8462/WQSlookupTable
+sudo  ls -l /app/rstudio-connect/apps/336/8835/WQSlookupTable
 # 336 is app "name", visible when you click an app from content page in the URL
 # to get version number, either ls into app name and get latest version or see ... next
 # to gear on app content page to find active version number
@@ -25,10 +25,10 @@ sudo  ls -l /app/rstudio-connect/apps/336/8462/WQSlookupTable
 
 
 # Copy whole directory and change all file permissions for download
-sudo cp -arv /app/rstudio-connect/apps/336/8462/WQSlookupTable /home/aaejones/temp
+sudo cp -arv /app/rstudio-connect/apps/336/8835/WQSlookupTable /home/aaejones/temp
 sudo chmod -R 755 /home/aaejones/temp/WQSlookupTable
 
-sudo cp -arv /app/rstudio-connect/apps/336/8462/AUlookupTable /home/aaejones/temp
+sudo cp -arv /app/rstudio-connect/apps/336/8835/AUlookupTable /home/aaejones/temp
 sudo chmod -R 755 /home/aaejones/temp/AUlookupTable
 
 

@@ -834,6 +834,33 @@ shinyServer(function(input, output, session) {
   
   
   
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   ##################################################################################################################################################
   
   ## WQS Side of Application
@@ -1004,7 +1031,7 @@ shinyServer(function(input, output, session) {
       dplyr::select(`DEQ GIS Web App Link`, everything())
     
     # All sites limited to waterbody type and subbasin
-    WQSreactive_objects$snap_input <- readRDS('data/WQStableWithCitmon11142022.RDS') %>%  #readRDS('data/WQStable10182022.RDS') %>% # Oct 2022 effort with expected DEQ sites
+    WQSreactive_objects$snap_input <- readRDS('data/WQStableWithCitmon11292022.RDS') %>%# readRDS('data/WQStableWithCitmon11142022.RDS') %>%  #readRDS('data/WQStable10182022.RDS') %>% # Oct 2022 effort with expected DEQ sites
       #  readRDS('data/WQStable.RDS') %>% # original effort
       filter(str_extract(WQS_ID, "^.{2}") %in% filter(WQSlayerConversion, waterbodyType %in% input$WQSwaterbodyType)$WQS_ID) %>%
       filter(gsub("_","",str_extract(WQS_ID, ".{3}_")) %in% 

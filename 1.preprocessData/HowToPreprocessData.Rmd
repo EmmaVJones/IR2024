@@ -306,6 +306,17 @@ filter(citmonNonAgency_sf, ! FDT_STA_ID %in% distinctSites_sf$FDT_STA_ID)
 
 
 
+### Remove Unwanted Stations
+
+There are some stations that are deemed permanently inappropriate for assessment purposes that make it through the conventionals query. Remove these stations now so assessors don't need to see them in the attribution or further steps.
+
+```{r staiton hit list}
+stationHitList <- read_csv('data/stationHitList.csv')
+
+distinctSites_sf <- filter(distinctSites_sf, ! FDT_STA_ID %in% stationHitList$`StationID to Remove`)
+```
+
+
 
 
 ### Attach subbasin information

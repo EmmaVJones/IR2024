@@ -34,7 +34,7 @@ WQStableCombined <- bind_rows(WQStableExisting, WQStableNew) #%>%
   # make sure no duplicates
   #group_by(StationID) %>% #mutate(n())
 # write it out to do edits manually
-write.csv(WQStableCombined, 'WQSlookupTable/20221115_0000_WQSlookup.csv', row.names = F)
+write.csv(WQStableCombined, 'WQSlookupTable/20221202_0000_WQSlookup.csv', row.names = F, na = "")
 
 
 # AU Bring in data from server
@@ -46,7 +46,7 @@ AUtableCombined <- bind_rows(AUtableExisting, AUtableNew) #%>%
 # make sure no duplicates
 #group_by(StationID) %>% #mutate(n())
 # write it out to do edits manually
-write.csv(AUtableCombined, 'AUlookupTable/20221115_0000_AUlookup.csv', row.names = F)
+write.csv(AUtableCombined, 'AUlookupTable/20221202_0000_AUlookup.csv', row.names = F, na = "")
 
 
 
