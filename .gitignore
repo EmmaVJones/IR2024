@@ -42,6 +42,7 @@ rsconnect/
 *.yml
 *.csv
 *.RDS
+*.zip
 data/
 GIS/
 config.yml
