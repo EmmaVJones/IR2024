@@ -48,7 +48,11 @@ Draft data created for testing
 ```{r pull pins}
 conventionals <- pin_get('ejones/conventionals2024draft', board = 'rsconnect')
 conventionals_distinct <- pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect') %>% 
-  filter(!is.na(Latitude) | !is.na(Longitude))
+  filter(!is.na(Latitude) | !is.na(Longitude)) %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"), 
+               remove = F, # don't remove these lat/lon cols from df
+               crs = 4326) %>% 
+  st_intersection(dplyr::select(basins, BASIN_CODE)) 
 
 
 WQMstationFull <- pin_get("ejones/WQM-Station-Full", board = "rsconnect")
@@ -59,6 +63,8 @@ VCPMI63results <- pin_get("ejones/VCPMI63results", board = "rsconnect") %>%
 VCPMI65results <- pin_get("ejones/VCPMI65results", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) ) 
 assessmentWindowLowFlows <- pin_get('ejones/AssessmentWindowLowFlows', board = 'rsconnect')
+#subbasinToVAHU6 <- pin_get('ejones/subbasinToVAHU6', board = 'rsconnect')
+basins <- st_as_sf(pin_get('ejones/DEQ_VAHUSB_subbasins_EVJ', board = 'rsconnect'))
 ```
 
 Placeholders until data window sorted
@@ -137,8 +143,23 @@ Pull pinned WQS info saved on server. Then perform a series of data manipulation
 
 ```{r pull WQS info}
 WQSlookup <- pin_get("WQSlookup-withStandards",  board = "rsconnect")
+citmonWQS <- readRDS('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/data/citmonStationsWithWQS.RDS') %>% 
+  dplyr::select(StationID = `Station Id`, `WQS Section`, `WQS Class`, `WQS Special Standard`)
 
-stationTable <- left_join(stationTable, WQSlookup, by = c('STATION_ID' = 'StationID')) %>% # (1)
+stationTable <- stationTable %>% # (1)
+  
+  # Special CitMon/Non Agency step until full WQS_ID inplementation in IR2028
+  left_join(citmonWQS, by = c('STATION_ID' = 'StationID')) %>% # (1)
+  
+  # Join to real WQS_ID's (do this second in case citmon station double listed, want proper WQS_ID if available) (1)
+  left_join(WQSlookup, by = c('STATION_ID' = 'StationID')) %>%
+  
+  # coalesce these similar fields together, taking WQS_ID info before citmon method
+  mutate(CLASS = coalesce(CLASS, `WQS Class`),
+         SEC = coalesce(SEC, `WQS Section`),
+         SPSTDS = coalesce(SPSTDS, `WQS Special Standard`)) %>% 
+  dplyr::select(-c(`WQS Section`, `WQS Class`, `WQS Special Standard`)) %>% 
+  
   # Fix for Class II Tidal Waters in Chesapeake (bc complicated DO/temp/etc standard)
   mutate(CLASS_BASIN = paste(CLASS,substr(BASIN, 1,1), sep="_")) %>% # (2)
   mutate(CLASS_BASIN = ifelse(CLASS_BASIN == 'II_7', "II_7", as.character(CLASS))) %>% # (2)
@@ -197,11 +218,28 @@ We also need to bring in the previously analyzed low flow periods for the assess
 
 This gage-specific information is spatially joined to VAHU5 watersheds to extrapolate low flow conditions to stations that fall into said watersheds. The temporal windows where low flow events were recorded in a watershed are joined to stations that fall into said watershed. Parameters that should not be analyzed during low flow events are flagged during the automated assessment process and presented to the assessment staff in the assessment applications.
 
-```{r low flow}
+
+Spatially join when doing stuff now with draft data
+
+```{r low flow data}
+# Simplify the data first by date and BASIN_CODE as to not duplicate data when joined to conventionals raw data
+assessmentWindowLowFlowsBasinLevelFlag <- dplyr::select(assessmentWindowLowFlows, Date, `7Q10 Flag`, BASIN_CODE, BASIN_NAME) %>% 
+  group_by(Date, BASIN_CODE) %>% 
+  #mutate(n = n()) %>% # visualize how many duplicated here
+  #arrange(desc(n), Date) %>% 
+  mutate(n = 1:n()) %>% 
+  filter(n ==1 ) %>% 
+  dplyr::select(-n)
+
+
 conventionals <- conventionals %>% 
+  left_join(dplyr::select(conventionals_distinct, FDT_STA_ID, BASIN_CODE) %>% st_drop_geometry(),
+            by = 'FDT_STA_ID') %>% 
   mutate(SampleDate = as.Date(FDT_DATE_TIME)) %>% 
-  left_join(dplyr::select(assessmentWindowLowFlows, Date, `7Q10 Flag`, VAHU5),
-            by = c('SampleDate' = 'Date', 'Huc6_Vahu5' = 'VAHU5')) %>% 
+  #left_join(dplyr::select(stationTable, STATION_ID, VAHU6), by = c('FDT_STA_ID' = 'STATION_ID')) %>% # join in VAHU6 information from Assessors
+  #left_join(dplyr::select(subbasinToVAHU6, VAHU6, BASIN_CODE, Basin_Code), by = 'VAHU6')  # join in basin information by VAHU6
+  left_join(assessmentWindowLowFlowsBasinLevelFlag,
+            by = c('SampleDate' = 'Date', 'BASIN_CODE' = 'BASIN_CODE')) %>% 
   dplyr::select(-SampleDate) # rm unnecessary column
 
 #View(filter(conventionals, `7Q10 Flag` == "7Q10 Flag"))
