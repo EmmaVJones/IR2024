@@ -1431,13 +1431,12 @@ annualRollingExceedanceSummary <- function(rolledAnalysis){
 
 
 
-
-
 chlorideFreshwaterSummary <- function(chlorideFreshwater){
-  chlorideFreshwaterExceed <- filter(chlorideFreshwater, Exceedance ==1)
+  chlorideFreshwaterExceed <- filter(chlorideFreshwater, Exceedance == 1 & `Criteria Type` %in% "Acute" |
+                                       Exceedance == 1 & `Criteria Type` %in% "Chronic" & `Sample Count` > 1)
   if(nrow(chlorideFreshwaterExceed) >0){
     return(tibble(CHL_EXC = nrow(chlorideFreshwaterExceed), CHL_STAT = 'Review'))
   } else {return(tibble(CHL_EXC = NA, CHL_STAT= NA))}
 }
-#chlorideFreshwaterSummary(suppressMessages(chlorideFreshwaterAnalysis(stationData)))
+#chlorideFreshwaterSummary(chlorideFreshwaterAnalysis(stationData))
 
