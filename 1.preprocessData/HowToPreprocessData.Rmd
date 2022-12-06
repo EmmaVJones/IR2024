@@ -318,6 +318,27 @@ distinctSites_sf <- filter(distinctSites_sf, ! FDT_STA_ID %in% stationHitList$`S
 
 
 
+### Pin Conventionals and Conventionals Distinct to server
+
+```{r}
+conventionals_distinct <- conventionals_distinct %>% 
+  filter(!is.na(Latitude) | !is.na(Longitude)) %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"), 
+               remove = F, # don't remove these lat/lon cols from df
+               crs = 4326) %>% 
+  st_intersection(dplyr::select(basins, BASIN_CODE)) 
+```
+
+now pin to server
+
+
+```{r}
+# pin final versions
+# pin('ejones/conventionals2024draft', board = 'rsconnect')
+# pin('ejones/conventionals2024_distinctdraft', board = 'rsconnect')  # see below for fix coming this way at final stage
+
+```
+
 
 ### Attach subbasin information
 

@@ -47,12 +47,7 @@ Draft data created for testing
 
 ```{r pull pins}
 conventionals <- pin_get('ejones/conventionals2024draft', board = 'rsconnect')
-conventionals_distinct <- pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect') %>% 
-  filter(!is.na(Latitude) | !is.na(Longitude)) %>% 
-  st_as_sf(coords = c("Longitude", "Latitude"), 
-               remove = F, # don't remove these lat/lon cols from df
-               crs = 4326) %>% 
-  st_intersection(dplyr::select(basins, BASIN_CODE)) 
+conventionals_distinct <- pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect')  # see below for fix coming this way at final stage
 
 
 WQMstationFull <- pin_get("ejones/WQM-Station-Full", board = "rsconnect")
@@ -65,6 +60,17 @@ VCPMI65results <- pin_get("ejones/VCPMI65results", board = "rsconnect") %>%
 assessmentWindowLowFlows <- pin_get('ejones/AssessmentWindowLowFlows', board = 'rsconnect')
 #subbasinToVAHU6 <- pin_get('ejones/subbasinToVAHU6', board = 'rsconnect')
 basins <- st_as_sf(pin_get('ejones/DEQ_VAHUSB_subbasins_EVJ', board = 'rsconnect'))
+
+
+# this will be taken care of in 1.preprocessing at the final draft stage and we can delete this out
+# conventionals_distinct <- conventionals_distinct %>% 
+#   filter(!is.na(Latitude) | !is.na(Longitude)) %>% 
+#   st_as_sf(coords = c("Longitude", "Latitude"), 
+#                remove = F, # don't remove these lat/lon cols from df
+#                crs = 4326) %>% 
+#   st_intersection(dplyr::select(basins, BASIN_CODE)) 
+# saveRDS(conventionals_distinct, 'data/conventionals_distinctDRAFT.RDS')
+conventionals_distinct <- readRDS('data/conventionals_distinctDRAFT.RDS')
 ```
 
 Placeholders until data window sorted
