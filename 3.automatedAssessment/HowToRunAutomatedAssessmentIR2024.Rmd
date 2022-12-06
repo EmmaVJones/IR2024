@@ -337,12 +337,21 @@ for(i in 15:25){#nrow(stationTable)){
         thermoclineDepth())) # adds thermocline information and SampleDate
       else mutate(., lakeStation = FALSE) }
 
+  # --------------------------------------------------------------------------------------------------------------------------------------
+  # Add some extra columns that are helpful for assessors but don't fit the bulk upload template
+  
   # Previous station table comments
   comments <- stationTableComments(stationTable$STATION_ID[i], stationsTable2022, '2022', stationsTable2020, '2020')
   
   # Date last sampled
   if(nrow(stationData) > 0){
     dateLastSampled <- as.character(max(stationData$FDT_DATE_TIME)) } else {dateLastSampled <- 'No data in conventionals data pull'}
+  
+  # Low Flow Summary, only gives flag if station has FDT_TEMP_CELCIUS, DO_mg_L, FDT_FIELD_PH collected on day with gage in subbasin 
+  # below 7Q10
+  lowFlowSummary <- lowFlowFlagColumn(stationData)
+  
+  #---------------------------------------------------------------------------------------------------------------------------------------
   
   # Ammonia special section
   ammoniaAnalysisStation <- freshwaterNH3limit(stationData, trout = ifelse(unique(stationData$CLASS) %in% c('V','VI'), TRUE, FALSE),
@@ -365,7 +374,7 @@ for(i in 15:25){#nrow(stationTable)){
     
   # chloride assessment if data exists
     if(nrow(filter(stationData, !is.na(CHLORIDE_mg_L))) > 0){
-      chlorideFreshwater <- chlorideFreshwaterSummary(suppressMessages(chlorideFreshwaterAnalysis(stationData)))
+      chlorideFreshwater <- chlorideFreshwaterSummary(chlorideFreshwaterAnalysis(stationData))
     } else {chlorideFreshwater <- tibble(CHL_EXC = NA, CHL_STAT= NA)}
     
   # Water toxics combination with PWS, Chloride Freshwater, and water column PCB data

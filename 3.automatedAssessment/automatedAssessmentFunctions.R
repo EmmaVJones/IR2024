@@ -1440,3 +1440,29 @@ chlorideFreshwaterSummary <- function(chlorideFreshwater){
 }
 #chlorideFreshwaterSummary(chlorideFreshwaterAnalysis(stationData))
 
+
+
+# Function to add a column to stations table output that summarizes 7Q10 information for relevant parameters
+lowFlowFlagColumn <- function(stationData){
+  lowFlowFlag <- filter(stationData, !is.na(`7Q10 Flag`))
+  if(nrow(lowFlowFlag) > 0){
+    withParameterData <- dplyr::select(lowFlowFlag, FDT_STA_ID, FDT_DATE_TIME, FDT_TEMP_CELCIUS, DO_mg_L, FDT_FIELD_PH, `7Q10 Flag Gage`) %>% 
+      pivot_longer(-c(FDT_STA_ID, FDT_DATE_TIME, `7Q10 Flag Gage`), names_to = 'parameter', values_to = 'value') %>% 
+      filter(!is.na(value)) # drop rows with no data for specific parameters
+    if(nrow(withParameterData) > 0){
+      gageFlags <- dplyr::select(withParameterData, FDT_DATE_TIME,  `7Q10 Flag Gage`) %>% 
+        distinct(FDT_DATE_TIME, .keep_all = T) %>% 
+        summarise(`7Q10 Flag` = paste(as.Date(FDT_DATE_TIME),  `7Q10 Flag Gage`, collapse = '; ')) %>% 
+        mutate(`7Q10 Flag` = paste('USGS Gages in subbasin below 7Q10: ', `7Q10 Flag`)) 
+    } else {
+      gageFlags <- tibble(`7Q10 Flag` = NA_character_)   }
+    
+  } else {
+    gageFlags <- tibble(`7Q10 Flag` = NA_character_)
+  }
+  return(gageFlags)
+}
+
+#lowFlowFlagColumn(stationData)
+
+
