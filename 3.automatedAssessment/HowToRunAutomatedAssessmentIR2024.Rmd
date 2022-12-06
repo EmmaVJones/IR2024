@@ -75,7 +75,7 @@ conventionals_distinct <- readRDS('data/conventionals_distinctDRAFT.RDS')
 
 Placeholders until data window sorted
 
-```{r placeholders}
+```{r placeholders, echo=FALSE, message=F, warning=F}
 ## Placeholders
 stations2020IR <- pin_get("stations2020IR-sf-final", board = "rsconnect")
 WCmetals <- pin_get("WCmetals-2022IRfinal",  board = "rsconnect")
@@ -215,41 +215,7 @@ stationTable <- stationTable %>% # (1)
 missingWQS <- filter(stationTable, is.na(CLASS))
 ```
 
-## Bring in Low Flow Information
 
-We also need to bring in the previously analyzed low flow periods for the assessment window. These USGS stream gages are analyzed using the 7Q10 methodology consistent with the DEQ Water Permitting Program with two assumption changes:
-
-1. Provisional data are accepted (due to the expedited assessment timeline). QA/QC changes from Provision to Accepted data generally involve storm event corrections, so using Provisional data should not affect low flow analyses.
-2. Gages analyzed for low flow statistics require 10 or more valid water years for inclusion in analyses.
-
-This gage-specific information is spatially joined to VAHU5 watersheds to extrapolate low flow conditions to stations that fall into said watersheds. The temporal windows where low flow events were recorded in a watershed are joined to stations that fall into said watershed. Parameters that should not be analyzed during low flow events are flagged during the automated assessment process and presented to the assessment staff in the assessment applications.
-
-
-Spatially join when doing stuff now with draft data
-
-```{r low flow data}
-# Simplify the data first by date and BASIN_CODE as to not duplicate data when joined to conventionals raw data
-assessmentWindowLowFlowsBasinLevelFlag <- dplyr::select(assessmentWindowLowFlows, Date, `7Q10 Flag`, BASIN_CODE, BASIN_NAME) %>% 
-  group_by(Date, BASIN_CODE) %>% 
-  #mutate(n = n()) %>% # visualize how many duplicated here
-  #arrange(desc(n), Date) %>% 
-  mutate(n = 1:n()) %>% 
-  filter(n ==1 ) %>% 
-  dplyr::select(-n)
-
-
-conventionals <- conventionals %>% 
-  left_join(dplyr::select(conventionals_distinct, FDT_STA_ID, BASIN_CODE) %>% st_drop_geometry(),
-            by = 'FDT_STA_ID') %>% 
-  mutate(SampleDate = as.Date(FDT_DATE_TIME)) %>% 
-  #left_join(dplyr::select(stationTable, STATION_ID, VAHU6), by = c('FDT_STA_ID' = 'STATION_ID')) %>% # join in VAHU6 information from Assessors
-  #left_join(dplyr::select(subbasinToVAHU6, VAHU6, BASIN_CODE, Basin_Code), by = 'VAHU6')  # join in basin information by VAHU6
-  left_join(assessmentWindowLowFlowsBasinLevelFlag,
-            by = c('SampleDate' = 'Date', 'BASIN_CODE' = 'BASIN_CODE')) %>% 
-  dplyr::select(-SampleDate) # rm unnecessary column
-
-#View(filter(conventionals, `7Q10 Flag` == "7Q10 Flag"))
-```
 
 
 
@@ -291,6 +257,50 @@ lakeStations <- filter_at(stationTable,
 <!-- ``` -->
 
 
+## Bring in Low Flow Information
+
+We also need to bring in the previously analyzed low flow periods for the assessment window. These USGS stream gages are analyzed using the 7Q10 methodology consistent with the DEQ Water Permitting Program with two assumption changes:
+
+1. Provisional data are accepted (due to the expedited assessment timeline). QA/QC changes from Provision to Accepted data generally involve storm event corrections, so using Provisional data should not affect low flow analyses.
+2. Gages analyzed for low flow statistics require 10 or more valid water years for inclusion in analyses.
+
+This gage-specific information is spatially joined to major river subbasins to extrapolate low flow conditions to stations that fall into said watersheds. The temporal windows where low flow events were recorded in a watershed are joined to stations that fall into said watershed. Lake stations are removed from this flag. Parameters that should not be analyzed during low flow events are flagged during the automated assessment process and presented to the assessment staff in the assessment applications. A station-level flag is presented in the stationTable output of these scripts for users who prefer to only use the tabular output from the automated assessment tools.
+
+
+Spatially join when doing stuff now with draft data
+
+```{r low flow data}
+# Simplify the data first by date and BASIN_CODE as to not duplicate data when joined to conventionals raw data
+assessmentWindowLowFlowsBasinLevelFlag <- dplyr::select(assessmentWindowLowFlows, Date, `Gage ID`, `7Q10 Flag`, BASIN_CODE) %>% 
+  group_by(Date, BASIN_CODE) %>% 
+  summarise(`7Q10 Flag Gage` = paste(unique(`Gage ID`),collapse = ", "),
+            `7Q10 Flag` = `7Q10 Flag`) %>% 
+  # still have duplicate rows with same info, so need to drop those or will duplicate conventionals data when joined in
+  mutate(n = 1:n()) %>% 
+  filter(n == 1) %>% 
+  dplyr::select(-n) # get rid of count bc no longer needed
+
+
+conventionals <- conventionals %>% 
+  left_join(dplyr::select(conventionals_distinct, FDT_STA_ID, BASIN_CODE) %>% st_drop_geometry(),
+            by = 'FDT_STA_ID') %>% 
+  mutate(SampleDate = as.Date(FDT_DATE_TIME)) %>% 
+  #left_join(dplyr::select(stationTable, STATION_ID, VAHU6), by = c('FDT_STA_ID' = 'STATION_ID')) %>% # join in VAHU6 information from Assessors
+  #left_join(dplyr::select(subbasinToVAHU6, VAHU6, BASIN_CODE, Basin_Code), by = 'VAHU6')  # join in basin information by VAHU6
+  left_join(assessmentWindowLowFlowsBasinLevelFlag,
+            by = c('SampleDate' = 'Date', 'BASIN_CODE' = 'BASIN_CODE')) %>% 
+  dplyr::select(-SampleDate) # rm unnecessary column
+
+
+
+# Special step to remove low flow information from lake stations
+conventionals <- conventionals %>% 
+  mutate(`7Q10 Flag` = case_when(FDT_STA_ID %in% lakeStations$STATION_ID ~ NA_character_,
+                                 TRUE ~ `7Q10 Flag`))
+
+#View(filter(conventionals, `7Q10 Flag` == "7Q10 Flag"))
+```
+
 
 # Automated Assessment Steps
 
@@ -314,14 +324,14 @@ for(i in 15:25){#nrow(stationTable)){
 
   # pull one station data
   stationData <- filter(conventionals, FDT_STA_ID %in% stationTable$STATION_ID[i]) %>%
-    #stationData <- filter(conventionals, FDT_STA_ID == '1AACO014.57') %>% #"4ACRV006.19") %>% #"1ABIR000.76") %>%# test a specific station
+    #stationData <- filter(conventionals, FDT_STA_ID == '1BCKS003.10') %>% # '1AACO014.57') %>% #"4ACRV006.19") %>% #"1ABIR000.76") %>%# test a specific station
     left_join(stationTable, by = c('FDT_STA_ID' = 'STATION_ID')) %>%
     # Special Standards Correction step. This is done on the actual data bc some special standards have temporal components
     pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
     temperatureSpecialStandardsCorrection() %>% # correct temperature special standards where necessary
     # special lake steps
     {if(stationTable$STATION_ID[i] %in% lakeStations$STATION_ID)
-    #{if('1AACO014.57' %in% lakeStations$STATION_ID)
+    #{if('1BCKS003.10' %in% lakeStations$STATION_ID)
       suppressWarnings(suppressMessages(
         mutate(., lakeStation = TRUE) %>%
         thermoclineDepth())) # adds thermocline information and SampleDate

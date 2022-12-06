@@ -97,9 +97,14 @@ lakeNameStandardization <- function(x){
 #  lakeNameStandardization()
 
 
-quickStats <- function(parameterDataset, parameter){
+quickStats <- function(parameterDataset, # dataset from one station that has been run through a parameter exceedance analysis function 
+                       #                  (e.g. tempExceedances(), DOExceedances_Min(), pHexceedances())
+                       parameter, # the name of the parameter as you want it to appear in final stations table output
+                       drop7Q10 = FALSE # drop any records from this analysis with a 7Q10 flag, default is false but can be overridden in apps
+                       ){
   # Drop any 7Q10 flagged data from exceedance analyses for appropriate parameters
-  if(parameter %in% c("TEMP", "DO", "DO_Daily_Avg", "PH")){
+  if(drop7Q10 == TRUE &
+     parameter %in% c("TEMP", "DO", "DO_Daily_Avg", "PH")){
     parameterDataset <- dplyr::filter(parameterDataset, is.na(`7Q10 Flag`)) # only assess on assessable dataset
   }
   
