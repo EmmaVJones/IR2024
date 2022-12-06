@@ -686,7 +686,7 @@ benthicAssessment <- function(x, VSCIresults){
 
 #### Ammonia Assessment Functions ---------------------------------------------------------------------------------------------------
 
-# Used rolling windows but opted for loops with filtering instead of roll_apply over time series so teh data analyzed each window could
+# Used rolling windows but opted for loops with filtering instead of roll_apply over time series so the data analyzed each window could
 #  cascade outside the function and be unpacked by further analyses/visualizations if necessary
 
 # Four day average analysis function
