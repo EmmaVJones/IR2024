@@ -493,6 +493,7 @@ for(i in 15:25){#nrow(stationTable)){
              #BACTERIA_COMMENTS = paste0(' | E.coli Comment: ', ECOLI_STATECOLI_VERBOSE,
             #                   ' | Enterococci Comment: ', ENTER_STATENTER_VERBOSE)) %>%
       left_join(comments, by = 'STATION_ID') %>%
+      left_join(lowFlowSummary, by = 'STATION_ID') %>%
       dplyr::select(-ends_with(c('exceedanceRate', 'VERBOSE', 'Assessment Decision', 'StationID'))) %>%  # to match Bulk Upload template but helpful to keep visible til now for testing
       mutate(`Date Last Sampled` = dateLastSampled)
   } else {# pull what you can from last cycle and flag as carry over

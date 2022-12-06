@@ -1450,15 +1450,18 @@ lowFlowFlagColumn <- function(stationData){
       pivot_longer(-c(FDT_STA_ID, FDT_DATE_TIME, `7Q10 Flag Gage`), names_to = 'parameter', values_to = 'value') %>% 
       filter(!is.na(value)) # drop rows with no data for specific parameters
     if(nrow(withParameterData) > 0){
-      gageFlags <- dplyr::select(withParameterData, FDT_DATE_TIME,  `7Q10 Flag Gage`) %>% 
+      gageFlags <- dplyr::select(withParameterData, FDT_STA_ID, FDT_DATE_TIME,  `7Q10 Flag Gage`) %>% 
         distinct(FDT_DATE_TIME, .keep_all = T) %>% 
-        summarise(`7Q10 Flag` = paste(as.Date(FDT_DATE_TIME),  `7Q10 Flag Gage`, collapse = '; ')) %>% 
+        summarise(STATION_ID = FDT_STA_ID, 
+                  `7Q10 Flag` = paste(as.Date(FDT_DATE_TIME),  `7Q10 Flag Gage`, collapse = '; ')) %>% 
         mutate(`7Q10 Flag` = paste('USGS Gages in subbasin below 7Q10: ', `7Q10 Flag`)) 
     } else {
-      gageFlags <- tibble(`7Q10 Flag` = NA_character_)   }
+      gageFlags <- tibble(STATION_ID = unique(lowFlowFlag$FDT_STA_ID),
+                          `7Q10 Flag` = NA_character_)   }
     
   } else {
-    gageFlags <- tibble(`7Q10 Flag` = NA_character_)
+    gageFlags <- tibble(STATION_ID = unique(lowFlowFlag$FDT_STA_ID),
+                        `7Q10 Flag` = NA_character_)
   }
   return(gageFlags)
 }
