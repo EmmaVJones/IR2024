@@ -733,186 +733,28 @@ freshwaterNH3limit <- function(stationData, # dataframe with station data
   # remove any data that shouldn't be considered
   stationDataAmmonia <- filter(stationData, !(LEVEL_FDT_TEMP_CELCIUS %in% c('Level II', 'Level I')) |
                                  !(LEVEL_FDT_FIELD_PH %in% c('Level II', 'Level I'))) %>% # get lower levels out
+    
     # lake stations should only be surface sample
     {if(unique(stationData$lakeStation) == TRUE)
       filter(., FDT_DEPTH <= 1)
       else . } %>%
     filter(!is.na(AMMONIA_mg_L)) %>% #get rid of NA's
-    dplyr::select(FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_TEMP_CELCIUS, FDT_FIELD_PH, AMMONIA_mg_L) %>% 
+    dplyr::select(FDT_DATE_TIME, FDT_DEPTH, FDT_TEMP_CELCIUS, FDT_FIELD_PH, AMMONIA_mg_L) %>% 
     # can only run analysis if all above variable are populated for a given date/time
     filter(!is.na(FDT_TEMP_CELCIUS) & !is.na(FDT_FIELD_PH))
   # If no data, return nothing
   if(nrow(stationDataAmmonia)==0){return(NULL)}
   
-  
-  # make a place to store analysis results
-  acuteCriteriaResults <- tibble(FDT_STA_ID = as.character(NA), WindowDateTimeStart = as.POSIXct(NA), FDT_DEPTH = as.numeric(NA),
-                                 Value = as.numeric(NA), ValueType = as.character(NA), 
-                                 `Criteria Type` = as.character(NA), CriteriaValue = as.numeric(NA), 
-                                 `Sample Count` = as.numeric(NA), 
-                                 parameterRound = as.numeric(NA), Exceedance = as.numeric(NA),
-                                 associatedData = list())
-  chronicCriteriaResults <- acuteCriteriaResults
-  fourDayCriteriaResults <- acuteCriteriaResults
-  # loop through each row of data to correctly calculate criteria and find any chronic scenarios
-  for(k in stationDataAmmonia$FDT_DATE_TIME){  #k = stationDataAmmonia$FDT_DATE_TIME[2]
-    acuteDataWindow <- filter(stationDataAmmonia,  between(FDT_DATE_TIME, k, k + hours(1)))
-    chronicDataWindow <- filter(stationDataAmmonia,  between(FDT_DATE_TIME, k, k + days(30)))
-    fourDayDataWindow <- filter(stationDataAmmonia,  between(FDT_DATE_TIME, k, k + days(4)))
-    
-    
-    # Run acute analysis if data exists
-    # Acute is calculated on 1 hour windows, so we need to average temperature and pH within each 1 hour window before we can calculate an
-    #  acute criteria. There are no rules on how many samples need to occur in a 1 hour window for the window to be valid, but chronic and
-    #  
-    
-    if(nrow(acuteDataWindow) > 0){
-      acuteDataCriteriaAnalysis <- suppressMessages( 
-        acuteDataWindow %>% 
-          group_by(FDT_STA_ID, FDT_DEPTH) %>% # can't group by datetime or summary can't happen
-          summarise(TempValue = mean(FDT_TEMP_CELCIUS, na.rm=T),  # get hourly average; don't round to even bc more calculations to follow with data
-                    pHValue = mean(FDT_FIELD_PH, na.rm=T),  # get hourly average; don't round to even bc more calculations to follow with data
-                    Value = mean(AMMONIA_mg_L, na.rm=T),  # get hourly average; don't round to even bc more calculations to follow with data
-                    `Sample Count` = length(AMMONIA_mg_L)) %>%  #count sample that made up average
-          mutate(ValueType = 'Hourly Average',
-                 ID = paste( FDT_STA_ID, FDT_DEPTH, sep = '_'), # make a uniqueID in case >1 sample for given datetime
-                 `Criteria Type` = 'Acute') %>% 
-          {if(trout == TRUE & mussels == TRUE)  # Trout & mussels present scenario
-            mutate(., CriteriaValue = as.numeric(signif(
-              min(((0.275 / (1 + 10^(7.204 - pHValue))) + (39.0 / (1 + 10^(pHValue - 7.204)))),
-                  (0.7249 * ( (0.0114 / (1 + 10^(7.204 - pHValue))) + (1.6181 / (1 + 10^(pHValue - 7.204)))) * (23.12 * 10^(0.036 * (20 - TempValue))) )), digits = 2)))
-            else . } %>%
-          {if(trout == TRUE & mussels == FALSE) # Trout present & mussels absent scenario
-            mutate(., CriteriaValue = as.numeric(signif(
-              min(((0.275 / (1 + 10^(7.204 - pHValue))) + (39.0 / (1 + 10^(pHValue - 7.204)))),
-                  (0.7249 * ( (0.0114 / (1 + 10^(7.204 - pHValue))) + (1.6181 / (1 + 10^(pHValue - 7.204)))) * (62.15 * 10^(0.036 * (20 - TempValue))) )), digits = 2)))
-            else . } %>%
-          {if(trout == FALSE & mussels == TRUE) # Trout absent & mussels present scenario
-            mutate(., CriteriaValue = as.numeric(signif(
-              0.7249 * ((0.0114 / (1 + 10^(7.204 - pHValue))) + (1.6181 / (1 + 10^(pHValue - 7.204)))) * min(51.93, (23.12 * 10^(0.036 * (20 - TempValue)))), digits = 2)))
-            else .} %>% 
-          {if(trout == FALSE & mussels == FALSE) # Trout & mussels absent scenario
-            mutate(., CriteriaValue = as.numeric(signif(
-              0.7249 * ((0.0114 / (1 + 10^(7.204 - pHValue))) + (1.6181 / (1 + 10^(pHValue - 7.204)))) * min(51.93, (62.15 * 10^(0.036 * (20 - TempValue)))), digits = 2)))
-            else .} %>% 
-          mutate(parameterRound = signif(Value, digits = 2), # two significant figures based on 9VAC25-260-155 https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section155/
-                 Exceedance = ifelse(parameterRound > CriteriaValue, 1, 0 ), # use 1/0 to easily summarize multiple results later
-                 WindowDateTimeStart = min(acuteDataWindow$FDT_DATE_TIME)) %>% 
-          dplyr::select(FDT_STA_ID, WindowDateTimeStart, everything(), -ID) ) 
-      # now save data for later, in a format that matches with desired output
-      acuteDataCriteriaAnalysis <- acuteDataCriteriaAnalysis %>% 
-        dplyr::select(-c(TempValue, pHValue)) %>% 
-        bind_cols(tibble(associatedData = list(left_join(acuteDataWindow,
-                                                         dplyr::select(acuteDataCriteriaAnalysis, FDT_STA_ID,  WindowDateTimeStart, FDT_DEPTH, TempValue, pHValue, Value),
-                                                         by = c('FDT_STA_ID', 'FDT_DATE_TIME' = 'WindowDateTimeStart', 'FDT_DEPTH')))) )
-      
-      # Save the results for viewing later
-      acuteCriteriaResults <- bind_rows(acuteCriteriaResults, acuteDataCriteriaAnalysis) 
-      
-    } else {acuteCriteriaResults <- acuteCriteriaResults }
-    
-
-    # Run chronic analysis if enough data exists, must have > 1 sample in chronic window to run analysis
-    # Chronic is calculated on 30 day windows, so we need to average temperature and pH within each 30 day window before we can calculate a
-    #  chronic criteria. The chronic criteria will be associated with each sample date that starts a 30 day period, but it applies to all
-    #  samples within the 30 day window. All raw data associated with each window is saved as a listcolumn for later review.
-    if(nrow(chronicDataWindow) > 1){ # need 2 or more data points to run a chronic
-      chronicDataCriteriaAnalysis <- suppressMessages(
-        chronicDataWindow %>%
-          group_by(FDT_STA_ID, FDT_DEPTH) %>% # can't group by datetime or summary can't happen
-          summarise(TempValue = mean(FDT_TEMP_CELCIUS, na.rm = T), # get 30 day average; don't round to even bc more calculations to follow with data
-                    pHValue = mean(FDT_FIELD_PH, na.rm = T), # get 30 day average; don't round to even bc more calculations to follow with data
-                    Value = mean(AMMONIA_mg_L, na.rm = T), # get 30 day average; don't round to even bc more calculations to follow with data
-                    `Sample Count` = length(AMMONIA_mg_L)) %>%  #count sample that made up average
-          mutate(ValueType = '30 Day Average',
-                 ID = paste( FDT_STA_ID, FDT_DEPTH, sep = '_'), # make a uniqueID in case >1 sample for given datetime
-                 `Criteria Type` = 'Chronic') %>%
-        # Trout & mussels present scenario
-        {if(trout == TRUE & mussels == TRUE & earlyLife == TRUE)  # Trout & mussels present scenario & earlyLife == TRUE
-          mutate(., CriteriaValue = as.numeric(signif(
-            0.8876 * ((0.0278 / (1 + 10^(7.688 - pHValue))) + (1.1994 / (1 + 10^(pHValue - 7.688)))) * (2.126 * 10^(0.028 * (20 - max(7, TempValue)))), digits = 2)))
-          else .} %>%
-        {if(trout == TRUE & mussels == TRUE & earlyLife == FALSE)  # Trout & mussels present scenario & earlyLife == FALSE
-          mutate(., CriteriaValue = as.numeric(NA))
-          else .} %>%
-
-        # Trout present & mussels absent scenario
-        {if(trout == TRUE & mussels == FALSE & earlyLife == TRUE)  # Trout present & mussels absent scenario & earlyLife == TRUE
-          mutate(., CriteriaValue = as.numeric(signif(
-            0.9405 * ((0.0278 / (1 + 10^(7.688 - pHValue))) + (1.1994 / (1 + 10^(pHValue - 7.688)))) * min(6.92, (7.547 * 10^(0.028 * (20 - TempValue)))), digits = 2)))
-          else .} %>%
-        {if(trout == TRUE & mussels == FALSE & earlyLife == FALSE)  # Trout present & mussels absent scenario & earlyLife == FALSE
-          mutate(., CriteriaValue = as.numeric(signif(
-            0.9405 * ((0.0278 / (1 + 10^(7.688 - pHValue))) + (1.1994 / (1 + 10^(pHValue - 7.688)))) * (7.547 * 10^(0.028 * (20 - max(TempValue, 7)))), digits = 2)))
-          else .} %>%
-
-        # Trout absent & mussels present scenario
-        {if(trout == FALSE & mussels == TRUE & earlyLife == TRUE)  # Trout absent & mussels present scenario & earlyLife == TRUE
-          mutate(., CriteriaValue = as.numeric(signif(
-            0.8876 * ((0.0278 / (1 + 10^(7.688 - pHValue))) + (1.1994 / (1 + 10^(pHValue - 7.688)))) * (2.126 * 10^(0.028 * (20 - max(7, TempValue)))), digits = 2)))
-          else .} %>%
-        {if(trout == FALSE & mussels == TRUE & earlyLife == FALSE)  # Trout absent & mussels present scenario & earlyLife == FALSE
-          mutate(., CriteriaValue = as.numeric(NA))
-          else .} %>%
-
-         # Trout & mussels absent scenario
-        {if(trout == FALSE & mussels == FALSE & earlyLife == TRUE)  # Trout & mussels absent scenario & earlyLife == TRUE
-          mutate(., CriteriaValue = as.numeric(signif(
-            0.9405 * ((0.0278 / (1 + 10^(7.688 - pHValue))) + (1.1994 / (1 + 10^(pHValue - 7.688)))) * min(6.92, (7.547 * 10^(0.028 * (20 - TempValue)))), digits = 2)))
-          else .} %>%
-        {if(trout == FALSE & mussels == FALSE & earlyLife == FALSE)  # Trout & mussels absent scenario & earlyLife == FALSE
-          mutate(., CriteriaValue = as.numeric(signif(
-            0.9405 * ((0.0278 / (1 + 10^(7.688 - pHValue))) + (1.1994 / (1 + 10^(pHValue - 7.688)))) * (7.547 * 10^(0.028 * (20 - max(TempValue, 7)))), digits = 2)))
-          else .} %>%
-
-        mutate(`4dayCriteriaValue` = as.numeric(signif(CriteriaValue * 2.5, digits = 2)),
-               parameterRound = signif(Value, digits = 2), # two significant figures based on 9VAC25-260-155 https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section155/
-               Exceedance = ifelse(parameterRound > CriteriaValue, 1, 0 ), # use 1/0 to easily summarize multiple results later
-               WindowDateTimeStart = min(acuteDataWindow$FDT_DATE_TIME)) %>%
-        dplyr::select(FDT_STA_ID, WindowDateTimeStart, everything(), -ID) ) 
-      # now save data for later, in a format that matches with desired output
-      chronicDataCriteriaAnalysis <- chronicDataCriteriaAnalysis %>% 
-        dplyr::select(-c(TempValue, pHValue)) %>% 
-        bind_cols(tibble(associatedData = list(left_join(chronicDataWindow,
-                                                         dplyr::select(chronicDataCriteriaAnalysis, FDT_STA_ID,  WindowDateTimeStart, FDT_DEPTH, TempValue, pHValue, Value),
-                                                         by = c('FDT_STA_ID', 'FDT_DATE_TIME' = 'WindowDateTimeStart', 'FDT_DEPTH')))) )
-
-      # Save the results for viewing later
-      chronicCriteriaResults <- bind_rows(chronicCriteriaResults, chronicDataCriteriaAnalysis)
-      } else {chronicCriteriaResults <- chronicCriteriaResults }
-
-    combinedResults <- bind_rows(acuteCriteriaResults, chronicCriteriaResults) %>%
-      arrange(WindowDateTimeStart, `Criteria Type`)
-        
-    }
-  
-      
-      return( combinedResults)#bind_rows(acuteDataCriteriaAnalysis, chronicDataCriteriaAnalysis))
-}
-        
-        
-          
-    
-      summarise(WindowStart = min(FDT_DATE_TIME),
-                `30dayAmmoniaAvg` = as.numeric(signif(mean(AMMONIA_mg_L, na.rm = T), digits = 2)), # round to even for comparison to chronic criteria
-                TempAvg = mean(FDT_TEMP_CELCIUS, na.rm = T), #don't round to even bc more calculations to follow with data
-                pHAvg = mean(FDT_FIELD_PH, na.rm = T)) %>% #don't round to even bc more calculations to follow with data
-        # Chronic Criteria mussels == T & earlyLife == T
-        {if(earlyLife == TRUE)
-          mutate(., chronicNH3limit = as.numeric(signif(
-            0.8876 * ((0.0278 / (1 + 10^(7.688 - pHAvg))) + (1.1994 / (1 + 10^(pHAvg - 7.688)))) * (2.126 * 10^(0.028 * (20 - max(7, TempAvg)))), digits = 2)),
-            `fourDayAvglimit`= as.numeric(signif(chronicNH3limit * 2.5, digits = 2)) )
-          else mutate(., chronicNH3limit = as.numeric(NA),
-                      `fourDayAvglimit`= as.numeric(NA)) } %>%
-        # Identify if window Ammonia average is above chronic criteria
-        mutate(chronicExceedance = `30dayAmmoniaAvg` > chronicNH3limit) %>%
-        # attach associated raw data to analysis for later use
-        bind_cols(tibble(associatedWindowData = list(chronicWindowData)))
-    
-  
-
-      
-      
+  # Trout & mussels present scenario
+  if(trout == TRUE & mussels == TRUE){
+    # Acute Criteria
+    acute <- stationDataAmmonia %>%
+      rowwise() %>%
+      mutate(ammoniaRound = as.numeric(signif(AMMONIA_mg_L, digits = 2)),
+             acuteNH3limit = as.numeric(signif(
+               min(((0.275 / (1 + 10^(7.204 - FDT_FIELD_PH))) + (39.0 / (1 + 10^(FDT_FIELD_PH - 7.204)))),
+                   (0.7249 * ( (0.0114 / (1 + 10^(7.204 - FDT_FIELD_PH))) + (1.6181 / (1 + 10^(FDT_FIELD_PH - 7.204)))) * (23.12 * 10^(0.036 * (20 - FDT_TEMP_CELCIUS))) )), digits = 2)),
+             acuteExceedance = ammoniaRound > acuteNH3limit) 
     # Chronic is calculated on 30 day windows, so we need to average temperature and pH within each 30 day window before we can calculate a
     #  chronic criteria. The chronic criteria will be associated with each sample date that starts a 30 day period, but it applies to all 
     #  samples within the 30 day window. All raw data associated with each window is saved as a listcolumn for later review. 
@@ -955,19 +797,6 @@ freshwaterNH3limit <- function(stationData, # dataframe with station data
              mutate(FDT_STA_ID = unique(stationData$FDT_STA_ID)) %>% 
              dplyr::select(FDT_STA_ID, everything()))  }
   
-
-
-
-
-
-
-
-
-
-
-
-
-
   # Trout present & mussels absent scenario
   if(trout == TRUE & mussels == FALSE){
     # Acute Criteria
