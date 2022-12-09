@@ -318,7 +318,7 @@ ammoniaAnalysis <- tibble()
 startTime <- Sys.time()
 
 # loop over all sites, not super efficient but get the job done in easy to follow format
-for(i in 15:25){#nrow(stationTable)){
+for(i in 1:500){#nrow(stationTable)){
 #i = 1
   print(paste('Assessing station', i, 'of', nrow(stationTable), sep=' '))
 
@@ -374,7 +374,9 @@ for(i in 15:25){#nrow(stationTable)){
     
   # chloride assessment if data exists
     if(nrow(filter(stationData, !is.na(CHLORIDE_mg_L))) > 0){
-      chlorideFreshwater <- chlorideFreshwaterSummary(chlorideFreshwaterAnalysis(stationData))
+      chlorideFreshwater <- rollingWindowSummary(
+        annualRollingExceedanceSummary(
+          annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData), 3) ), "CHL")
     } else {chlorideFreshwater <- tibble(CHL_EXC = NA, CHL_STAT= NA)}
     
   # Water toxics combination with PWS, Chloride Freshwater, and water column PCB data
@@ -385,7 +387,8 @@ for(i in 15:25){#nrow(stationTable)){
           dplyr::select(contains(c('_EXC','_STAT'))) %>%
           mutate(across( everything(),  as.character)) %>%
           pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) %>% 
-          filter(! str_detect(values, 'WQS info missing from analysis'))  ) > 1) {
+          filter(! str_detect(values, 'WQS info missing from analysis')) %>% 
+          filter(! values == "S")) > 1) {
     WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = 'Review')
     } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA)} 
   
@@ -397,10 +400,8 @@ for(i in 15:25){#nrow(stationTable)){
   if(nrow(stationData) > 0){
     # Nutrients based on station type
     # Nutrient: TP (lakes have real standards; riverine no longer uses 0.2 mg/L as an observed effect for Aquatic life use)
-      # NUT_TP_EXC, NUT_TP_SAMP, NUT_TP_STAT
     if(unique(stationData$lakeStation) == TRUE){
       TP <- TP_Assessment(stationData) 
-        #tibble(NUT_TP_EXC = NA, NUT_TP_SAMP = NA, NUT_TP_STAT = NA) # placeholder for now
       } else {
         TP <- countNutrients(stationData, PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, NA) %>% quickStats('NUT_TP') %>% 
           mutate(NUT_TP_STAT = ifelse(NUT_TP_STAT != "S", "Review", NA)) } # flag OE but don't show a real assessment decision
@@ -412,11 +413,6 @@ for(i in 15:25){#nrow(stationTable)){
       } else {
         chla <- countNutrients(stationData, CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA) %>% quickStats('NUT_CHLA') %>%
           mutate(NUT_CHLA_STAT = NA) } # don't show a real assessment decision
-    
-    # run DO daily average status for riverine and tuck results into comments later
-   # if(unique(stationData$lakeStation) == TRUE){
-  #    DO_Daily_Avg_STAT <- ''
-  #  } else {
     
     # Run DO Daily Avg for everyone!
       DO_Daily_Avg_STAT <- paste0('DO_Daily_Avg_STAT: ', 
@@ -431,33 +427,21 @@ for(i in 15:25){#nrow(stationTable)){
       # this will be removed for lake stations later since it does not apply
       pHExceedances(stationData) %>% quickStats('PH'),
       bacteriaAssessmentDecisionClass(stationData),
-      
-      #bacteriaAssessmentDecision(stationData, 'ECOLI', 'RMK_ECOLI', 10, 410, 126) %>%
-      #  dplyr::select(ECOLI_EXC:ECOLI_STATECOLI_VERBOSE), # add verbose comment to COMMENT field
-      #bacteriaAssessmentDecision(stationData, 'ENTEROCOCCI', 'RMK_ENTEROCOCCI', 10, 130, 35) %>%
-      #  dplyr::select(ENTER_EXC:ENTER_STATENTER_VERBOSE), # add verbose comment to COMMENT field
-
-      # Ammonia needs to go here
-      ammoniaDecision(list(acute = freshwaterNH3Assessment(ammoniaAnalysisStation, 'acute'),
-                           chronic = freshwaterNH3Assessment(ammoniaAnalysisStation, 'chronic'),
-                           fourDay = freshwaterNH3Assessment(ammoniaAnalysisStation, 'four-day'))), 
+ 
+      # Ammonia 
+      rollingWindowSummary(
+        annualRollingExceedanceSummary(
+          annualRollingExceedanceAnalysis(ammoniaAnalysisStation, yearsToRoll = 3)), parameterAbbreviation = "AMMONIA"),
     
       # Flag for whether or not metals data exists
       metalsData(filter(WCmetals, Station_Id %in% stationData$FDT_STA_ID), 'WAT_MET'),
-      # old method when Roger made the assessment for group
-      #metalsExceedances(filter(WCmetals, FDT_STA_ID %in% stationData$FDT_STA_ID) %>% 
-      #                                 dplyr::select(`ANTIMONY HUMAN HEALTH PWS`:`ZINC ALL OTHER SURFACE WATERS`), 'WAT_MET'),
+   
       # Mark's water column PCB results, flagged
       WCtoxics, # from above, adds in PWS and water column PCB information
-      # PCBmetalsDataExists(filter(markPCB, str_detect(SampleMedia, 'Water')) %>%
-      #                                 filter(StationID %in% stationData$FDT_STA_ID), 'WAT_TOX'), 
-      # 
+    
       # Roger's sediment metals analysis, transcribed
       metalsData(filter(Smetals, Station_Id %in% stationData$FDT_STA_ID), 'SED_MET'),
-      # old method when Roger made the assessment for group
-      # metalsExceedances(filter(Smetals, FDT_STA_ID %in% stationData$FDT_STA_ID) %>% 
-      #                                 dplyr::select(ARSENIC:ZINC), 'SED_MET'), 
-      # 
+      
       # Mark's sediment PCB results, flagged
       PCBmetalsDataExists(filter(markPCB, str_detect(SampleMedia, 'Sediment')) %>%
                       filter(StationID %in% stationData$FDT_STA_ID), 'SED_TOX'),
@@ -467,10 +451,8 @@ for(i in 15:25){#nrow(stationTable)){
       
       # Gabe's fish PCB results, flagged
       PCBmetalsDataExists(filter(fishPCB, `DEQ rivermile` %in%  stationData$FDT_STA_ID), 'FISH_TOX'),
-
     
       # Benthics 
-      # BENTHIC_STAT, BENTHIC_WOE_CAT, BIBI_SCORE
       benthicAssessment(stationData, VSCIresults),
       
       # Nutrient Assessment done above by waterbody type
@@ -488,10 +470,7 @@ for(i in 15:25){#nrow(stationTable)){
       #   mutate(NUT_CHLA_STAT = NA)) %>% # don't show a real assessment decision
     
       # COMMENTS
-      mutate(COMMENTS = paste0(DO_Daily_Avg_STAT, 
-                               ' | AMMONIA Comment: ', `Assessment Decision`)) %>% #,
-             #BACTERIA_COMMENTS = paste0(' | E.coli Comment: ', ECOLI_STATECOLI_VERBOSE,
-            #                   ' | Enterococci Comment: ', ENTER_STATENTER_VERBOSE)) %>%
+      mutate(COMMENTS = paste0(DO_Daily_Avg_STAT) ) %>% 
       left_join(comments, by = 'STATION_ID') %>%
       left_join(lowFlowSummary, by = 'STATION_ID') %>%
       dplyr::select(-ends_with(c('exceedanceRate', 'VERBOSE', 'Assessment Decision', 'StationID'))) %>%  # to match Bulk Upload template but helpful to keep visible til now for testing
@@ -513,7 +492,7 @@ for(i in 15:25){#nrow(stationTable)){
 
 stationTableResults <- bind_rows(stationsTemplate, stationTableResults) %>%
   # for now bc bacteria needs help still
-  dplyr::select(STATION_ID:`2018 IR COMMENTS`)
+  dplyr::select(STATION_ID:`7Q10 Flag`)
 
 timeDiff = Sys.time()- startTime
   
