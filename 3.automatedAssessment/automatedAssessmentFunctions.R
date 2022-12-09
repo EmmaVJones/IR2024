@@ -689,37 +689,6 @@ benthicAssessment <- function(x, VSCIresults){
 # Used rolling windows but opted for loops with filtering instead of roll_apply over time series so the data analyzed each window could
 #  cascade outside the function and be unpacked by further analyses/visualizations if necessary
 
-# Four day average analysis function
-
-fourDayAverageAnalysis <- function(chronicWindowData, chronicWindowResults){
-  fourDayResults <- tibble(`fourDayAmmoniaAvg` = as.numeric(NA),
-                           WindowStart = as.POSIXct(NA),
-                           `fourDayAvglimit` = as.numeric(NA),
-                           fourDayExceedance = as.logical(NA),
-                           fourDayWindowData = list())
-  for(k in 1:nrow(chronicWindowData)){
-    fourDayWindow <- filter(chronicWindowData, between(FDT_DATE_TIME, chronicWindowData$FDT_DATE_TIME[k], chronicWindowData$FDT_DATE_TIME[k] + days(4) ) )
-    if(nrow(fourDayWindow) > 1){
-      fourDayResultsi <- fourDayWindow %>%
-        summarize(WindowStart = min(FDT_DATE_TIME),
-                  `fourDayAmmoniaAvg` = as.numeric(signif(mean(AMMONIA_mg_L, na.rm = T), digits = 2))) %>% # two sigfigs for comparison to chronic criteria
-        bind_cols(dplyr::select(chronicWindowResults,`fourDayAvglimit`)) %>%
-        mutate(fourDayExceedance = `fourDayAmmoniaAvg` > `fourDayAvglimit`)
-      fourDayResults <- bind_rows(fourDayResults, 
-                                  fourDayResultsi %>% bind_cols(tibble(fourDayWindowData = list(fourDayWindow))) )
-    } else {
-      fourDayResults <- bind_rows(fourDayResults, 
-                                  tibble(`fourDayAmmoniaAvg` = as.numeric(NA),
-                                         WindowStart = fourDayWindow$FDT_DATE_TIME,
-                                         `fourDayAvglimit` = as.numeric(NA),
-                                         fourDayExceedance = as.logical(NA),
-                                         fourDayWindowData = list(NA)) )    }
-  }
-  fourDayResults <- filter(fourDayResults, !is.na(fourDayAmmoniaAvg))
-  return(fourDayResults)
-}
-#fourDayAverageAnalysis(chronicWindowData, chronicWindowResultsi)
-
 
 # Calculate limits and return dataframe with original data and limits 9VAC25-260-155 https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section155/
 freshwaterNH3limit <- function(stationData, # dataframe with station data
@@ -949,115 +918,6 @@ freshwaterNH3limit <- function(stationData, # dataframe with station data
 # fake data for testing, station == "1AACO014.57"
 #stationData$AMMONIA_mg_L[2:12] <- rep(25, 11)
 #ammoniaAnalysisStation <- freshwaterNH3limit(stationData, trout = TRUE, mussels = TRUE, earlyLife = TRUE)
-
-
-
-# This function organizes results from freshwaterNH3limit() into a single assessment decision
-freshwaterNH3Assessment <- function(ammoniaAnalysisStation, # ammoniaAnalysisStation is station run through freshwaterNH3limit(), which handles citmon/nonagency data appropriately
-                                    assessmentType){ # c('acute', 'chronic', 'four-day') one of these options to change criteria tested and window length
-  
-  
-  # Adjust presets based on assessmentType
-  if(assessmentType == 'acute'){limitColumn <- quo(acuteExceedance)}
-  if(assessmentType == 'chronic'){limitColumn <- quo(chronicExceedance)} ###
-  if(assessmentType == 'four-day'){limitColumn <- quo(fourDayExceedance)} ####
-  
-  # Identify any exceedances
-  if(!is.null(ammoniaAnalysisStation)){
-    exceedances <- filter(ammoniaAnalysisStation, !! limitColumn) # find any exceedances                       
-    
-    if(nrow(exceedances) > 0){
-      
-      # Test if > 1 exceedance in any 3 year window, start each window with sampling event
-      # Loop through each row of exceedance df to test if any other exceedance in a 3 year window
-      exceedancesIn3YrWindow <- tibble()
-      for( i in 1 : nrow(exceedances)){
-        windowBegin <- exceedances$FDT_DATE_TIME[i]
-        windowEnd <- exceedances$FDT_DATE_TIME[i] + years(3)
-        
-        # Find exceeding data in window defined above
-        exceedancesIn3YrWindowData <- filter(exceedances, between(FDT_DATE_TIME, windowBegin, windowEnd) ) %>% 
-          ungroup()
-        
-        
-        exceedancesIn3YrWindowi <- tibble(`Window Begin` = windowBegin, `Window End` = windowEnd) %>%
-          bind_cols(summarise(exceedancesIn3YrWindowData, nExceedancesInWindow = n())) %>%  # count number of exceedances in 3 year window
-          bind_cols(tibble(associatedExceedanceData = list(exceedancesIn3YrWindowData))) # dataset with just exceedances in each exceeding window
-        exceedancesIn3YrWindow <- bind_rows(exceedancesIn3YrWindow, exceedancesIn3YrWindowi) 
-      }
-      
-      # Summarize results for user
-      # More than one 3 year window with exceedance
-      if(nrow(exceedancesIn3YrWindow) > 1){
-        return(
-          list(
-            tibble(AMMONIA_EXC = ifelse(max(exceedancesIn3YrWindow$nExceedancesInWindow) == 1, nrow(exceedancesIn3YrWindow), max(exceedancesIn3YrWindow$nExceedancesInWindow)),
-                   AMMONIA_STAT = 'IM',
-                   `Assessment Decision` = paste0('Dataset contains more than one 3 year window with at least one ', assessmentType , ' exceedance.')),
-            `Exceedance Results` = exceedancesIn3YrWindow)     )
-      } else { # only one exceedance in any 3 year window
-        return(
-          list(
-            tibble(AMMONIA_EXC = max(exceedancesIn3YrWindow$nExceedancesInWindow),
-                   AMMONIA_STAT = 'Review',
-                   `Assessment Decision` = paste0('Dataset contains one 3 year window with at least one ', assessmentType, ' exceedance.')),
-            `Exceedance Results` = exceedancesIn3YrWindow)     )
-        
-      }
-    } else { # No exceedances
-      return(
-        list(
-          tibble(AMMONIA_EXC = 0,
-                 AMMONIA_STAT = ifelse(nrow(ammoniaAnalysisStation) > 1, 'S', 'IN'),#'S',
-                 `Assessment Decision` = paste0('Dataset contains no ', assessmentType, ' exceedances.')),
-          `Exceedance Results` = NA)  )
-    }
-  } else { # x has no data
-    return(
-      list(
-        tibble(AMMONIA_EXC = NA,
-               AMMONIA_STAT = NA,
-               `Assessment Decision` = paste0('Dataset contains no Ammonia data.')),
-        `Exceedance Results` = NA)  )
-  }
-  
-}
-
-#freshwaterAssessments <- list(acute = freshwaterNH3Assessment(ammoniaAnalysisStation, 'acute'),
-#                              chronic = freshwaterNH3Assessment(ammoniaAnalysisStation, 'chronic'),
-#                              fourDay = freshwaterNH3Assessment(ammoniaAnalysisStation, 'four-day'))
-
-# Function to consolidate 3 assessments to fit one row
-ammoniaDecision <- function(freshwaterAssessments # list of freshwater assessments to consolidate into a single decision
-){ 
-  consolidatedResults <- map_df(freshwaterAssessments, 1)
-  
-  review <- filter(consolidatedResults, AMMONIA_STAT %in% c('IM', 'Review'))
-  if(nrow(review) > 0){
-    
-    stationTableOutput <- review %>%
-      slice_max(AMMONIA_EXC, n = 1)
-    
-    # special case if max results in tie, just choose 1
-    if(nrow(stationTableOutput) > 1){
-      stationTableOutput <- stationTableOutput[1,] }
-    
-    # Add the other assessment decisions into comment field
-    extra <- paste(filter(consolidatedResults, ! `Assessment Decision` %in% stationTableOutput$`Assessment Decision`)$`Assessment Decision`, collapse = ' ')
-    stationTableOutput <- mutate(stationTableOutput, `Assessment Decision` = paste(`Assessment Decision`, extra))
-  } else { # no exceedances of any type in this scenario
-    stationTableOutput <- consolidatedResults[1,]
-    # Add the other assessment decisions into comment field
-    extra <- paste(filter(consolidatedResults, ! `Assessment Decision` %in% stationTableOutput$`Assessment Decision`)$`Assessment Decision`, collapse = ' ')
-    stationTableOutput <- mutate(stationTableOutput, `Assessment Decision` = paste(`Assessment Decision`, extra))
-    
-  }
-  return(stationTableOutput)
-}
-
-# ammoniaDecision(list(acute = freshwaterNH3Assessment(ammoniaAnalysisStation, 'acute'),
-#                     chronic = freshwaterNH3Assessment(ammoniaAnalysisStation, 'chronic'),
-#                     fourDay = freshwaterNH3Assessment(ammoniaAnalysisStation, 'four-day')))
 
 
 
@@ -1296,6 +1156,7 @@ chlorideFreshwaterAnalysis <- function(stationData){
   
   if(nrow(stationDataCHL) > 0){
     
+    
     # make a place to store analysis results
     acuteCriteriaResults <- tibble(FDT_STA_ID = as.character(NA), WindowDateTimeStart = as.POSIXct(NA), FDT_DEPTH = as.numeric(NA),
                                    Value = as.numeric(NA), ValueType = as.character(NA), 
@@ -1353,11 +1214,12 @@ chlorideFreshwaterAnalysis <- function(stationData){
       distinct(FDT_STA_ID, WindowDateTimeStart, FDT_DEPTH, `Criteria Type`, .keep_all = T) %>% # remove duplicates in case > 1 depth per datetime
       arrange(FDT_STA_ID, WindowDateTimeStart, FDT_DEPTH, `Criteria Type`)
     return(stationCriteriaResults)
-  } else {return(tibble(FDT_STA_ID = as.character(NA), WindowDateTimeStart = as.POSIXct(NA), FDT_DEPTH = as.numeric(NA),
-                        Value = as.numeric(NA), ValueType = as.character(NA), 
-                        `Criteria Type` = as.character(NA), CriteriaValue = as.numeric(NA), 
-                        `Sample Count` = as.numeric(NA), 
-                        parameterRound = as.numeric(NA), Exceedance = as.numeric(NA)) ) }
+  } else { return(NULL)}
+  # } else {return(tibble(FDT_STA_ID = as.character(NA), WindowDateTimeStart = as.POSIXct(NA), FDT_DEPTH = as.numeric(NA),
+  #                       Value = as.numeric(NA), ValueType = as.character(NA), 
+  #                       `Criteria Type` = as.character(NA), CriteriaValue = as.numeric(NA), 
+  #                       `Sample Count` = as.numeric(NA), 
+  #                       parameterRound = as.numeric(NA), Exceedance = as.numeric(NA)) ) }
 }
 # dataToAnalyze <- chlorideFreshwaterAnalysis(stationData) 
 
@@ -1365,6 +1227,12 @@ chlorideFreshwaterAnalysis <- function(stationData){
 #dataToAnalyze$`Sample Count`[1:77] <- rep(3, 77)
 # dataToAnalyze <- zz
 
+
+
+
+# New rolling window analysis function. This calculates the number of exceedances in a X year window (not repeating windows)
+#  and determines if the number of windows exceeding criteria are greater than the number of windows not exceeding criteria
+#  using subsequent annualRollingExceedanceSummary()
 # analyze results by 3 year windows, not a strict rolling window, roll by year
 annualRollingExceedanceAnalysis <- function(dataToAnalyze,
                                             yearsToRoll){
@@ -1465,9 +1333,14 @@ annualRollingExceedanceSummary <- function(rolledAnalysis){
 
 # Rolling summary for stations table
 rollingWindowSummary <- function(annualRollingExceedanceSummaryOutput, parameterAbbreviation){
+  
   if("Review" %in% unique(annualRollingExceedanceSummaryOutput$`Suggested Result`)){
     z <- tibble(`_EXC` = as.numeric(NA), `_STAT` = 'Review')
-  } else {z <- tibble(`_EXC` = as.numeric(NA), `_STAT` = "S")}
+  } else {
+    # first kick out NULL entries (no data to analyze)
+    if(is.null(annualRollingExceedanceSummaryOutput)){
+      z <- tibble(`_EXC` = as.numeric(NA), `_STAT` = as.character(NA))
+      } else {  z <- tibble(`_EXC` = as.numeric(NA), `_STAT` = "S")} }
   names(z) <- paste0(parameterAbbreviation, names(z))
   return(z)
 }
