@@ -2,18 +2,18 @@
 
 # Function is built to calculate both E.coli and Enterococci based on 90 day assessment windows.
 # here is some test data 
-station <- '1AACO014.57'#'2-JKS023.61'#'1ABAR037.84'#
-stationData <- filter(conventionals, FDT_STA_ID %in% station)%>%
-   left_join(stationTable, by = c('FDT_STA_ID' = 'STATION_ID')) %>% 
-  # Special Standards Correction step. This is done on the actual data bc some special standards have temporal components
-  pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
-  temperatureSpecialStandardsCorrection() %>% # correct temperature special standards where necessary
-  # special lake steps
-  {if(station %in% lakeStations$STATION_ID)
-      suppressWarnings(suppressMessages(
-        mutate(., lakeStation = TRUE) %>%
-          thermoclineDepth())) # adds thermocline information and SampleDate
-      else mutate(., lakeStation = FALSE) }
+# station <- '1AACO014.57'#'2-JKS023.61'#'1ABAR037.84'#
+# stationData <- filter(conventionals, FDT_STA_ID %in% station)%>%
+#    left_join(stationTable, by = c('FDT_STA_ID' = 'STATION_ID')) %>% 
+#   # Special Standards Correction step. This is done on the actual data bc some special standards have temporal components
+#   pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
+#   temperatureSpecialStandardsCorrection() %>% # correct temperature special standards where necessary
+#   # special lake steps
+#   {if(station %in% lakeStations$STATION_ID)
+#       suppressWarnings(suppressMessages(
+#         mutate(., lakeStation = TRUE) %>%
+#           thermoclineDepth())) # adds thermocline information and SampleDate
+#       else mutate(., lakeStation = FALSE) }
 
 # # add some high frequency data
 # stationData <- bind_rows(stationData,
@@ -27,17 +27,17 @@ stationData <- filter(conventionals, FDT_STA_ID %in% station)%>%
 #                          #LEVEL_ECOLI = c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA)))
 
 
-
-bacteriaField <- 'ECOLI' #
-#  'ENTEROCOCCI'
-bacteriaRemark <- 'LEVEL_ECOLI' #
-#  'LEVEL_ENTEROCOCCI'
-sampleRequirement <- 10
-STV <- 410 #
-#130
-geomeanCriteria <- 126 #
-#  35
-rm(i);rm(bacteriaField);rm(bacteriaRemark); rm(sampleRequirement); rm(STV); rm(geomeanCriteria); rm(stationTableName); rm(z);rm(exceedGeomean); rm(out); rm(exceedSTVrate);rm(stationData); rm(time1);rm(timePlus89); rm(nSamples); rm(exceedSTVn);
+# 
+# bacteriaField <- 'ECOLI' #
+# #  'ENTEROCOCCI'
+# bacteriaRemark <- 'LEVEL_ECOLI' #
+# #  'LEVEL_ENTEROCOCCI'
+# sampleRequirement <- 10
+# STV <- 410 #
+# #130
+# geomeanCriteria <- 126 #
+# #  35
+# rm(i);rm(bacteriaField);rm(bacteriaRemark); rm(sampleRequirement); rm(STV); rm(geomeanCriteria); rm(stationTableName); rm(z);rm(exceedGeomean); rm(out); rm(exceedSTVrate);rm(stationData); rm(time1);rm(timePlus89); rm(nSamples); rm(exceedSTVn);
 
 # Function to assess on 90 day windows across input dataset
 # really just a building block, one probably wouldn't run this function independently
@@ -52,6 +52,7 @@ bacteriaExceedances_NEW <- function(stationData, # input dataframe with bacteria
   out <- tibble(`StationID` = as.character(NA),
                 `Date Window Starts` = as.Date(NA), 
                 `Date Window Ends` = as.Date(NA), 
+                `Last Sample Date in Window` = as.Date(NA), 
                 `Samples in 90 Day Window` = as.numeric(NA), 
                 `STV Exceedances In Window` = as.numeric(NA), 
                 `STV Exceedance Rate` = as.numeric(NA), 
@@ -110,7 +111,9 @@ bacteriaExceedances_NEW <- function(stationData, # input dataframe with bacteria
         `Geomean Assessment` <- 'Insufficient Information: geomean sampling criteria not met'  }
       
       out[i,] <-  tibble(`StationID` = unique(stationData2$FDT_STA_ID),
-                         `Date Window Starts` = time1, `Date Window Ends` = timePlus89, 
+                         `Date Window Starts` = time1, 
+                         `Date Window Ends` = timePlus89, 
+                         `Last Sample Date in Window` = max(windowData$FDT_DATE_TIME),
                          `Samples in 90 Day Window` = unique(windowData$nSamples), 
                          `STV Exceedances In Window` = nSTVhitsInWindow, 
                          `STV Exceedance Rate` = STVexceedanceRate,
@@ -120,18 +123,32 @@ bacteriaExceedances_NEW <- function(stationData, # input dataframe with bacteria
                          associatedData = list(windowData)) 
     } #end for loop
   } else {
-    return(tibble(`StationID` = unique(stationData$FDT_STA_ID),
+    out <- tibble(`StationID` = unique(stationData$FDT_STA_ID),
                   `Date Window Starts` = as.Date(NA), 
                   `Date Window Ends` = as.Date(NA), 
+                  `Last Sample Date in Window` = as.Date(NA), 
                   `Samples in 90 Day Window` = as.numeric(NA), 
                   `STV Exceedances In Window` = as.numeric(NA), 
                   `STV Exceedance Rate` = as.numeric(NA), 
                   `STV Assessment` = as.character(NA),
                   `Geomean In Window` = as.numeric(NA),
                   `Geomean Assessment` = as.character(NA),
-                  associatedData = list(NA)))
+                  associatedData = list(NA))
   }
   
+  # For IR2024, we only want to make assessment decisions on data windows with unique datasets. Running distinct() on `Last Sample Date in Window`
+  # will keep only the rows with the first occurrence of any given sample date, allowing us to remove rolled windows that contain duplicated 
+  # datasets. Joining this result back to the out dataset allows us to flag `Valid Assessment Window` appropriately. Since this function
+  # feeds the app, we want to keep all records and only at later functions that make assessment decisions do we want to filter out 
+  # non-unique windows.
+  distinctWindows <- distinct(out, `Last Sample Date in Window`, .keep_all = T) %>% 
+    mutate(`Valid Assessment Window` = TRUE)
+  
+  out <- left_join(out, distinctWindows,
+                    by = c("StationID", "Date Window Starts", "Date Window Ends", "Last Sample Date in Window", 
+                           "Samples in 90 Day Window", "STV Exceedances In Window", "STV Exceedance Rate", 
+                           "STV Assessment", "Geomean In Window", "Geomean Assessment", "associatedData")) %>% # join by everything to be safe
+    dplyr::select(StationID:`Last Sample Date in Window`, `Valid Assessment Window`, everything())
   
   return(out) 
 }
@@ -176,9 +193,11 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
     if(nrow(nSamples) > 0){ # only proceed through decisions if there is data to be analyzed
 
     # Run assessment function
-    z <- suppressWarnings(bacteriaExceedances_NEW(stationData, bacteriaField, bacteriaRemark, sampleRequirement, STV, geomeanCriteria)   )
-    # bail out if no data to analyze bc all Level II or Level I
-    if(nrow(filter(z, !is.na(`Date Window Starts`))) == 0 ){
+    validForAssessment <- suppressWarnings(bacteriaExceedances_NEW(stationData, bacteriaField, bacteriaRemark, sampleRequirement, STV, geomeanCriteria)   ) %>% 
+      filter(`Valid Assessment Window` == TRUE)
+    
+    # bail out if no data to analyze bc all Level II or Level I, OR (new for IR2024) no valid windows for assessment
+    if(nrow(filter(validForAssessment, !is.na(`Date Window Starts`))) == 0 ){
       return(tibble(StationID = unique(stationData$FDT_STA_ID),
                     `_EXC` = NA, # right now this is set to # total STV exceedances, not the # STV exceedances in a 90-day period with 10+ samples
                     #`_IMPAIREDWINDOWS` = NA,
@@ -195,10 +214,11 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
     }
     
     # number of STV exceedances, reported in bacteria_EXC field in stations table and useful for logic testing
+    # don't want to do this analysis on validForAssessment bc sum(validForAssessment$`STV Exceedances In Window`) will overshoot real n
     exceedSTVn <- select(stationData,  Value = {{ bacteriaField }} ) %>%
       filter(Value > STV) # total STV exceedances in dataset
     # # Windows with impairments, reported outside stations table bulk upload template
-    # zz <- mutate(z, UID = 1:n())
+    # zz <- mutate(validForAssessment, UID = 1:n())
     # impairedWindow <- bind_rows(filter(zz, str_detect(`STV Assessment`, 'Impaired')), 
     #                             filter(zz, str_detect(`Geomean Assessment`, 'Impaired')) ) %>% 
     #   distinct(UID, .keep_all = T)
@@ -207,15 +227,15 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
     #                         filter(zz, `STV Exceedances In Window` > 0 & `Samples in 90 Day Window` < 10)) %>% 
     #   distinct(UID, .keep_all = T)
     # Windows with > 10% STV rate, these can only be calculated on windows with 10 or more samples
-    exceedSTVrate <- filter(z, `STV Exceedance Rate` > 10)
+    exceedSTVrate <- filter(validForAssessment, `STV Exceedance Rate` > 10)
     # windows with geomean exceedances, these can only be calculated on windows with 10 or more samples
-    exceedGeomean <- filter(z, `Geomean In Window` > geomeanCriteria)
+    exceedGeomean <- filter(validForAssessment, `Geomean In Window` > geomeanCriteria)
     
     # Decision logic time, work through geomean first and if there is no appropriate geomean data (no windows with 10+ samples)
     #   then go to STV assessment
     
     # Were at least 10 samples taken within any 90-day period of the assessment window?
-    if( any(!is.na(z$`Geomean In Window`)) ){ # Were at least 10 samples taken within any 90-day period of the assessment window? - Yes
+    if( any(!is.na(validForAssessment$`Geomean In Window`)) ){ # Were at least 10 samples taken within any 90-day period of the assessment window? - Yes
       # Do the geometric means calculated for the 90-day periods represented by 10+ samples meet the GM criterion?
       if( nrow(exceedGeomean) == 0){ # Do the geometric means calculated for the 90-day periods represented by 10+ samples meet the GM criterion? - Yes
         # Do any of the 90-day periods of the assessment window represented in the dataset exceed the 10% STV Exceedance Rate?
@@ -223,69 +243,65 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
           
           # Yes, in a 90-day period represented by 10+ samples
           if(nrow(filter(exceedSTVrate, `Samples in 90 Day Window` >= 10 & `STV Exceedance Rate` > 10)) > 0){ # STV exceedances in a 90-day period represented by >= 10 samples
-            return(tibble(StationID = unique(z$StationID),
+            return(tibble(StationID = unique(validForAssessment$StationID),
                           `_EXC` = nrow(exceedSTVn), # right now this is set to # total STV exceedances, not the # STV exceedances in a 90-day period with 10+ samples
-                          #`_IMPAIREDWINDOWS` = nrow(impairedWindow), # number of impaired windows
                           `_SAMP` = nrow(nSamples), 
                           `_GM.EXC` = nrow(exceedGeomean),
-                          `_GM.SAMP` = nrow(filter(z, !is.na(`Geomean In Window`))),
+                          `_GM.SAMP` = nrow(filter(validForAssessment, !is.na(`Geomean In Window`))),
                           `_STAT` = "IM",
                           `_STAT_VERBOSE` = "Impaired - 2 or more STV exceedances in the same 90-day period represented by 10+ samples, no geomean exceedances.",#STV exceedances in a 90-day period represented by >= 10 samples after verifying geomean passes where applicable.",
                           `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                           `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                          associatedDecisionData = list(z) ) %>%
+                          associatedDecisionData = list(validForAssessment) ) %>%
                      rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                      rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
             
           } else {  # STV exceedances in a 90-day period represented by < 10 samples
             
             # 2 or more hits in the same 90-day period?
-            if(any(z$`STV Exceedances In Window` >= 2) ){
-              return(tibble(StationID = unique(z$StationID),
+            if(any(validForAssessment$`STV Exceedances In Window` >= 2) ){
+              return(tibble(StationID = unique(validForAssessment$StationID),
                             `_EXC` = nrow(exceedSTVn), # right now this is set to # total STV exceedances, not the # STV exceedances in a 90-day period with 10+ samples
-                            #`_IMPAIREDWINDOWS` = nrow(impairedWindow), # number of impaired windows
                             `_SAMP` = nrow(nSamples), 
                             `_GM.EXC` = nrow(exceedGeomean),
-                            `_GM.SAMP` = nrow(filter(z, !is.na(`Geomean In Window`))),
+                            `_GM.SAMP` = nrow(filter(validForAssessment, !is.na(`Geomean In Window`))),
                             `_STAT` = "IM",
                             `_STAT_VERBOSE` = "Impaired- 2 or more STV exceedances in the same 90-day period with < 10 samples, no geomean exceedances.", #2 or more STV hits in the same 90-day period with < 10 samples after verifying geomean passes where applicable.",
                             `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                             `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                            associatedDecisionData = list(z) ) %>%
+                            associatedDecisionData = list(validForAssessment) ) %>%
                        rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                        rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
               } else { 
                 
                 # did the STV exceedance(s) occur in windows with 10+ samples?
-                if(all(filter(z, `STV Exceedances In Window` > 0)$`Samples in 90 Day Window` >= 10)){
-                  return(tibble(StationID = unique(z$StationID),
+                if(all(filter(validForAssessment, `STV Exceedances In Window` > 0)$`Samples in 90 Day Window` >= 10)){
+                  return(tibble(StationID = unique(validForAssessment$StationID),
                                 `_EXC` = nrow(exceedSTVn), # right now this is set to # total STV exceedances, not the # STV exceedances in a 90-day period with 10+ samples
-                                #`_IMPAIREDWINDOWS` = nrow(impairedWindow), # number of impaired windows
                                 `_SAMP` = nrow(nSamples), 
                                 `_GM.EXC` = nrow(exceedGeomean),
-                                `_GM.SAMP` = nrow(filter(z, !is.na(`Geomean In Window`))),
+                                `_GM.SAMP` = nrow(filter(validForAssessment, !is.na(`Geomean In Window`))),
                                 `_STAT` = "S",
                                 `_STAT_VERBOSE` = "Fully Supporting - No STV exceedance rates >10% or geomean exceedances in any 90-day period represented by 10+ samples.",# No geomean exceedances and STV exceedance(s) in one or multiple 90-day periods represented by 10+ samples.", # previous language: 1 STV hit in one or multiple 90-day periods with < 10 samples after verifying geomean passes where applicable.",
                                 `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                                 `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                                associatedDecisionData = list(z) ) %>%
+                                associatedDecisionData = list(validForAssessment) ) %>%
                            rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                            rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
                   
                 } else {# STV exceedance(s) occured in windows with < 10 samples
                 
                 # 1 hit in one or multiple 90-day periods after verifying geomean passes where applicable
-                return(tibble(StationID = unique(z$StationID),
+                return(tibble(StationID = unique(validForAssessment$StationID),
                               `_EXC` = nrow(exceedSTVn), # right now this is set to # total STV exceedances, not the # STV exceedances in a 90-day period with 10+ samples
-                              #`_IMPAIREDWINDOWS` = nrow(impairedWindow), # number of impaired windows
                               `_SAMP` = nrow(nSamples), 
                               `_GM.EXC` = nrow(exceedGeomean),
-                              `_GM.SAMP` = nrow(filter(z, !is.na(`Geomean In Window`))),
+                              `_GM.SAMP` = nrow(filter(validForAssessment, !is.na(`Geomean In Window`))),
                               `_STAT` = "O",
                               `_STAT_VERBOSE` = "Fully Supporting - No geomean exceedances and only 1 STV exceedance in one or multiple 90-day periods represented by < 10 samples.", # previous language: 1 STV hit in one or multiple 90-day periods with < 10 samples after verifying geomean passes where applicable.",
                               `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                               `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                              associatedDecisionData = list(z) ) %>%
+                              associatedDecisionData = list(validForAssessment) ) %>%
                          rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                          rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
                 } 
@@ -293,33 +309,31 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
           }
           
         } else {  # Do any of the 90-day periods of the assessment window represented in the dataset exceed the 10% STV Exceedance Rate? - No
-          return(tibble(StationID = unique(z$StationID),
+          return(tibble(StationID = unique(validForAssessment$StationID),
                         `_EXC` = nrow(exceedSTVn), # right now this is set to # total STV exceedances, not the # STV exceedances in a 90-day period with 10+ samples
-                        #`_IMPAIREDWINDOWS` = nrow(impairedWindow), # number of impaired windows
                         `_SAMP` = nrow(nSamples), 
                         `_GM.EXC` = nrow(exceedGeomean),
-                        `_GM.SAMP` = nrow(filter(z, !is.na(`Geomean In Window`))),
+                        `_GM.SAMP` = nrow(filter(validForAssessment, !is.na(`Geomean In Window`))),
                         `_STAT` = "S",
                         `_STAT_VERBOSE` = "Fully Supporting - No STV exceedance rates >10% or geomean exceedances in any 90-day period represented by 10+ samples.", #No STV exceedances or geomean exceedances in any 90-day period.",
                         `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                         `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                        associatedDecisionData = list(z) ) %>%
+                        associatedDecisionData = list(validForAssessment) ) %>%
                    rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                    rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
           }
         
       } else { # Do the geometric means calculated for the 90-day periods represented by 10+ samples meet the GM criterion? - No
-        return(tibble(StationID = unique(z$StationID),
+        return(tibble(StationID = unique(validForAssessment$StationID),
                       `_EXC` = nrow(exceedSTVn), # right now this is set to # total STV exceedances, not the # STV exceedances in a 90-day period with 10+ samples
-                      #`_IMPAIREDWINDOWS` = nrow(impairedWindow), # number of impaired windows
                       `_SAMP` = nrow(nSamples), 
                       `_GM.EXC` = nrow(exceedGeomean),
-                      `_GM.SAMP` = nrow(filter(z, !is.na(`Geomean In Window`))),
+                      `_GM.SAMP` = nrow(filter(validForAssessment, !is.na(`Geomean In Window`))),
                       `_STAT` = "IM",
                       `_STAT_VERBOSE` = "Impaired- geomean exceedance in any 90-day period.", #geomean exceedance(s) in any 90-day period with >= 10 samples.",
                       `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                       `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                      associatedDecisionData = list(z) ) %>%
+                      associatedDecisionData = list(validForAssessment) ) %>%
                  rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                  rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
         }
@@ -327,49 +341,46 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
     } else { # Were at least 10 samples taken within any 90-day period of the assessment window? - No
       # Were there any hits of the STV during the dataset?
       if( nrow(exceedSTVn) == 0){ # Were there any hits of the STV during the dataset? - No
-        return(tibble(StationID = unique(z$StationID),
+        return(tibble(StationID = unique(validForAssessment$StationID),
                       `_EXC` = nrow(exceedSTVn), # right now this is set to # total STV exceedances, not the # STV exceedances in a 90-day period with 10+ samples
-                      #`_IMPAIREDWINDOWS` = nrow(impairedWindow), # number of impaired windows
                       `_SAMP` = nrow(nSamples), 
                       `_GM.EXC` = as.numeric(NA), #nrow(exceedGeomean), # Data Entry manual updated to require NA instead of 0 if < 10 samples per 90 day window
-                      `_GM.SAMP` = as.numeric(NA), #nrow(filter(z, !is.na(`Geomean In Window`))), # Data Entry manual updated to require NA instead of 0 if < 10 samples per 90 day window
+                      `_GM.SAMP` = as.numeric(NA), #nrow(filter(validForAssessment, !is.na(`Geomean In Window`))), # Data Entry manual updated to require NA instead of 0 if < 10 samples per 90 day window
                       `_STAT` = "IN", # is this the right code???
                       `_STAT_VERBOSE` = "Insufficient Information (Prioritize for follow up monitoring)- No STV exceedances but insufficient data to analyze geomean.", #0 STV hits but insufficient data to analyze geomean.",
                       `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                       `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                      associatedDecisionData = list(z) ) %>%
+                      associatedDecisionData = list(validForAssessment) ) %>%
                  rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE))%>%  # fix names to match station table format
                  rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
         } else { # Were there any hits of the STV during the dataset? - Yes
           # 2 or more hits in the same 90-day period
-          if(any(z$`STV Exceedances In Window` >= 2) ){
-            return(tibble(StationID = unique(z$StationID),
+          if(any(validForAssessment$`STV Exceedances In Window` >= 2) ){
+            return(tibble(StationID = unique(validForAssessment$StationID),
                           # not quite right yet
                           `_EXC` = nrow(exceedSTVn), # right now this is set to # total STV exceedances, not the number of STV exceedances in a 90-day period with 10+ samples
-                          #`_IMPAIREDWINDOWS` = nrow(impairedWindow), # number of impaired windows
                           `_SAMP` = nrow(nSamples), 
                           `_GM.EXC` = as.numeric(NA), #nrow(exceedGeomean), # Data Entry manual updated to require NA instead of 0 if < 10 samples per 90 day window
-                          `_GM.SAMP` = as.numeric(NA), #nrow(filter(z, !is.na(`Geomean In Window`))), # Data Entry manual updated to require NA instead of 0 if < 10 samples per 90 day window
+                          `_GM.SAMP` = as.numeric(NA), #nrow(filter(validForAssessment, !is.na(`Geomean In Window`))), # Data Entry manual updated to require NA instead of 0 if < 10 samples per 90 day window
                           `_STAT` = "IM", # is this the right code???
                           `_STAT_VERBOSE` = "Impaired - 2 or more STV hits in the same 90-day period with < 10 samples.",
                           `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                           `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                          associatedDecisionData = list(z) ) %>%
+                          associatedDecisionData = list(validForAssessment) ) %>%
                      rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE))%>%  # fix names to match station table format
                      rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
           } else { 
             # 1 hit in one or multiple 90-day periods
-            return(tibble(StationID = unique(z$StationID),
+            return(tibble(StationID = unique(validForAssessment$StationID),
                           `_EXC` = nrow(exceedSTVn), # right now this is set to # total STV exceedances, not the # STV exceedances in a 90-day period with 10+ samples
-                          #`_IMPAIREDWINDOWS` = nrow(impairedWindow), # number of impaired windows
                           `_SAMP` = nrow(nSamples), 
                           `_GM.EXC` = as.numeric(NA), #nrow(exceedGeomean), # Data Entry manual updated to require NA instead of 0 if < 10 samples per 90 day window
-                          `_GM.SAMP` = as.numeric(NA), #nrow(filter(z, !is.na(`Geomean In Window`))), # Data Entry manual updated to require NA instead of 0 if < 10 samples per 90 day window
+                          `_GM.SAMP` = as.numeric(NA), #nrow(filter(validForAssessment, !is.na(`Geomean In Window`))), # Data Entry manual updated to require NA instead of 0 if < 10 samples per 90 day window
                           `_STAT` = "IN", # is this the right code???
                           `_STAT_VERBOSE` = "Insufficient Information (Prioritize for follow up monitoring)- One STV exceedance in one or multiple 90-day periods but insufficient data to analyze geomean.",#1 STV hit in one or multiple 90-day periods but insufficient data to analyze geomean.",
                           `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                           `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                          associatedDecisionData = list(z) ) %>%
+                          associatedDecisionData = list(validForAssessment) ) %>%
                      rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                      rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
             }
@@ -379,7 +390,6 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
     } else {
       return(tibble(StationID = unique(stationData$FDT_STA_ID),
                     `_EXC` = NA, # right now this is set to # total STV exceedances, not the # STV exceedances in a 90-day period with 10+ samples
-                    #`_IMPAIREDWINDOWS` = NA,
                     `_SAMP` = NA, 
                     `_GM.EXC` = NA,
                     `_GM.SAMP` = NA,
