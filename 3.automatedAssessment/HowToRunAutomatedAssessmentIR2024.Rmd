@@ -426,7 +426,8 @@ for(i in 1:500){#nrow(stationTable)){
       DOExceedances_Min(stationData) %>% quickStats('DO'), 
       # this will be removed for lake stations later since it does not apply
       pHExceedances(stationData) %>% quickStats('PH'),
-      bacteriaAssessmentDecisionClass(stationData),
+      bacteriaAssessmentDecisionClass( # NEW for IR2024, bacteria only assessed in two most recent years of assessment period
+        filter(stationData, between(FDT_DATE_TIME, assessmentPeriod[1] + years(4), assessmentPeriod[2])) ),
  
       # Ammonia 
       rollingWindowSummary(

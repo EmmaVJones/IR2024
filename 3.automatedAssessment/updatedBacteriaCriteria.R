@@ -2,13 +2,20 @@
 
 # Function is built to calculate both E.coli and Enterococci based on 90 day assessment windows.
 # here is some test data 
-#stationData <- filter(conventionals, FDT_STA_ID %in% '1AACO014.57')%>%
-#    left_join(stationTable, by = c('FDT_STA_ID' = 'STATION_ID'))
+station <- '1AACO014.57'#'2-JKS023.61'#'1ABAR037.84'#
+stationData <- filter(conventionals, FDT_STA_ID %in% station)%>%
+   left_join(stationTable, by = c('FDT_STA_ID' = 'STATION_ID')) %>% 
+  # Special Standards Correction step. This is done on the actual data bc some special standards have temporal components
+  pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
+  temperatureSpecialStandardsCorrection() %>% # correct temperature special standards where necessary
+  # special lake steps
+  {if(station %in% lakeStations$STATION_ID)
+      suppressWarnings(suppressMessages(
+        mutate(., lakeStation = TRUE) %>%
+          thermoclineDepth())) # adds thermocline information and SampleDate
+      else mutate(., lakeStation = FALSE) }
 
-#stationData <- filter(conventionals, FDT_STA_ID %in% '2-JKS023.61') %>%
-#  left_join(stationTable, by = c('FDT_STA_ID' = 'STATION_ID'))
-
-# add some high frequency data
+# # add some high frequency data
 # stationData <- bind_rows(stationData,
 #                         data.frame(FDT_STA_ID = c('2-JKS023.61', '2-JKS023.61', '2-JKS023.61', '2-JKS023.61', '2-JKS023.61', '2-JKS023.61',
 #                                                  '2-JKS023.61', '2-JKS023.61', '2-JKS023.61', '2-JKS023.61', '2-JKS023.61', '2-JKS023.61', '2-JKS023.61'),
@@ -20,21 +27,21 @@
 #                          #LEVEL_ECOLI = c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA)))
 
 
-#x <- stationData
-#bacteriaField <- 'ECOLI' #
-##  'ENTEROCOCCI'
-#bacteriaRemark <- 'LEVEL_ECOLI' #  
-##  'LEVEL_ENTEROCOCCI'
-#sampleRequirement <- 10
-#STV <- 410 #
-##130
-#geomeanCriteria <- 126 #
-##  35
-#rm(i); rm(x);rm(bacteriaField);rm(bacteriaRemark); rm(sampleRequirement); rm(STV); rm(geomeanCriteria); rm(stationTableName); rm(z);rm(exceedGeomean); rm(out); rm(exceedSTVrate);rm(x2); rm(time1);rm(timePlus89); rm(nSamples); rm(exceedSTVn);
+
+bacteriaField <- 'ECOLI' #
+#  'ENTEROCOCCI'
+bacteriaRemark <- 'LEVEL_ECOLI' #
+#  'LEVEL_ENTEROCOCCI'
+sampleRequirement <- 10
+STV <- 410 #
+#130
+geomeanCriteria <- 126 #
+#  35
+rm(i);rm(bacteriaField);rm(bacteriaRemark); rm(sampleRequirement); rm(STV); rm(geomeanCriteria); rm(stationTableName); rm(z);rm(exceedGeomean); rm(out); rm(exceedSTVrate);rm(stationData); rm(time1);rm(timePlus89); rm(nSamples); rm(exceedSTVn);
 
 # Function to assess on 90 day windows across input dataset
 # really just a building block, one probably wouldn't run this function independently
-bacteriaExceedances_NEW <- function(x, # input dataframe with bacteria data
+bacteriaExceedances_NEW <- function(stationData, # input dataframe with bacteria data
                                     bacteriaField, # name of bacteria field data
                                     bacteriaRemark, # name of bacteria comment field
                                     sampleRequirement, # minimum n samples in 90 day window needed to apply geomean
@@ -54,19 +61,19 @@ bacteriaExceedances_NEW <- function(x, # input dataframe with bacteria data
                 associatedData = list())
   
   # Data reorg to enable both types of bacteria assessment from a single function
-  x2 <- dplyr::select(x, FDT_STA_ID, FDT_DATE_TIME, !! bacteriaField, !! bacteriaRemark) %>%
+  stationData2 <- dplyr::select(stationData, FDT_STA_ID, FDT_DATE_TIME, !! bacteriaField, !! bacteriaRemark) %>%
     rename(Value = bacteriaField, LEVEL_Value = bacteriaRemark) %>%
     filter(! LEVEL_Value %in% c('Level II', 'Level I')) %>% # get lower levels out
     filter(!is.na(Value))
   
-  if(nrow(x2) > 0){
+  if(nrow(stationData2) > 0){
     # Loop through each row of input df to test 90 day windows against assessment criteria
-    for( i in 1 : nrow(x2)){
-      time1 <- as.Date(x2$FDT_DATE_TIME[i])
+    for( i in 1 : nrow(stationData2)){
+      time1 <- as.Date(stationData2$FDT_DATE_TIME[i])
       timePlus89 <- time1 + days(89) 
       
       # Organize prerequisites to decision process
-      z <- filter(x2, as.Date(FDT_DATE_TIME) >= time1 & as.Date(FDT_DATE_TIME) <= timePlus89) %>% 
+      windowData <- filter(stationData2, as.Date(FDT_DATE_TIME) >= time1 & as.Date(FDT_DATE_TIME) <= timePlus89) %>% 
         mutate(nSamples = n(), # count number of samples in 90 day window
                STVhit = ifelse(Value > STV, TRUE, FALSE), # test values in window against STV
                geomean = ifelse(nSamples > 1, # calculate geomean of samples if nSamples>1
@@ -75,9 +82,10 @@ bacteriaExceedances_NEW <- function(x, # input dataframe with bacteria data
                geomeanCriteriaHit = ifelse(geomean > geomeanCriteria, TRUE, FALSE)) # test round to even geomean against geomean Criteria
       
       # First level of testing: any STV hits in dataset? Want this information for all scenarios
-      nSTVhitsInWindow <- nrow(filter(z, STVhit == TRUE))
+      nSTVhitsInWindow <- nrow(filter(windowData, STVhit == TRUE))
       # STV exceedance rate calculation with round to even math
-      STVexceedanceRate <- ifelse(z$nSamples >= 10, as.numeric(round::roundAll((nSTVhitsInWindow / unique(z$nSamples)) * 100,digits=0, "r0.C")), # round to nearest whole number per Memo to Standardize Rounding for Assessment Guidance
+      STVexceedanceRate <- ifelse(unique(windowData$nSamples) >= 10, 
+                                  as.numeric(round::roundAll((nSTVhitsInWindow / unique(windowData$nSamples)) * 100,digits=0, "r0.C")), # round to nearest whole number per Memo to Standardize Rounding for Assessment Guidance
                                   NA) # no STV exceedance rate if < 10 samples
       if(nSTVhitsInWindow == 0){
         `STV Assessment` <- 'No STV violations within 90 day window' } 
@@ -90,29 +98,29 @@ bacteriaExceedances_NEW <- function(x, # input dataframe with bacteria data
       
       
       # Second level of testing: only if minimum geomean sampling requirements met in 90 day period
-      if(unique(z$nSamples) >= sampleRequirement){
+      if(unique(windowData$nSamples) >= sampleRequirement){
         # Geomean Hit
-        if(unique(z$geomeanCriteriaHit) == TRUE){
-          `Geomean Assessment` <- paste('Geomean: ', format(unique(z$geomean), digits = 3), 
+        if(unique(windowData$geomeanCriteriaHit) == TRUE){
+          `Geomean Assessment` <- paste('Geomean: ', format(unique(windowData$geomean), digits = 3), 
                                         ' | Impaired: geomean exceeds criteria in the 90-day period', sep='')  
         } else{
-          `Geomean Assessment` <-  paste('Geomean: ', format(unique(z$geomean), digits = 3), 
+          `Geomean Assessment` <-  paste('Geomean: ', format(unique(windowData$geomean), digits = 3), 
                                          ' | Geomean criteria met, hold assessment decision for further testing', sep= '')} 
       } else { # minimum geomean sampling requirements NOT met in 90 day period
         `Geomean Assessment` <- 'Insufficient Information: geomean sampling criteria not met'  }
       
-      out[i,] <-  tibble(`StationID` = unique(x2$FDT_STA_ID),
+      out[i,] <-  tibble(`StationID` = unique(stationData2$FDT_STA_ID),
                          `Date Window Starts` = time1, `Date Window Ends` = timePlus89, 
-                         `Samples in 90 Day Window` = unique(z$nSamples), 
+                         `Samples in 90 Day Window` = unique(windowData$nSamples), 
                          `STV Exceedances In Window` = nSTVhitsInWindow, 
                          `STV Exceedance Rate` = STVexceedanceRate,
                          `STV Assessment` = `STV Assessment`,
-                         `Geomean In Window` = ifelse(unique(z$nSamples) >= sampleRequirement, unique(z$geomean), NA), # avoid excitement, only give geomean result if 10+ samples
+                         `Geomean In Window` = ifelse(unique(windowData$nSamples) >= sampleRequirement, unique(windowData$geomean), NA), # avoid excitement, only give geomean result if 10+ samples
                          `Geomean Assessment` = `Geomean Assessment`,
-                         associatedData = list(z)) 
+                         associatedData = list(windowData)) 
     } #end for loop
   } else {
-    return(tibble(`StationID` = unique(x$FDT_STA_ID),
+    return(tibble(`StationID` = unique(stationData$FDT_STA_ID),
                   `Date Window Starts` = as.Date(NA), 
                   `Date Window Ends` = as.Date(NA), 
                   `Samples in 90 Day Window` = as.numeric(NA), 
@@ -141,17 +149,17 @@ STVexceedance <- function(df, STV){
 }
 
 
-# bacteriaField <- 'ECOLI' #
-# bacteriaRemark <- 'LEVEL_ECOLI' #
-# sampleRequirement <- 10
-# STV <- 410 #
-# geomeanCriteria <- 126 #
+bacteriaField <- 'ECOLI' #
+bacteriaRemark <- 'LEVEL_ECOLI' #
+sampleRequirement <- 10
+STV <- 410 #
+geomeanCriteria <- 126 #
 
 # Function to summarize bacteria assessment results into decisions
 # This function returns all potential issues with priory on geomean results IF there
 # are enough samples to run geomean
 # Round to even rules are applied
-bacteriaAssessmentDecision <- function(x, # input dataframe with bacteria data
+bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacteria data
                                        bacteriaField, # name of bacteria field data
                                        bacteriaRemark, # name of bacteria comment field
                                        sampleRequirement, # minimum n samples in 90 day window needed to apply geomean
@@ -161,17 +169,17 @@ bacteriaAssessmentDecision <- function(x, # input dataframe with bacteria data
     # Rename output columns based on station table template
     stationTableName <- ifelse(bacteriaField == 'ECOLI', "ECOLI", "ENTER")
     
-    nSamples <- select(x,  Value = {{ bacteriaField }} ) %>% 
+    nSamples <- select(stationData,  Value = {{ bacteriaField }} ) %>% 
       filter(!is.na(Value)) # total n samples taken in assessment window
     
     
     if(nrow(nSamples) > 0){ # only proceed through decisions if there is data to be analyzed
 
     # Run assessment function
-    z <- suppressWarnings(bacteriaExceedances_NEW(x, bacteriaField, bacteriaRemark, sampleRequirement, STV, geomeanCriteria)   )
+    z <- suppressWarnings(bacteriaExceedances_NEW(stationData, bacteriaField, bacteriaRemark, sampleRequirement, STV, geomeanCriteria)   )
     # bail out if no data to analyze bc all Level II or Level I
     if(nrow(filter(z, !is.na(`Date Window Starts`))) == 0 ){
-      return(tibble(StationID = unique(x$FDT_STA_ID),
+      return(tibble(StationID = unique(stationData$FDT_STA_ID),
                     `_EXC` = NA, # right now this is set to # total STV exceedances, not the # STV exceedances in a 90-day period with 10+ samples
                     #`_IMPAIREDWINDOWS` = NA,
                     `_SAMP` = NA, 
@@ -187,7 +195,7 @@ bacteriaAssessmentDecision <- function(x, # input dataframe with bacteria data
     }
     
     # number of STV exceedances, reported in bacteria_EXC field in stations table and useful for logic testing
-    exceedSTVn <- select(x,  Value = {{ bacteriaField }} ) %>%
+    exceedSTVn <- select(stationData,  Value = {{ bacteriaField }} ) %>%
       filter(Value > STV) # total STV exceedances in dataset
     # # Windows with impairments, reported outside stations table bulk upload template
     # zz <- mutate(z, UID = 1:n())
@@ -274,7 +282,7 @@ bacteriaAssessmentDecision <- function(x, # input dataframe with bacteria data
                               `_GM.EXC` = nrow(exceedGeomean),
                               `_GM.SAMP` = nrow(filter(z, !is.na(`Geomean In Window`))),
                               `_STAT` = "O",
-                              `_STAT_VERBOSE` = "Fully Supporting with Observed Effects - No geomean exceedances and only 1 STV exceedance in one or multiple 90-day periods represented by < 10 samples.", # previous language: 1 STV hit in one or multiple 90-day periods with < 10 samples after verifying geomean passes where applicable.",
+                              `_STAT_VERBOSE` = "Fully Supporting - No geomean exceedances and only 1 STV exceedance in one or multiple 90-day periods represented by < 10 samples.", # previous language: 1 STV hit in one or multiple 90-day periods with < 10 samples after verifying geomean passes where applicable.",
                               `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                               `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
                               associatedDecisionData = list(z) ) %>%
@@ -369,7 +377,7 @@ bacteriaAssessmentDecision <- function(x, # input dataframe with bacteria data
       }
     # No bacteria data to analyze
     } else {
-      return(tibble(StationID = unique(x$FDT_STA_ID),
+      return(tibble(StationID = unique(stationData$FDT_STA_ID),
                     `_EXC` = NA, # right now this is set to # total STV exceedances, not the # STV exceedances in a 90-day period with 10+ samples
                     #`_IMPAIREDWINDOWS` = NA,
                     `_SAMP` = NA, 
@@ -395,53 +403,63 @@ bacteriaAssessmentDecision <- function(x, # input dataframe with bacteria data
 
 
 ## outermost function to decide which bacteria should be assessed based on WQS Class
-bacteriaAssessmentDecisionClass <- function(x){ # input dataframe with bacteria data
-  z <- unique(x$FDT_STA_ID) # just in case
+bacteriaAssessmentDecisionClass <- function(stationData){ # input dataframe with bacteria data
+  uniqueStationName <- unique(stationData$FDT_STA_ID) # just in case
   
   # # quick out if all bacteria data level II or I
-  # if(any( c('CMON', 'NONA') %in% unique(dplyr::select(x, contains('TYPE_')) %>% summarize(unique(.)) %>%
+  # if(any( c('CMON', 'NONA') %in% unique(dplyr::select(stationData, contains('TYPE_')) %>% summarize(unique(.)) %>%
   #                                       pivot_longer(cols = everything(), names_to = 'name', values_to = 'value') %>% pull(value)) ) ){
   #   # quick out if all bacteria data level II or I
-  #   if(all(c(filter(x, !is.na(LEVEL_ECOLI)) %>% dplyr::select(LEVEL_ECOLI) %>% pull(),
-  #            filter(x, !is.na(LEVEL_ENTEROCOCCI)) %>% dplyr::select(LEVEL_ENTEROCOCCI) %>% pull() )  %in% c('Level II', 'Level I')) ){
+  #   if(all(c(filter(stationData, !is.na(LEVEL_ECOLI)) %>% dplyr::select(LEVEL_ECOLI) %>% pull(),
+  #            filter(stationData, !is.na(LEVEL_ENTEROCOCCI)) %>% dplyr::select(LEVEL_ENTEROCOCCI) %>% pull() )  %in% c('Level II', 'Level I')) ){
   #     return(
   #       tibble(StationID = z, ECOLI_EXC = as.numeric(NA), ECOLI_SAMP = as.numeric(NA), ECOLI_GM_EXC = as.numeric(NA), ECOLI_GM_SAMP = as.numeric(NA),
   #              ECOLI_STAT = as.character(NA), ECOLI_STATECOLI_VERBOSE = as.character(NA),
   #              ENTER_EXC = as.numeric(NA), ENTER_SAMP = as.numeric(NA), ENTER_GM_EXC = as.numeric(NA), ENTER_GM_SAMP = as.numeric(NA),
   #              ENTER_STAT = as.character(NA), ENTER_STATENTER_VERBOSE = as.character(NA)) ) }
-  #   if(any(c(filter(x, !is.na(LEVEL_ECOLI)) %>% dplyr::select(LEVEL_ECOLI) %>% pull(),
-  #            filter(x, !is.na(LEVEL_ENTEROCOCCI)) %>% dplyr::select(LEVEL_ENTEROCOCCI) %>% pull() )  %in% c('Level III')) ){
+  #   if(any(c(filter(stationData, !is.na(LEVEL_ECOLI)) %>% dplyr::select(LEVEL_ECOLI) %>% pull(),
+  #            filter(stationData, !is.na(LEVEL_ENTEROCOCCI)) %>% dplyr::select(LEVEL_ENTEROCOCCI) %>% pull() )  %in% c('Level III')) ){
   #     # run both bacteria methods if level III data exists to be most inclusive
   #     return(
-  #       left_join(bacteriaAssessmentDecision(x, 'ECOLI', 'LEVEL_ECOLI', 10, 410, 126), 
-  #                 bacteriaAssessmentDecision(x, 'ENTEROCOCCI', 'LEVEL_ENTEROCOCCI', 10, 130, 35), by = 'StationID') %>% 
+  #       left_join(bacteriaAssessmentDecision(stationData, 'ECOLI', 'LEVEL_ECOLI', 10, 410, 126), 
+  #                 bacteriaAssessmentDecision(stationData, 'ENTEROCOCCI', 'LEVEL_ENTEROCOCCI', 10, 130, 35), by = 'StationID') %>% 
   #         dplyr::select(StationID, ECOLI_EXC, ECOLI_SAMP, ECOLI_GM_EXC, ECOLI_GM_SAMP, ECOLI_STAT, ECOLI_STATECOLI_VERBOSE,
   #                       ENTER_EXC, ENTER_SAMP, ENTER_GM_EXC, ENTER_GM_SAMP, ENTER_STAT, ENTER_STATENTER_VERBOSE) ) } }
     
     
   # lake stations should only be surface sample
-  if(unique(x$lakeStation) == TRUE){
-    x <- filter(x, FDT_DEPTH <= 0.3) }
-  if(nrow(x) > 0){
-    if(unique(x$CLASS) %in% c('I', 'II')){
+  if(unique(stationData$lakeStation) == TRUE){
+    stationData <- filter(stationData, FDT_DEPTH <= 0.3) }
+  
+  if(nrow(stationData) > 0){
+    if(unique(stationData$CLASS) %in% c('I', 'II')){
       return(
-        bacteriaAssessmentDecision(x, 'ENTEROCOCCI', 'LEVEL_ENTEROCOCCI', 10, 130, 35) %>%
-          mutate(ECOLI_EXC = as.numeric(NA), ECOLI_SAMP = as.numeric(NA), ECOLI_GM_EXC = as.numeric(NA), ECOLI_GM_SAMP = as.numeric(NA),
-                 ECOLI_STAT = as.character(NA), ECOLI_STATECOLI_VERBOSE = as.character(NA)) %>%
-          dplyr::select(StationID, ECOLI_EXC, ECOLI_SAMP, ECOLI_GM_EXC, ECOLI_GM_SAMP, ECOLI_STAT, ECOLI_STATECOLI_VERBOSE, ENTER_EXC, 
-                        ENTER_SAMP, ENTER_GM_EXC, ENTER_GM_SAMP, ENTER_STAT, ENTER_STATENTER_VERBOSE, BACTERIADECISION, BACTERIASTATS) )
+        left_join(bacteriaAssessmentDecision(stationData, 'ECOLI', 'LEVEL_ECOLI', 10, 410, 126),
+                  bacteriaAssessmentDecision(stationData, 'ENTEROCOCCI', 'LEVEL_ENTEROCOCCI', 10, 130, 35),
+                  by = 'StationID') %>% 
+          mutate(BACTERIADECISION = paste0(BACTERIADECISION.x, ' | ', BACTERIADECISION.y),
+                 BACTERIASTATS = paste0(BACTERIASTATS.x, ' | ', BACTERIASTATS.y)) %>% 
+          dplyr::select(-c(BACTERIADECISION.x, BACTERIADECISION.y, BACTERIASTATS.x, BACTERIASTATS.y,
+                           associatedDecisionData.x, associatedDecisionData.y)) )
+      # previously this was programmed to only output enterococci results for these classes, but assessors requested both outputs to be conservative for
+      # transitional sites
+        # bacteriaAssessmentDecision(stationData, 'ENTEROCOCCI', 'LEVEL_ENTEROCOCCI', 10, 130, 35) %>%
+        #   mutate(ECOLI_EXC = as.numeric(NA), ECOLI_SAMP = as.numeric(NA), ECOLI_GM_EXC = as.numeric(NA), ECOLI_GM_SAMP = as.numeric(NA),
+        #          ECOLI_STAT = as.character(NA), ECOLI_STATECOLI_VERBOSE = as.character(NA)) %>%
+        #   dplyr::select(StationID, ECOLI_EXC, ECOLI_SAMP, ECOLI_GM_EXC, ECOLI_GM_SAMP, ECOLI_STAT, ECOLI_STATECOLI_VERBOSE, ENTER_EXC, 
+        #                 ENTER_SAMP, ENTER_GM_EXC, ENTER_GM_SAMP, ENTER_STAT, ENTER_STATENTER_VERBOSE, BACTERIADECISION, BACTERIASTATS) )
     } else {
       return(
-        bacteriaAssessmentDecision(x, 'ECOLI', 'LEVEL_ECOLI', 10, 410, 126) %>%
+        bacteriaAssessmentDecision(stationData, 'ECOLI', 'LEVEL_ECOLI', 10, 410, 126) %>%
           dplyr::select(StationID:BACTERIASTATS) %>% #ECOLI_STATECOLI_VERBOSE) %>%
           mutate(ENTER_EXC = as.numeric(NA), ENTER_SAMP = as.numeric(NA), ENTER_GM_EXC = as.numeric(NA), ENTER_GM_SAMP = as.numeric(NA),
                  ENTER_STAT = as.character(NA), ENTER_STATENTER_VERBOSE = as.character(NA)) ) }
   } else {
     return(
-      tibble(StationID = z, ECOLI_EXC = as.numeric(NA), ECOLI_SAMP = as.numeric(NA), ECOLI_GM_EXC = as.numeric(NA), ECOLI_GM_SAMP = as.numeric(NA),
+      tibble(StationID = uniqueStationName, ECOLI_EXC = as.numeric(NA), ECOLI_SAMP = as.numeric(NA), ECOLI_GM_EXC = as.numeric(NA), ECOLI_GM_SAMP = as.numeric(NA),
              ECOLI_STAT = as.character(NA), ECOLI_STATECOLI_VERBOSE = as.character(NA),
              ENTER_EXC = as.numeric(NA), ENTER_SAMP = as.numeric(NA), ENTER_GM_EXC = as.numeric(NA), ENTER_GM_SAMP = as.numeric(NA),
              ENTER_STAT = as.character(NA), ENTER_STATENTER_VERBOSE = as.character(NA)) )}
 }
-#bacteriaAssessmentDecisionClass(x)
+#bacteriaAssessmentDecisionClass(stationData)
 #bacteriaAssessmentDecisionClass(stationData)

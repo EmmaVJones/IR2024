@@ -1,8 +1,8 @@
 
 #####################################   UPDATE EACH NEW TOOL REBUILD #############################################
 # Establish Assessment Period 
-assessmentPeriod <- as.POSIXct(c("2015-01-01 00:00:00 UTC","2020-12-31 23:59:59 UTC"),tz='UTC')
-assessmentCycle <- '2022'
+assessmentPeriod <- as.POSIXct(c("2017-01-01 00:00:00 UTC","2022-12-31 23:59:59 UTC"),tz='UTC')
+assessmentCycle <- '2024'
 ##################################################################################################################
 
 # WQS information for functions
