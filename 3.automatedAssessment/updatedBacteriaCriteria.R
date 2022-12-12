@@ -193,7 +193,10 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
     if(nrow(nSamples) > 0){ # only proceed through decisions if there is data to be analyzed
 
     # Run assessment function
-    validForAssessment <- suppressWarnings(bacteriaExceedances_NEW(stationData, bacteriaField, bacteriaRemark, sampleRequirement, STV, geomeanCriteria)   ) %>% 
+    # make two objects here because we want to base all decisions only on valid data, but we also want to output all associated data from 
+      # this function, so we create a rawAnalysisForOutput to be saved in a list column for unpacking later
+    rawAnalysisForOutput <- suppressWarnings(bacteriaExceedances_NEW(stationData, bacteriaField, bacteriaRemark, sampleRequirement, STV, geomeanCriteria)   )
+    validForAssessment <- rawAnalysisForOutput %>% 
       filter(`Valid Assessment Window` == TRUE)
     
     # bail out if no data to analyze bc all Level II or Level I, OR (new for IR2024) no valid windows for assessment
@@ -252,7 +255,7 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
                           `_STAT_VERBOSE` = "Impaired - 2 or more STV exceedances in the same 90-day period represented by 10+ samples, no geomean exceedances.",#STV exceedances in a 90-day period represented by >= 10 samples after verifying geomean passes where applicable.",
                           `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                           `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                          associatedDecisionData = list(validForAssessment) ) %>%
+                          associatedDecisionData = list(rawAnalysisForOutput) ) %>%
                      rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                      rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
             
@@ -269,7 +272,7 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
                             `_STAT_VERBOSE` = "Impaired- 2 or more STV exceedances in the same 90-day period with < 10 samples, no geomean exceedances.", #2 or more STV hits in the same 90-day period with < 10 samples after verifying geomean passes where applicable.",
                             `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                             `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                            associatedDecisionData = list(validForAssessment) ) %>%
+                            associatedDecisionData = list(rawAnalysisForOutput) ) %>%
                        rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                        rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
               } else { 
@@ -285,7 +288,7 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
                                 `_STAT_VERBOSE` = "Fully Supporting - No STV exceedance rates >10% or geomean exceedances in any 90-day period represented by 10+ samples.",# No geomean exceedances and STV exceedance(s) in one or multiple 90-day periods represented by 10+ samples.", # previous language: 1 STV hit in one or multiple 90-day periods with < 10 samples after verifying geomean passes where applicable.",
                                 `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                                 `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                                associatedDecisionData = list(validForAssessment) ) %>%
+                                associatedDecisionData = list(rawAnalysisForOutput) ) %>%
                            rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                            rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
                   
@@ -301,7 +304,7 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
                               `_STAT_VERBOSE` = "Fully Supporting - No geomean exceedances and only 1 STV exceedance in one or multiple 90-day periods represented by < 10 samples.", # previous language: 1 STV hit in one or multiple 90-day periods with < 10 samples after verifying geomean passes where applicable.",
                               `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                               `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                              associatedDecisionData = list(validForAssessment) ) %>%
+                              associatedDecisionData = list(rawAnalysisForOutput) ) %>%
                          rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                          rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
                 } 
@@ -318,7 +321,7 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
                         `_STAT_VERBOSE` = "Fully Supporting - No STV exceedance rates >10% or geomean exceedances in any 90-day period represented by 10+ samples.", #No STV exceedances or geomean exceedances in any 90-day period.",
                         `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                         `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                        associatedDecisionData = list(validForAssessment) ) %>%
+                        associatedDecisionData = list(rawAnalysisForOutput) ) %>%
                    rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                    rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
           }
@@ -333,7 +336,7 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
                       `_STAT_VERBOSE` = "Impaired- geomean exceedance in any 90-day period.", #geomean exceedance(s) in any 90-day period with >= 10 samples.",
                       `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                       `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                      associatedDecisionData = list(validForAssessment) ) %>%
+                      associatedDecisionData = list(rawAnalysisForOutput) ) %>%
                  rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                  rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
         }
@@ -350,7 +353,7 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
                       `_STAT_VERBOSE` = "Insufficient Information (Prioritize for follow up monitoring)- No STV exceedances but insufficient data to analyze geomean.", #0 STV hits but insufficient data to analyze geomean.",
                       `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                       `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                      associatedDecisionData = list(validForAssessment) ) %>%
+                      associatedDecisionData = list(rawAnalysisForOutput) ) %>%
                  rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE))%>%  # fix names to match station table format
                  rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
         } else { # Were there any hits of the STV during the dataset? - Yes
@@ -366,7 +369,7 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
                           `_STAT_VERBOSE` = "Impaired - 2 or more STV hits in the same 90-day period with < 10 samples.",
                           `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                           `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                          associatedDecisionData = list(validForAssessment) ) %>%
+                          associatedDecisionData = list(rawAnalysisForOutput) ) %>%
                      rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE))%>%  # fix names to match station table format
                      rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
           } else { 
@@ -380,7 +383,7 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
                           `_STAT_VERBOSE` = "Insufficient Information (Prioritize for follow up monitoring)- One STV exceedance in one or multiple 90-day periods but insufficient data to analyze geomean.",#1 STV hit in one or multiple 90-day periods but insufficient data to analyze geomean.",
                           `BACTERIADECISION` = paste0(stationTableName, ": ",`_STAT_VERBOSE`),
                           `BACTERIASTATS` = paste0(stationTableName, ": Number of 90 day windows with > 10% STV exceedance rate: ", nrow(exceedSTVrate)),
-                          associatedDecisionData = list(validForAssessment) ) %>%
+                          associatedDecisionData = list(rawAnalysisForOutput) ) %>%
                      rename_with( ~ gsub("_", paste0(stationTableName,"_"), .x, fixed = TRUE)) %>%  # fix names to match station table format
                      rename_with( ~ gsub(".", "_", .x, fixed = TRUE)) ) # special step to get around accidentally replacing _GM with station table name
             }
@@ -437,6 +440,14 @@ bacteriaAssessmentDecisionClass <- function(stationData){ # input dataframe with
   #                       ENTER_EXC, ENTER_SAMP, ENTER_GM_EXC, ENTER_GM_SAMP, ENTER_STAT, ENTER_STATENTER_VERBOSE) ) } }
     
     
+  # stop everything if no data to analyze in stationData
+  if(nrow(stationData) == 0){
+    return(
+      tibble(StationID = uniqueStationName, ECOLI_EXC = as.numeric(NA), ECOLI_SAMP = as.numeric(NA), ECOLI_GM_EXC = as.numeric(NA), ECOLI_GM_SAMP = as.numeric(NA),
+             ECOLI_STAT = as.character(NA), ECOLI_STATECOLI_VERBOSE = as.character(NA),
+             ENTER_EXC = as.numeric(NA), ENTER_SAMP = as.numeric(NA), ENTER_GM_EXC = as.numeric(NA), ENTER_GM_SAMP = as.numeric(NA),
+             ENTER_STAT = as.character(NA), ENTER_STATENTER_VERBOSE = as.character(NA)) )}
+  
   # lake stations should only be surface sample
   if(unique(stationData$lakeStation) == TRUE){
     stationData <- filter(stationData, FDT_DEPTH <= 0.3) }
