@@ -15,11 +15,11 @@ subbasins <- st_read('../GIS/DEQ_VAHUSB_subbasins_EVJ.shp') %>%
 
 
 assessmentType1 <- 'Lacustrine'#'Riverine' #'Estuarine'#
-AUDEQregionSelection1 <- "BRRO"#"TRO"#"NRO"##"CO"#
+AUDEQregionSelection1 <- "TRO"#"BRRO"#"TRO"#"NRO"##"CO"#
 # filter(subbasinOptionsByWQStype, waterbodyType %in% assessmentType1) %>%
 # distinct(AssessmentRegion) %>% 
 # pull()
-AUsubbasinSelection1 <-  "Roanoke"#"James-Middle"#"York"#"Potomac-Lower"# 'Small Coastal'#"James-Middle"#"James-Middle"
+AUsubbasinSelection1 <-  'Small Coastal'#"Roanoke"#"James-Middle"#"York"#"Potomac-Lower"# 'Small Coastal'#"James-Middle"#"James-Middle"
 filter(subbasinOptionsByWQStype, waterbodyType %in% assessmentType1) %>%
   filter(AssessmentRegion %in% AUDEQregionSelection1) %>%
   {if(AUDEQregionSelection1 == 'TRO') # no AU polygons in this combo even though in WQS
@@ -42,11 +42,17 @@ typeName1 <- filter(WQSlayerConversion, waterbodyType %in% assessmentType1) %>%
 
 
 if(length(basinCodesAU1) > 1){ # in case more than 1 basin code in basin
+  if(typeName1[1] == "LP" & any(grepl(7, basinCodesAU1)) ){
+    # just use the one basin we have spatial data for or the app will bomb out
+    AUs <- st_zm(
+      st_read(paste0('data/GIS/processedAUs/AU_', typeName1[1],'_7A.shp' ))) %>%           # change to final
+      st_transform(4326) 
+  } else {
   AUs <- paste0('data/GIS/processedAUs/AU_', typeName1[1],'_',basinCodesAU1,'.shp' ) %>%                       # change to final
     map(st_read) %>%
     reduce(rbind) %>%
     st_transform(4326) %>%
-    st_zm()
+    st_zm() }
 } else {
   AUs <- st_zm(
     st_read(paste0('data/GIS/processedAUs/AU_', typeName1[1],'_',basinCodesAU1,'.shp' ))) %>%           # change to final

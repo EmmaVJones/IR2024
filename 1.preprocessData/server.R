@@ -76,11 +76,17 @@ shinyServer(function(input, output, session) {
       pull()    
     withProgress(message = 'Reading in Large Spatial File',
                  if(length(basinCodesAU()) >1){ # in case more than 1 basin code in basin
+                   if(typeName[1] == "LP" & any(grepl(7, basinCodesAU())) ){
+                     # just use the one basin we have spatial data for or the app will bomb out
+                     st_zm(
+                       st_read(paste0('data/GIS/processedAUs/AU_', typeName[1],'_7A.shp' ))) %>%           # change to final
+                       st_transform(4326) 
+                   } else {
                    paste0('data/GIS/processedAUs/AU_', typeName[1],'_',basinCodesAU(),'.shp' ) %>%                       # change to final
                      map(st_read) %>%
                      reduce(rbind) %>%
                      st_transform(4326) %>%
-                     st_zm()
+                     st_zm() }
                  } else {
                    st_zm(
                      st_read(paste0('data/GIS/processedAUs/AU_', typeName[1],'_',basinCodesAU(),'.shp' ))) %>%           # change to final
