@@ -986,20 +986,44 @@ metalsCriteriaFunction <- function(ID, Hardness, WER){
 #criteria <- metalsCriteriaFunction(stationMetalsData[1,]$Hardness, WER = 1)
 
 # # get one station metals data for assessment
-# station <- '2-JKS028.69'
-# # pull one station data
-# stationData <- filter(conventionals, FDT_STA_ID %in% station) %>% #stationTable$STATION_ID[i]) %>%
-#   left_join(stationTable, by = c('FDT_STA_ID' = 'STATION_ID')) %>%
-#   pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
-#   # special lake steps
-#   {if(station %in% lakeStations$STATION_ID)#stationTable$STATION_ID[i] %in% lakeStations$STATION_ID)
-#     suppressWarnings(suppressMessages(
-#       mutate(., lakeStation = TRUE) %>%
-#         thermoclineDepth())) # adds thermocline information and SampleDate
-#     else mutate(., lakeStation = FALSE) }
-# stationMetalsData <- filter(WCmetalsForAnalysis, Station_Id %in% station)
+# this is pulled from the shiny app scripts right now. might need to go into .Rmd as well
+# Separate object for analysis, tack on METALS and RMK designation to make the filtering of certain lab comment codes easier
+# WCmetalsForAnalysis <- WCmetals %>%
+#   dplyr::select(Station_Id, FDT_DATE_TIME, FDT_DEPTH, # include depth bc a few samples taken same datetime but different depths
+#                 METAL_Antimony = `STORET_01095_ANTIMONY, DISSOLVED (UG/L AS SB)`, RMK_Antimony = RMK_01097,
+#                 METAL_Arsenic = `STORET_01000_ARSENIC, DISSOLVED  (UG/L AS AS)`, RMK_Arsenic = RMK_01002,
+#                 METAL_Barium = `STORET_01005_BARIUM, DISSOLVED (UG/L AS BA)`, RMK_Barium = RMK_01005,
+#                 METAL_Cadmium = `STORET_01025_CADMIUM, DISSOLVED (UG/L AS CD)`, RMK_Cadmium = RMK_01025,
+#                 METAL_Chromium = `STORET_01030_CHROMIUM, DISSOLVED (UG/L AS CR)`, RMK_Chromium = RMK_01030,
+#                 # Chromium III and ChromiumVI dealt with inside metalsAnalysis()
+#                 METAL_Copper = `STORET_01040_COPPER, DISSOLVED (UG/L AS CU)`, RMK_Copper = RMK_01040,
+#                 METAL_Lead = `STORET_01049_LEAD, DISSOLVED (UG/L AS PB)`, RMK_Lead = RMK_01049,
+#                 METAL_Mercury = `STORET_50091_MERCURY-TL,FILTERED WATER,ULTRATRACE METHOD UG/L`, RMK_Mercury = RMK_50091,
+#                 METAL_Nickel = `STORET_01065_NICKEL, DISSOLVED (UG/L AS NI)`, RMK_Nickel = RMK_01067,
+#                 METAL_Uranium = `URANIUM_TOT`, RMK_Uranium = `RMK_7440-61-1T`,
+#                 METAL_Selenium = `STORET_01145_SELENIUM, DISSOLVED (UG/L AS SE)`, RMK_Selenium = RMK_01145,
+#                 METAL_Silver = `STORET_01075_SILVER, DISSOLVED (UG/L AS AG)`, RMK_Silver = RMK_01075,
+#                 METAL_Thallium = `STORET_01057_THALLIUM, DISSOLVED (UG/L AS TL)`, RMK_Thallium = RMK_01057,
+#                 METAL_Zinc = `STORET_01090_ZINC, DISSOLVED (UG/L AS ZN)`, RMK_Zinc = RMK_01092,
+#                 METAL_Hardness = `STORET_DHARD_HARDNESS, CA MG CALCULATED (MG/L AS CACO3) AS DISSOLVED`, RMK_Hardness = RMK_DHARD) %>%
+#   group_by(Station_Id, FDT_DATE_TIME, FDT_DEPTH) %>%
+#   mutate_if(is.numeric, as.character) %>% # need everyone as character so we can pivot longer in one go
+#   pivot_longer(cols = METAL_Antimony:RMK_Hardness, #RMK_Antimony:RMK_Hardness,
+#                names_to = c('Type', 'Metal'),
+#                names_sep = "_",
+#                values_to = 'Value') %>%
+#   ungroup() %>% group_by(Station_Id, FDT_DATE_TIME, FDT_DEPTH, Metal) %>%
+#   pivot_wider(id_cols = c(Station_Id, FDT_DATE_TIME, FDT_DEPTH, Metal), names_from = Type, values_from = Value) %>% # pivot remark wider so the appropriate metal value is dropped when filtering on lab comment codes
+#   filter(! RMK %in% c('IF', 'J', 'O', 'QF', 'V')) %>% # lab codes dropped from further analysis
+#   pivot_longer(cols= METAL:RMK, names_to = 'Type', values_to = 'Value') %>% # get in appropriate format to flip wide again
+#   pivot_wider(id_cols = c(Station_Id, FDT_DATE_TIME, FDT_DEPTH), names_from = c(Type, Metal), names_sep = "_", values_from = Value) %>%
+#   mutate_at(vars(contains('METAL')), as.numeric) %>%# change metals values back to numeric
+#   rename_with(~str_remove(., 'METAL_')) # drop METAL_ prefix for easier analyses
+# stationMetalsData <- filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID)
 
 # Single station Metals analysis
+# this function and metalsAssessmentFunction() are applied in the shiny app but may be included in 
+# the stations table output if we reorganize the results to come into one field nicely
 metalsAnalysis <- function(stationMetalsData, stationData, WER){
   # If no WER supplied, use 1
   WER <- ifelse(is.na(WER), 1, WER)
@@ -1128,6 +1152,7 @@ metalsAnalysis <- function(stationMetalsData, stationData, WER){
     arrange(Station_Id, WindowDateTimeStart, FDT_DEPTH, Metal)
   return(stationCriteriaResults)
 }
+#metalsAnalysisResults <- metalsAnalysis(stationMetalsData, stationData, WER = 1)
 
 # Metals Assessment function that makes sense of output from metalsAnalysis()
 metalsAssessmentFunction <- function(metalsAnalysisResults){
@@ -1137,15 +1162,13 @@ metalsAssessmentFunction <- function(metalsAnalysisResults){
     arrange(Criteria) %>% # arrange on just Criteria to make column order make more sense 
     pivot_wider(names_from = Criteria, values_from = Exceedances)
 }
-
+# metalsAssessmentFunction(metalsAnalysisResults) %>% View()
 
 
 
 
 
 # Single station chloride assessment
-
-
 
 chlorideFreshwaterAnalysis <- function(stationData){
   # doesn't apply in class II transition zone
