@@ -416,9 +416,10 @@ bacteriaAssessmentDecision <- function(stationData, # input dataframe with bacte
 
 
 ## outermost function to decide which bacteria should be assessed based on WQS Class
-bacteriaAssessmentDecisionClass <- function(stationData){ # input dataframe with bacteria data
-  uniqueStationName <- unique(stationData$FDT_STA_ID) # just in case
-  
+bacteriaAssessmentDecisionClass <- function(stationData, # input dataframe with bacteria data
+                                            uniqueStationName # stationID for output in case no data come into function
+                                            ){
+
   # # quick out if all bacteria data level II or I
   # if(any( c('CMON', 'NONA') %in% unique(dplyr::select(stationData, contains('TYPE_')) %>% summarize(unique(.)) %>%
   #                                       pivot_longer(cols = everything(), names_to = 'name', values_to = 'value') %>% pull(value)) ) ){

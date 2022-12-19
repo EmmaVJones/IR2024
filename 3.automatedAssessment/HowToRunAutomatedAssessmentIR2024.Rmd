@@ -32,7 +32,7 @@ board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_K
 
 ```
 
-This document walks users through running the automated assessement for any given set of stations and waterbody type (riverine or lacustrine for now). Prior to this point, the user needs to have completed the necessary prerequisites of attributing stations with AU and WQS information. This dataset is a companion to the rivers and streams/lake assessment applications and is **NOT** final. The results cited in this table are identical to the app calculations and are meant for assessor review, QA, editing prior to sumbitting to WQA CEDS bulk data upload.
+This document walks users through running the automated assessment for any given set of stations and waterbody type. Prior to this point, the user needs to have completed the necessary prerequisites of attributing stations with AU and WQS information. This dataset is a companion to the rivers and streams/lake assessment applications and is **NOT** final. The results cited in this table are identical to the app calculations and are meant for assessor review, QA, editing prior to submitting to WQA CEDS bulk data upload.
 
 # Prerequisites
 The user will have to have all conventionals data, water column metals, and sediment metals organized by Roger for the window. **Additionally, the CEDS EDAS data needs to be exported and available for use, including regional Bioassessment calls**. Last cycle's finalized regional assessment layer (shapefile with AUs) are the spatial component needed. Lastly, the assessor must have the stations bulk data upload table filled out to their requirements in order to run the assessment scripts. 
@@ -318,7 +318,7 @@ ammoniaAnalysis <- tibble()
 startTime <- Sys.time()
 
 # loop over all sites, not super efficient but get the job done in easy to follow format
-for(i in 1:500){#nrow(stationTable)){
+for(i in 1:nrow(stationTable)){
 #i = 1
   print(paste('Assessing station', i, 'of', nrow(stationTable), sep=' '))
 
@@ -427,7 +427,8 @@ for(i in 1:500){#nrow(stationTable)){
       # this will be removed for lake stations later since it does not apply
       pHExceedances(stationData) %>% quickStats('PH'),
       bacteriaAssessmentDecisionClass( # NEW for IR2024, bacteria only assessed in two most recent years of assessment period
-        filter(stationData, between(FDT_DATE_TIME, assessmentPeriod[1] + years(4), assessmentPeriod[2])) ),
+        filter(stationData, between(FDT_DATE_TIME, assessmentPeriod[1] + years(4), assessmentPeriod[2])),
+        uniqueStationName = unique(stationData$FDT_STA_ID)),
  
       # Ammonia 
       rollingWindowSummary(
@@ -496,5 +497,63 @@ stationTableResults <- bind_rows(stationsTemplate, stationTableResults) %>%
   dplyr::select(STATION_ID:`7Q10 Flag`)
 
 timeDiff = Sys.time()- startTime
-  
 ```
+
+
+Don't think we need either of these now that we take data from ODS but here for the ride along just in case.
+
+
+
+Now add in comment for estuarine stations to expedite assessor identification of stations
+
+```{r add back estuarine stations }
+# estuarineStations <- filter(estuarineStations, ! STATION_ID %in% bothTypesE$STATION_ID) # drop duplicates
+# 
+# # Previous station table comments
+# comments <- stationTableComments(unique(estuarineStations$STATION_ID), stations2020IR, '2020', historicalStationsTable2, '2018')
+#   
+# 
+# estuarineStationData <- dplyr::select(estuarineStations, STATION_ID:VAHU6, COMMENTS) %>%
+#       mutate(COMMENTS = 'This station is designated as an estuarine station and cannot be assessed by current automated methods.') %>%
+#       left_join(comments, by = 'STATION_ID')
+#   
+#   
+# stationTableResults <- bind_rows(stationTableResults, estuarineStationData)
+
+### stationTableResults1 <- stationTableResults1 %>% group_by(STATION_ID) %>% mutate(n()) %>% 
+###   dplyr::select(`n()`, everything())
+### 
+### View(filter(stationTableResults1, STATION_ID == '7ACHE004.29'))
+```
+
+Fix station comments if not already fixed
+
+```{r}
+# realComments <- read_excel('data/GIS/ir20_Appendix8_StationsKey-List.xlsx', sheet = 'ir20_Appendix8_StationsList') %>%
+#   dplyr::select(STATION_ID, COMMENTS)
+# 
+# stationTableResults <- left_join(stationTableResults, realComments, by = "STATION_ID") %>%
+#   rename('COMMENTS' = 'COMMENTS.x') %>%
+#   mutate(`2020 IR COMMENTS` = COMMENTS.y) %>%
+#   dplyr::select(-COMMENTS.y)
+```
+
+
+
+
+Now save all this work as a this is the starting point for the app or for regional assessor review, depending on the assessor's preferred review method.
+
+```{r}
+# can use write_csv bc there are no date fields that could be corrupted by function
+write_csv(stationTableResults, 'processedStationData/stationTableResults.csv',
+          na = "") # dont write out a character NA in csv
+
+# If you want just one region's worth of stations, you could do this:
+# stationTableResults1 <- filter(stationTableResults, STATION_ID %in% filter(stationTable, REGION == "BRRO")$STATION_ID)
+# write_csv(stationTableResults1, 'processedStationData/stationTableResultsBRRO.csv',
+#           na = "") # dont write out a character NA in csv
+
+saveRDS(ammoniaAnalysis, 'processedStationData/ammoniaAnalysis.RDS')
+```
+
+
