@@ -1,7 +1,7 @@
 
 #####################################   UPDATE EACH NEW TOOL REBUILD #############################################
 # Establish Assessment Period 
-assessmentPeriod <- as.POSIXct(c("2017-01-01 00:00:00 UTC","2022-12-31 23:59:59 UTC"),tz='UTC')
+assessmentPeriod <- as.POSIXct( c("2017-01-01 00:00:00 UTC", "2022-12-31 23:59:59 UTC"), tz='UTC')
 assessmentCycle <- '2024'
 ##################################################################################################################
 
@@ -21,28 +21,29 @@ WQSvalues <- tibble(CLASS_BASIN = c('I',"II","II_7","III","IV","V","VI","VII"),
                     `Max Temperature (C)` = c(NA, NA, NA, 32, 31, 21, 20, NA)) %>%
   mutate(CLASS_DESCRIPTION = paste0(CLASS, " | ", `Description Of Waters`))
 
-concatinateUnique <- function(stuff){
-  if(length(stuff)==1){
-    if(is.na(stuff)){return(NA)
-    }else{
-      return(paste(unique(stuff), collapse= ', ')) }
-  } 
-  if(length(stuff) > 1){return(paste(unique(stuff), collapse= ', '))}
-}
-
-changeDEQRegionName <- function(stuff){
-  # have to do this bc different places in conventionals report the assessment region over sample region
-  if(length(stuff) == 1){
-    if(is.na(stuff)){return("NA")}
-    if(stuff == "Valley"){return('VRO')}
-    if(stuff == "Northern"){return('NRO')}
-    if(stuff == "Piedmont"){return('PRO')}
-    if(stuff == "Blue Ridge"){return('BRRO')}
-    if(stuff == "Tidewater"){return('TRO')}
-    if(stuff == "Southwest" ){return('SWRO')}
-    if(stuff == 'NA'){return('NA')}
-  } else {return(concatinateUnique(stuff))}
-}
+# Do we need these functions? cant trace them to any usage
+# concatinateUnique <- function(stuff){
+#   if(length(stuff)==1){
+#     if(is.na(stuff)){return(NA)
+#     }else{
+#       return(paste(unique(stuff), collapse= ', ')) }
+#   } 
+#   if(length(stuff) > 1){return(paste(unique(stuff), collapse= ', '))}
+# }
+# 
+# changeDEQRegionName <- function(stuff){
+#   # have to do this bc different places in conventionals report the assessment region over sample region
+#   if(length(stuff) == 1){
+#     if(is.na(stuff)){return("NA")}
+#     if(stuff == "Valley"){return('VRO')}
+#     if(stuff == "Northern"){return('NRO')}
+#     if(stuff == "Piedmont"){return('PRO')}
+#     if(stuff == "Blue Ridge"){return('BRRO')}
+#     if(stuff == "Tidewater"){return('TRO')}
+#     if(stuff == "Southwest" ){return('SWRO')}
+#     if(stuff == 'NA'){return('NA')}
+#   } else {return(concatinateUnique(stuff))}
+# }
 
 # Lake name standardization
 lakeNameStandardization <- function(x){
@@ -207,11 +208,9 @@ tempExceedances <- function(stationData){
            limit = !! names(.[6])) %>% 
     # Apply Round to Even Rule before testing for exceedances
     dplyr::mutate(parameterRound = signif(parameter, digits = 2), # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section50/
-                  exceeds = case_when(parameterRound > limit & is.na(`7Q10 Flag`) ~ TRUE, # exceedance if above limit and no 7Q10 Flag
-                                      parameterRound > limit & `7Q10 Flag` == "7Q10 Flag" ~ FALSE,  # exceedance if above limit and 7Q10 Flag
+                  exceeds = case_when(parameterRound > limit ~ TRUE, # Identify where above max Temperature, 
                                       parameterRound <= limit ~ FALSE, # no exceedance
                                       TRUE ~ NA))
-                   # ifelse(parameterRound > limit, T, F)) # Identify where above max Temperature
 }
 # tempExceedances(stationData) %>%
 #  quickStats('TEMP')
@@ -251,12 +250,10 @@ DOExceedances_Min <- function(stationData){
     dplyr::rename(parameter = !!names(.[4]), limit = !!names(.[7])) %>% # rename columns to make functions easier to apply
     # Round to Even Rule
     dplyr::mutate(parameterRound = signif(parameter, digits = 2), # two significant figures based on  https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section50/
-                  exceeds = case_when(parameterRound < limit & is.na(`7Q10 Flag`) ~ TRUE, # exceedance if above limit and no 7Q10 Flag
-                                      parameterRound < limit & `7Q10 Flag` == "7Q10 Flag" ~ FALSE,  # exceedance if above limit and 7Q10 Flag
+                  exceeds = case_when(parameterRound < limit ~ TRUE, # Identify where below min DO 
                                       parameterRound >= limit ~ FALSE, # no exceedance
                                       TRUE ~ NA))
-  # exceeds = ifelse(parameterRound < limit, T, F))# Identify where below min DO 
-}
+  }
 #DOExceedances_Min(stationData) %>% quickStats('DO')
 
 
@@ -298,13 +295,13 @@ DO_Assessment_DailyAvg <- function(stationData){
 }
 #DO_Assessment_DailyAvg(stationData) %>% quickStats('DO_Daily_Avg') 
 
-# pH range Exceedance Function
+
 pHSpecialStandardsCorrection <- function(stationData){
   mutate(stationData, `pH Min` = case_when(str_detect(as.character(SPSTDS), '6.5-9.5') ~ 6.5, TRUE ~ `pH Min`),
          `pH Max` = case_when(str_detect(as.character(SPSTDS), '6.5-9.5') ~ 9.5, TRUE ~ `pH Max`))
 }
   
-
+# pH range Exceedance Function
 pHExceedances <- function(stationData){
   # special step for lake stations, remove samples based on lake assessment guidance 
   if(unique(stationData$lakeStation) == TRUE){
@@ -332,11 +329,9 @@ pHExceedances <- function(stationData){
         mutate(parameterRound = signif(FDT_FIELD_PH, digits = 2)) %>% # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section50/
         mutate(interval=findInterval(parameterRound,c(`pH Min`,`pH Max`), left.open=TRUE, rightmost.closed = TRUE)) %>% # Identify where pH outside of assessment range with round to even
         ungroup()%>%
-        mutate(exceeds = case_when(interval != 1 & is.na(`7Q10 Flag`) ~ TRUE, # exceedance if outside limit and no 7Q10 Flag
-                                   interval != 1 & `7Q10 Flag` == "7Q10 Flag" ~ FALSE,  # no exceedance if outside limit and 7Q10 Flag
+        mutate(exceeds = case_when(interval != 1 ~ TRUE, #  Highlight where pH doesn't fall into criteria range
                                    interval == 1 ~ FALSE,  # no exceedance if inside limit
                                    TRUE ~ NA),
-               #ifelse(interval == 1, F, T)), # Highlight where pH doesn't fall into assessment range
                limit = `pH Min`) # placeholder for quickStats function, carries over whether or not station has WQS attributed
     }
   return(pH)
@@ -360,9 +355,11 @@ metalsExceedances <- function(x, metalType){
 
 
 ## Identify if further review needs to happen for PCB or metals data 
-PCBmetalsDataExists <- function(x, parameterType){
+PCBmetalsDataExists <- function(datasetType, # any of the preorganized PCB or fish tissue datasets
+                                parameterType # field name to pass through to Station Table output
+                                ){
   # if any data given to function
-  if(nrow(x) > 0){ 
+  if(nrow(datasetType) > 0){ 
     x <- data.frame(EXC = NA, STAT = 'Review')
   }else {
     x <- data.frame(EXC = NA, STAT = NA) }
@@ -672,15 +669,17 @@ metalsExceedances <- function(x, metalType){
 
 
 # Benthic Data flag
-benthicAssessment <- function(x, VSCIresults){
+benthicAssessment <- function(stationData,
+                              VSCIresults # pinned dataset with all BenSamps run against just VSCI
+                              ){
   # this works because the all SCI options are run on all data, so if there is a VSCI result 
   # (even if in real life that is not the correct SCI to use), then benthic data exists for
   # a given station
-  z <- filter(VSCIresults, StationID %in% unique(x$FDT_STA_ID))
-  if(nrow(z) > 0){tibble(BENTHIC_STAT='Review')
-  } else { tibble(BENTHIC_STAT=NA)}
+  benthicDataExist <- filter(VSCIresults, StationID %in% unique(stationData$FDT_STA_ID))
+  if(nrow(benthicDataExist) > 0){tibble(BENTHIC_STAT = 'Review')
+  } else { tibble(BENTHIC_STAT = NA)}
 }
-#benthicAssessment(x, VSCIresults)
+#benthicAssessment(stationData, VSCIresults)
 
 
 
@@ -1387,7 +1386,6 @@ lowFlowFlagColumn <- function(stationData){
     } else {
       gageFlags <- tibble(STATION_ID = unique(lowFlowFlag$FDT_STA_ID),
                           `7Q10 Flag` = NA_character_)   }
-    
   } else {
     gageFlags <- tibble(STATION_ID = unique(lowFlowFlag$FDT_STA_ID),
                         `7Q10 Flag` = NA_character_)

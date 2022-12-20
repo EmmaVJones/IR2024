@@ -304,8 +304,7 @@ conventionals <- conventionals %>%
 
 # Automated Assessment Steps
 
-Finally, we are ready to analyze some data!  Go through conventionals one station at a time, join stationTable, analyze by functions, report in WQA CEDS template
-
+Finally, we are ready to analyze some data! Go through stationTable one station at a time, join conventionals, analyze all available data by each parameter function (or nested functions), and report out results in the WQA CEDS bulk upload template format
 
 ```{r Automated Assessment}
 # make placeholder objects to store data results

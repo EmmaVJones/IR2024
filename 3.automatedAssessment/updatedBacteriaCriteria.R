@@ -158,19 +158,19 @@ bacteriaExceedances_NEW <- function(stationData, # input dataframe with bacteria
 
 
 #Function to see if any 90 day windows have 2+ STV exceedances
-STVexceedance <- function(df, STV){
-  morethan1STVexceedanceInAnyWindow <- filter(df, `STV Exceedances In Window` >= 2)
-  if(nrow(morethan1STVexceedanceInAnyWindow) > 0){
-    return('| 2 or more STV exceedances in a 90 day window |')
-  }
-}
+# STVexceedance <- function(df, STV){
+#   morethan1STVexceedanceInAnyWindow <- filter(df, `STV Exceedances In Window` >= 2)
+#   if(nrow(morethan1STVexceedanceInAnyWindow) > 0){
+#     return('| 2 or more STV exceedances in a 90 day window |')
+#   }
+# }
 
 
-bacteriaField <- 'ECOLI' #
-bacteriaRemark <- 'LEVEL_ECOLI' #
-sampleRequirement <- 10
-STV <- 410 #
-geomeanCriteria <- 126 #
+# bacteriaField <- 'ECOLI' #
+# bacteriaRemark <- 'LEVEL_ECOLI' #
+# sampleRequirement <- 10
+# STV <- 410 #
+# geomeanCriteria <- 126 #
 
 # Function to summarize bacteria assessment results into decisions
 # This function returns all potential issues with priory on geomean results IF there
