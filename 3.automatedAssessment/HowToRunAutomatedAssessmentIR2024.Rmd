@@ -301,6 +301,15 @@ conventionals <- conventionals %>%
 #View(filter(conventionals, `7Q10 Flag` == "7Q10 Flag"))
 ```
 
+That dataset is money. We want to use that one in the shiny applications, so make sure you pin that to the server (and update it any time new conventionals data are processed).
+
+```{r pin new conventionals}
+# pin(conventionals, name = "conventionals2024draft_with7Q10flag", 
+#     description = "Draft Conventionals data for IR2024 with added 7Q10 flag joined at major river basin level. This is used for the shiny app versions of the automated assessment protocol to save rendering time", board = 'rsconnect')
+```
+
+
+
 
 # Automated Assessment Steps
 

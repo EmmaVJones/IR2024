@@ -1,0 +1,291 @@
+# This script is a companion to the server.R and allows you to test individual portions of the application
+
+
+source('global.R')
+
+# # Pinned to server, done for each region in C:\HardDriveBackup\R\GitHub\IR2022\1.preprocessData\preprocessingWorkflow\ReworkingDataPreprocessingMethod.Rmd
+# #regionalAUs <- st_read('userDataToUpload/AU_working/va_2020_aus_riverine_DRAFT_BRRO.shp') %>%
+# #  st_transform(4326)   # transform to WQS84 for spatial intersection
+# #pin(regionalAUs, name = 'BRROworkingAUriverine', description = "BRRO working AU riverine", board = "rsconnect")
+# 
+# 
+# 
+# Pull data from server
+conventionals <- pin_get('ejones/conventionals2024draft_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
+vahu6 <- st_as_sf(pin_get("vahu6", board = "rsconnect")) # bring in as sf object
+WQSlookup <- pin_get("WQSlookup-withStandards",  board = "rsconnect")
+WQMstationFull <- pin_get("WQM-Station-Full", board = "rsconnect")
+stationsTemplate <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect')[0,] %>% 
+  mutate(across(matches(c("LATITUDE", "LONGITUDE", "EXC", "SAMP")), as.numeric)) 
+
+
+# Read in local data, don't want this saved on the server in case someone pulls and uses for unintended purposes
+template <- read_csv('userDataToUpload/stationTableResults.csv')
+lastUpdated <- as.Date(file.info('userDataToUpload/stationTableResults.csv')$mtime)
+historicalStationsTable <- readRDS('data/stationsTable2022.RDS')# last cycle stations table (forced into new station table format)
+historicalStationsTable2 <- readRDS('data/stationsTable2020.RDS') # two cycle ago stations table
+
+
+# WCmetals <- pin_get("WCmetals-2022IRfinal",  board = "rsconnect")
+# # Separate object for analysis, tack on METALS and RMK designation to make the filtering of certain lab comment codes easier
+# WCmetalsForAnalysis <- WCmetals %>%
+#   dplyr::select(Station_Id, FDT_DATE_TIME, FDT_DEPTH, # include depth bc a few samples taken same datetime but different depths
+#                 METAL_Antimony = `STORET_01095_ANTIMONY, DISSOLVED (UG/L AS SB)`, RMK_Antimony = RMK_01097,
+#                 METAL_Arsenic = `STORET_01000_ARSENIC, DISSOLVED  (UG/L AS AS)`, RMK_Arsenic = RMK_01002,
+#                 METAL_Barium = `STORET_01005_BARIUM, DISSOLVED (UG/L AS BA)`, RMK_Barium = RMK_01005,
+#                 METAL_Cadmium = `STORET_01025_CADMIUM, DISSOLVED (UG/L AS CD)`, RMK_Cadmium = RMK_01025,
+#                 METAL_Chromium = `STORET_01030_CHROMIUM, DISSOLVED (UG/L AS CR)`, RMK_Chromium = RMK_01030,
+#                 # Chromium III and ChromiumVI dealt with inside metalsAnalysis()
+#                 METAL_Copper = `STORET_01040_COPPER, DISSOLVED (UG/L AS CU)`, RMK_Copper = RMK_01040,
+#                 METAL_Lead = `STORET_01049_LEAD, DISSOLVED (UG/L AS PB)`, RMK_Lead = RMK_01049,
+#                 METAL_Mercury = `STORET_50091_MERCURY-TL,FILTERED WATER,ULTRATRACE METHOD UG/L`, RMK_Mercury = RMK_50091,
+#                 METAL_Nickel = `STORET_01065_NICKEL, DISSOLVED (UG/L AS NI)`, RMK_Nickel = RMK_01067,
+#                 METAL_Uranium = `URANIUM_TOT`, RMK_Uranium = `RMK_7440-61-1T`,
+#                 METAL_Selenium = `STORET_01145_SELENIUM, DISSOLVED (UG/L AS SE)`, RMK_Selenium = RMK_01145,
+#                 METAL_Silver = `STORET_01075_SILVER, DISSOLVED (UG/L AS AG)`, RMK_Silver = RMK_01075,
+#                 METAL_Thallium = `STORET_01057_THALLIUM, DISSOLVED (UG/L AS TL)`, RMK_Thallium = RMK_01057,
+#                 METAL_Zinc = `STORET_01090_ZINC, DISSOLVED (UG/L AS ZN)`, RMK_Zinc = RMK_01092,
+#                 METAL_Hardness = `STORET_DHARD_HARDNESS, CA MG CALCULATED (MG/L AS CACO3) AS DISSOLVED`, RMK_Hardness = RMK_DHARD) %>%
+#   group_by(Station_Id, FDT_DATE_TIME, FDT_DEPTH) %>%
+#   mutate_if(is.numeric, as.character) %>%
+#   pivot_longer(cols = METAL_Antimony:RMK_Hardness, #RMK_Antimony:RMK_Hardness,
+#                names_to = c('Type', 'Metal'),
+#                names_sep = "_",
+#                values_to = 'Value') %>%
+#   ungroup() %>% group_by(Station_Id, FDT_DATE_TIME, FDT_DEPTH, Metal) %>%
+#   pivot_wider(id_cols = c(Station_Id, FDT_DATE_TIME, FDT_DEPTH, Metal), names_from = Type, values_from = Value) %>% # pivot remark wider so the appropriate metal value is dropped when filtering on lab comment codes
+#   filter(! RMK %in% c('IF', 'J', 'O', 'QF', 'V')) %>% # lab codes dropped from further analysis
+#   pivot_longer(cols= METAL:RMK, names_to = 'Type', values_to = 'Value') %>% # get in appropriate format to flip wide again
+#   pivot_wider(id_cols = c(Station_Id, FDT_DATE_TIME, FDT_DEPTH), names_from = c(Type, Metal), names_sep = "_", values_from = Value) %>%
+#   mutate_at(vars(contains('METAL')), as.numeric) %>%# change metals values back to numeric
+#   rename_with(~str_remove(., 'METAL_')) # drop METAL_ prefix for easier analyses
+# Smetals <- pin_get("Smetals-2022IRfinal",  board = "rsconnect")
+# IR2020WCmetals <- pin_get("WCmetals-2020IRfinal",  board = "rsconnect")
+# IR2020Smetals <- pin_get("Smetals-2020IRfinal",  board = "rsconnect")
+# VSCIresults <- pin_get("VSCIresults", board = "rsconnect") %>%
+#   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+# VCPMI63results <- pin_get("VCPMI63results", board = "rsconnect") %>%
+#   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+# VCPMI65results <- pin_get("VCPMI65results", board = "rsconnect") %>%
+#   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+# benSampsStations <- st_as_sf(pin_get("ejones/benSampsStations", board = "rsconnect")) #%>%
+# benSamps <- pin_get("ejones/benSamps", board = "rsconnect") %>%
+#   filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2])) %>%# limit data to assessment window
+#   filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
+#   filter(`Target Count` == 110) %>% # only assess rarified data
+#   left_join(benSampsStations, by = 'StationID') %>% # update with spatial, assess reg, vahu6, basin/subbasin, & ecoregion info
+#   dplyr::select(StationID, Sta_Desc, everything()) %>%
+#   arrange(StationID)
+# habSamps <- pin_get("ejones/habSamps", board = "rsconnect") %>%
+#   filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]))# limit data to assessment window
+# habValues <- pin_get("ejones/habValues", board = "rsconnect")  %>%
+#   filter(HabSampID %in% habSamps$HabSampID)
+# habObs <- pin_get("ejones/habObs", board = "rsconnect") %>%
+#   filter(HabSampID %in% habSamps$HabSampID)
+# pinnedDecisions <- pin_get('IR2022bioassessmentDecisions_test', board = 'rsconnect') %>% ####################change to real when available
+#   dplyr::select(IRYear:FinalAssessmentRating)
+
+
+# Bring in local data (for now)
+ammoniaAnalysis <- readRDS('userDataToUpload/ammoniaAnalysis.RDS') # by having this locally and pre-analyzed it speeds up app rendering significantly
+# markPCB <- read_excel('data/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ') %>%
+#   mutate(SampleDate = as.Date(SampleDate),
+#          `Parameter Rounded to WQS Format` = as.numeric(signif(`Total Of Concentration`, digits = 2))) %>% # round to even for comparison to chronic criteria)
+#   dplyr::select(StationID: `Total Of Concentration`,`Parameter Rounded to WQS Format`, StationID_join)
+# fishPCB <- read_excel('data/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs') %>%
+#   mutate(`Parameter Rounded to WQS Format` = as.numeric(signif(`Total PCBs`, digits = 2))) %>% # round to even for comparison to chronic criteria)
+#   dplyr::select(WBID:`Weight (g)`, `Water %`:`Total PCBs`, `Parameter Rounded to WQS Format`, uncorrected, `recovery corrected`, comment3, Latitude, Longitude)
+# fishMetals <- read_excel('data/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals') %>%
+#   rename("# of Fish" = "# of fish...4", "Species_Name"  = "Species_Name...5",
+#          "species_name" = "Species_Name...47", "number of fish" = "# of fish...48")#,
+# #         "Beryllium"= "Be",  "Aluminum" = "Al",  "Vanadium" = "V", "Chromium"= "Cr",
+# #         "Manganese" = "Mn", "Nickel" = "Ni", "Copper" = "Cu" ,"Zinc"=  "Zn",  "Arsenic" = "As" , "Selenium" = "Se" ,
+# #         "Silver" = "Ag" , "Cadmium" = "Cd",
+# #         "Antimony" = "Sb", "Barium"=  "Ba" , "Mercury" =  "Hg", "Thallium"  = "Tl", "Lead" = "Pb"  )
+# fishMetalsScreeningValues <- read_csv('data/FishMetalsScreeningValues.csv') %>%
+#   group_by(`Screening Method`) %>%
+#   pivot_longer(cols = -`Screening Method`, names_to = 'Metal', values_to = 'Screening Value') %>%
+#   arrange(Metal)
+
+
+## Data Upload Tab
+
+# Pull together stationTable, this happens once per user upload
+stationTable <- read_csv('userDataToUpload/stationTableResults.csv',
+                         col_types = cols(COMMENTS = col_character())) %>% # force to character bc parsing can incorrectly guess logical based on top 1000 rows
+  as_tibble()
+# Remove stations that don't apply to application
+lakeStations <- filter_at(stationTable, vars(starts_with('TYPE')), any_vars(. == 'L'))
+estuarineStations <- filter(stationTable, str_detect(ID305B_1, 'E_'))
+
+
+stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %>%
+  filter(!STATION_ID %in% estuarineStations$STATION_ID) %>%
+  
+  # add WQS information to stations
+  left_join(WQSlookup, by = c('STATION_ID'='StationID')) %>%
+  mutate(CLASS_BASIN = paste(CLASS,substr(BASIN, 1,1), sep="_")) %>%
+  mutate(CLASS_BASIN = ifelse(CLASS_BASIN == 'II_7', "II_7", as.character(CLASS))) %>%
+  # Fix for Class II Tidal Waters in Chesapeake (bc complicated DO/temp/etc standard)
+  left_join(WQSvalues, by = 'CLASS_BASIN') %>%
+  # data cleanup
+  dplyr::select(-c(CLASS.y,CLASS_BASIN)) %>%
+  rename('CLASS' = 'CLASS.x') %>%
+  left_join(dplyr::select(WQMstationFull, WQM_STA_ID, EPA_ECO_US_L3CODE, EPA_ECO_US_L3NAME) %>%
+              distinct(WQM_STA_ID, .keep_all = TRUE), by = c('STATION_ID' = 'WQM_STA_ID')) %>%
+  mutate(lakeStation = FALSE)
+
+
+
+## Watershed selection Tab
+# side panel arguments
+DEQregionSelection <- 'BRRO'#"PRO"#'BRRO'
+basinSelection <- "James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
+HUC6Selection <- "JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+
+# pull together data based on user input on side panel
+# Pull AU data from server
+regionalAUs <- st_zm(st_as_sf(pin_get(paste0(DEQregionSelection, '_AUriverine'), board = 'rsconnect')))   
+
+
+the_data <- filter(vahu6, ASSESS_REG %in% DEQregionSelection) %>%
+  left_join(dplyr::select(subbasinToVAHU6, VAHU6, Basin, BASIN_CODE, Basin_Code))
+basin_filter <- filter(the_data, Basin_Code %in% basinSelection)
+huc6_filter <- filter(basin_filter, VAHU6 %in% HUC6Selection)
+
+
+# Spatially intersect chosen VAHU6 with regionalAUs
+AUs <- suppressWarnings(st_intersection(regionalAUs,  huc6_filter)) 
+
+
+# Watershed Map, main panel
+m <- mapview(basin_filter,label= basin_filter$VAHU6, layer.name = 'Basin Chosen',
+               popup= leafpop::popupTable(basin_filter, zcol=c('VAHU6',"VaName","VAHU5","ASSESS_REG")), legend= FALSE) + 
+    mapview(huc6_filter, color = 'yellow',lwd= 5, label= huc6_filter$VAHU6, layer.name = c('Selected HUC6'),
+            popup= leafpop::popupTable(huc6_filter, zcol=c('VAHU6',"VaName","VAHU5","ASSESS_REG")), legend= FALSE)
+m@map %>% setView(st_bbox(huc6_filter)$xmax[[1]],st_bbox(huc6_filter)$ymax[[1]],zoom = 9) 
+
+# Table of AUs within Selected VAHU6, main panel
+DT::datatable(AUs %>% st_drop_geometry(), rownames = FALSE, 
+                options= list(scrollX = TRUE, pageLength = nrow(AUs), scrollY = "300px", dom='Bti'),
+                selection = 'none') 
+
+# Table of Stations within Selected VAHU6, main panel
+stationSummary <- filter(conventionals, Huc6_Vahu6 %in% huc6_filter$VAHU6) %>%
+    distinct(FDT_STA_ID, .keep_all = TRUE)  %>% 
+    dplyr::select(FDT_STA_ID:FDT_SPG_CODE, STA_LV2_CODE:Data_Source, Latitude, Longitude) %>% 
+    dplyr::select(-FDT_DATE_TIME) %>% # drop date time bc confusing to users
+    mutate(`Analyzed By App` = ifelse(FDT_STA_ID %in% unique(stationTable$STATION_ID), 'yes','no')) 
+
+DT::datatable(stationSummary, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(stationSummary), 
+                                                                  scrollY = "300px", dom='Bti'),
+                selection = 'none') %>%
+    DT::formatStyle('Analyzed By App', target = 'row', backgroundColor = styleEqual(c('yes','no'), c('lightgray', 'yellow'))) 
+
+
+# Table of stations that were carried over from last cycle that have no data in current window, main panel
+carryoverStations <- filter(stationTable, VAHU6 %in% huc6_filter$VAHU6 & str_detect(COMMENTS, "This station has no data"))
+z <- carryoverStations %>%  dplyr::select(STATION_ID:VAHU6, COMMENTS)
+DT::datatable(z, rownames = FALSE, 
+                options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "300px", dom='Bti',
+                              autoWidth = TRUE, columnDefs = list(list(width = '400px', targets = c(29)))),
+                selection = 'none') 
+
+
+## Review AU Modal Modal--------------------------------------------------------------------------------------------------------------
+
+# AU modal map
+stations <- dplyr::select(stationSummary, STATION_ID = FDT_STA_ID, LATITUDE = Latitude, LONGITUDE = Longitude, `Analyzed By App`) %>%
+  bind_rows(filter(stationTable, VAHU6 %in% huc6_filter$VAHU6 & !STATION_ID %in% stationSummary$FDT_STA_ID) %>%
+              dplyr::select(STATION_ID, LATITUDE, LONGITUDE) %>%
+              mutate(`Analyzed By App` = 'IM carryover with no data in window')) %>%
+  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), 
+           remove = F, # don't remove these lat/lon cols from df
+           crs = 4269) # add projection, needs to be geographic for now bc entering lat/lng
+
+z <- AUs
+z$ID305B <- factor(z$ID305B) # drop extra factor levels so colors come out right
+
+m <- mapview(huc6_filter, color = 'yellow',lwd= 5, label= NULL, layer.name = c('Selected HUC6'),
+             popup= leafpop::popupTable(huc6_filter, zcol=c('VAHU6',"VaName","VAHU5","ASSESS_REG")), legend= FALSE) + 
+  mapview(z, label= z$ID305B, layer.name = c('AUs in Selected HUC6'), zcol = "ID305B", 
+          popup= leafpop::popupTable(z, zcol=c("ID305B","MILES","CYCLE","WaterName","Location" )), legend= FALSE) +
+  mapview(stations, label = stations$STATION_ID, layer.name = c('Stations in Selected HUC6'), zcol = "Analyzed By App", 
+          popup= leafpop::popupTable(stations, zcol=c("STATION_ID", "Analyzed By App")), legend= FALSE) 
+m@map 
+
+
+## End Review AU Modal Modal--------------------------------------------------------------------------------------------------------------
+
+## Status Overview Modal--------------------------------------------------------------------------------------------------------------
+  
+chooseStatusParameter <- c('Overall Status', unique(parameterSTATcrosswalk$Parameter))[1]
+
+# VAHU6 station status 
+stationStatus <- VAHU6stationSummary(stationTable, huc6_filter, parameterSTATcrosswalk) 
+
+# Station Status modal map
+indStatusMap(chooseStatusParameter, stationStatus) 
+
+## End Status Overview Modal--------------------------------------------------------------------------------------------------------------
+
+
+################################ Assessment Unit Review Tab ########################################
+
+# Show selected VAHU6
+DT::datatable(huc6_filter %>% st_set_geometry(NULL) %>% select(VAHU6, VaName, Basin),
+            rownames = FALSE, options= list(pageLength = 1, scrollY = "35px", dom='t'),
+            selection = 'none')
+
+# Pull Conventionals data for selected AU on click
+conventionals_HUC <- filter(conventionals, Huc6_Vahu6 %in% huc6_filter$VAHU6) %>%
+    left_join(dplyr::select(stationTable, STATION_ID:VAHU6,lakeStation,
+                            WQS_ID:EPA_ECO_US_L3NAME),
+              by = c('FDT_STA_ID' = 'STATION_ID')) %>%
+    filter(!is.na(ID305B_1)) %>%
+    pHSpecialStandardsCorrection() %>% #correct pH to special standards where necessary
+    temperatureSpecialStandardsCorrection()  # correct temperature special standards where necessary
+
+
+# Allow user to select from available AUs to investigate further
+
+# AUs from data in conventionals and carryoverStations
+AUselectionOptions <- unique(c(conventionals_HUC$ID305B_1, 
+                               #dplyr::select(carryoverStations(), ID305B_1:ID305B_10) %>% as.character()))
+                               # this method allows for multiple carryover stations to be concatinated correctly
+                               dplyr::select(carryoverStations, ID305B_1:ID305B_10) %>% 
+                                 mutate_at(vars(starts_with("ID305B")), as.character) %>%
+                                 pivot_longer(ID305B_1:ID305B_10, names_to = 'ID305B', values_to = 'keep') %>%
+                                 filter(!is.na(keep)) %>% 
+                                 pull(keep) ))
+AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))] # double check nothing wonky in there before proceeding
+
+# user selection
+AUselection <- AUselectionOptions[2]
+
+# Table with AU information from last cycle
+z <- filter(regionalAUs, ID305B %in% AUselection) %>% st_set_geometry(NULL) %>% as.data.frame()
+datatable(z, rownames = FALSE, 
+          options= list(pageLength = nrow(z),scrollX = TRUE, scrollY = "300px", dom='t'),
+          selection = 'none')
+
+
+# Allow user to select from available stations in chosen AU to investigate further
+stationSelection <- filter(conventionals_HUC, ID305B_1 %in% AUselection | ID305B_2 %in% AUselection | 
+                ID305B_3 %in% AUselection | ID305B_4 %in% AUselection | ID305B_5 %in% AUselection | 
+                ID305B_6 %in% AUselection | ID305B_7 %in% AUselection | ID305B_8 %in% AUselection | 
+                ID305B_9 %in% AUselection | ID305B_10 %in% AUselection) %>%
+    distinct(FDT_STA_ID) %>%
+    pull()
+# add in carryover stations
+if(nrow(carryoverStations) > 0){
+  carryoverStationsInAU <- filter(carryoverStations,  ID305B_1 %in% AUselection | ID305B_2 %in% AUselection | 
+                                    ID305B_3 %in% AUselection | ID305B_4 %in% AUselection | ID305B_5 %in% AUselection | 
+                                    ID305B_6 %in% AUselection | ID305B_7 %in% AUselection | ID305B_8 %in% AUselection | 
+                                    ID305B_9 %in% AUselection | ID305B_10 %in% AUselection) %>%
+    distinct(STATION_ID) %>%
+    pull()
+  if(length(carryoverStationsInAU) > 0){
+    stationSelection  <- c(stationSelection , carryoverStationsInAU)  } }
+
+  
