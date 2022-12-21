@@ -140,8 +140,8 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
 ## Watershed selection Tab
 # side panel arguments
 DEQregionSelection <- 'BRRO'#"PRO"#'BRRO'
-basinSelection <- "James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
-HUC6Selection <- "JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+basinSelection <- "James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
+HUC6Selection <- "JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
 
 # pull together data based on user input on side panel
 # Pull AU data from server
@@ -156,6 +156,62 @@ huc6_filter <- filter(basin_filter, VAHU6 %in% HUC6Selection)
 
 # Spatially intersect chosen VAHU6 with regionalAUs
 AUs <- suppressWarnings(st_intersection(regionalAUs,  huc6_filter)) 
+
+### ------- Just for testing, skip front matter and jump to picking station for module testing---------------------------------------------------------
+# Pull Conventionals data for selected AU on click
+conventionals_HUC <- filter(conventionals, Huc6_Vahu6 %in% huc6_filter$VAHU6) %>%
+  left_join(dplyr::select(stationTable, STATION_ID:VAHU6,lakeStation,
+                          WQS_ID:EPA_ECO_US_L3NAME),
+            by = c('FDT_STA_ID' = 'STATION_ID')) %>%
+  filter(!is.na(ID305B_1)) %>%
+  pHSpecialStandardsCorrection() %>% #correct pH to special standards where necessary
+  temperatureSpecialStandardsCorrection()  # correct temperature special standards where necessary
+
+# AUs from data in conventionals and carryoverStations
+AUselectionOptions <- unique(c(conventionals_HUC$ID305B_1, 
+                               #dplyr::select(carryoverStations(), ID305B_1:ID305B_10) %>% as.character()))
+                               # this method allows for multiple carryover stations to be concatinated correctly
+                               dplyr::select(carryoverStations, ID305B_1:ID305B_10) %>% 
+                                 mutate_at(vars(starts_with("ID305B")), as.character) %>%
+                                 pivot_longer(ID305B_1:ID305B_10, names_to = 'ID305B', values_to = 'keep') %>%
+                                 filter(!is.na(keep)) %>% 
+                                 pull(keep) ))
+AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))] # double check nothing wonky in there before proceeding
+
+# user selection
+AUselection <- AUselectionOptions[1]
+
+# Allow user to select from available stations in chosen AU to investigate further
+stationSelection_ <- filter(conventionals_HUC, ID305B_1 %in% AUselection | ID305B_2 %in% AUselection | 
+                              ID305B_3 %in% AUselection | ID305B_4 %in% AUselection | ID305B_5 %in% AUselection | 
+                              ID305B_6 %in% AUselection | ID305B_7 %in% AUselection | ID305B_8 %in% AUselection | 
+                              ID305B_9 %in% AUselection | ID305B_10 %in% AUselection) %>%
+  distinct(FDT_STA_ID) %>%
+  pull()
+# add in carryover stations
+if(nrow(carryoverStations) > 0){
+  carryoverStationsInAU <- filter(carryoverStations,  ID305B_1 %in% AUselection | ID305B_2 %in% AUselection | 
+                                    ID305B_3 %in% AUselection | ID305B_4 %in% AUselection | ID305B_5 %in% AUselection | 
+                                    ID305B_6 %in% AUselection | ID305B_7 %in% AUselection | ID305B_8 %in% AUselection | 
+                                    ID305B_9 %in% AUselection | ID305B_10 %in% AUselection) %>%
+    distinct(STATION_ID) %>%
+    pull()
+  if(length(carryoverStationsInAU) > 0){
+    stationSelection_  <- c(stationSelection_ , carryoverStationsInAU)  } }
+
+# user selection
+stationSelection <- stationSelection_[2]
+
+
+# Pull conventionals data for just selected AU
+AUData <- filter_at(conventionals_HUC, vars(starts_with("ID305B")), any_vars(. %in% AUselection) ) 
+
+# Pull conventionals data for just selected station
+stationData <- filter(AUData, FDT_STA_ID %in% stationSelection)
+### ------- End Just for testing, skip front matter and jump to picking station for module testing---------------------------------------------------------
+
+
+
 
 
 # Watershed Map, main panel
@@ -428,8 +484,7 @@ stationTableOutput <- bind_rows(stationsTemplate,
                                   left_join(dplyr::select(stationTable, STATION_ID, COMMENTS),
                                             by = 'STATION_ID') %>% 
                                   dplyr::select(-ends_with(c('exceedanceRate','Assessment Decision', 'VERBOSE', 'StationID')))) %>% 
-  filter(!is.na(STATION_ID)) %>% 
-  dplyr::select(-c(BACTERIADECISION, BACTERIASTATS))
+  filter(!is.na(STATION_ID)) 
 
 # Display marked up station table row for each site
 datatable(stationTableOutput, extensions = 'Buttons', escape=F, rownames = F, editable = TRUE,
@@ -477,6 +532,24 @@ if(is.na(unique(stationData$PWS))){
       formatStyle(c("PWS_Total_Sulfate_EXC","PWS_Total_Sulfate_SAMP","PWS_Total_Sulfate_STAT"), "PWS_Total_Sulfate_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) } 
 
 #### Data Sub Tab ####---------------------------------------------------------------------------------------------------
+
+# Display Data 
+DT::datatable(AUData, extensions = 'Buttons', escape=F, rownames = F, 
+                options= list(scrollX = TRUE, pageLength = nrow(AUData), scrollY = "300px", 
+                              dom='Btf', buttons=list('copy',
+                                                      list(extend='csv',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')),
+                                                      list(extend='excel',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')))),
+                selection = 'none')
+# Summarize data
+paste(nrow(AUData), 'records were retrieved for',as.character(AUselection),sep=' ')
+AUData %>% 
+  group_by(FDT_STA_ID) %>% 
+  count() %>% dplyr::rename('Number of Records'='n')
+withinAssessmentPeriod(AUData)
+
+
+## Temperature Sub Tab ##------------------------------------------------------------------------------------------------------
+
 
 
 

@@ -195,8 +195,8 @@ shinyUI(fluidPage(theme="yeti.css",
                                                                         in the TEMP_EXC, TEMP_SAMP, and TEMP_STAT columns in the station table.',
                                                                         span('Users may adjust the WQS used for analysis in this modal by choosing a standard from
                                                                               the `WQS for Analysis` drop down. The default WQS chosen is the WQS provided by the assessor
-                                                                              to the WQS Metadata Attribution App.', style="color:red"))  )#,
-                                                                #temperaturePlotlySingleStationUI('temperature')),
+                                                                              to the WQS Metadata Attribution App.', style="color:red")),
+                                                                temperaturePlotlySingleStationUI('temperature'))#,
                                                      )))
                                  )
                                  

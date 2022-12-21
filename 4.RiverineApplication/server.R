@@ -393,7 +393,7 @@ shinyServer(function(input, output, session) {
   
   # Historical Station Table Information 
   output$stationHistoricalInfo1 <- DT::renderDataTable({ req(nrow(stationInfo()) >0)
-    z <- suppressWarnings(filter(historicalStationsTable, `Station Id` %in% stationSelection) %>% 
+    z <- suppressWarnings(filter(historicalStationsTable, `Station Id` %in% input$stationSelection) %>% 
                             select(`Station Id`:`Modified Date`) %>%
                             t() %>% as.data.frame()) #%>% rename(`Station Information From 2022 Cycle` = 'V1')) # need to update each rebuild
     names(z) <- paste0('Station Information From ', as.numeric(assessmentCycle) - 2, ' Cycle')
@@ -401,7 +401,7 @@ shinyServer(function(input, output, session) {
                   selection = 'none')  })
   
   output$stationHistoricalInfo2 <- DT::renderDataTable({ req(nrow(stationInfo()) >0)
-    z <- suppressWarnings(filter(historicalStationsTable2, `Station Id` %in% stationSelection) %>% 
+    z <- suppressWarnings(filter(historicalStationsTable2, `Station Id` %in% input$stationSelection) %>% 
                             select(`Station Id`:`Modified Date`) %>%
                             t() %>% as.data.frame()) #%>% rename(`Station Information From 2020 Cycle` = 'V1')) # need to update each rebuild
     names(z) <- paste0('Station Information From ', as.numeric(assessmentCycle) - 4, ' Cycle')
@@ -503,8 +503,7 @@ shinyServer(function(input, output, session) {
                                                left_join(dplyr::select(stationTable(), STATION_ID, COMMENTS),
                                                          by = 'STATION_ID') %>% 
                                                dplyr::select(-ends_with(c('exceedanceRate','Assessment Decision', 'VERBOSE', 'StationID')))) %>% 
-      filter(!is.na(STATION_ID)) %>% 
-      dplyr::select(-c(BACTERIADECISION, BACTERIASTATS))
+      filter(!is.na(STATION_ID)) 
   })
   
   # Display marked up station table row for each site
@@ -559,5 +558,32 @@ shinyServer(function(input, output, session) {
   
   
   #### Data Sub Tab ####---------------------------------------------------------------------------------------------------
+  
+  # Display Data 
+  output$AURawData <- DT::renderDataTable({ req(AUData())
+    DT::datatable(AUData(), extensions = 'Buttons', escape=F, rownames = F, 
+                  options= list(scrollX = TRUE, pageLength = nrow(AUData()), scrollY = "300px", 
+                                dom='Btf', buttons=list('copy',
+                                                        list(extend='csv',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')),
+                                                        list(extend='excel',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')))),
+                  selection = 'none')})
+  # Summarize data
+  output$stationDataTableRecords <- renderText({req(AUData())
+    paste(nrow(AUData()), 'records were retrieved for',as.character(input$AUselection),sep=' ')})
+  output$uniqueStationDataTableRecords <- renderTable({req(AUData())
+    AUData() %>% 
+      group_by(FDT_STA_ID) %>% 
+      count() %>% dplyr::rename('Number of Records'='n') })
+  output$stationDataTableAssessmentWindow <- renderText({req(AUData())
+    withinAssessmentPeriod(AUData())})
+  
+  
+  # Need this as a reactive to regenerate below modules when user changes station 
+  stationSelected <- reactive({input$stationSelection})
+  
+  
+  ## Temperature Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(temperaturePlotlySingleStation, 'temperature', AUData, stationSelected)
+  
   
 })
