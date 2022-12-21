@@ -167,7 +167,7 @@ shinyUI(fluidPage(theme="yeti.css",
                                                   in different colors to indicate further review may be necessary. Parameters highlighted in yellow have at least one 
                                                   violation of a standard. When BENTHIC_STAT is highlighed, it indicates there is benthic data present for that site
                                                   and the assessor should review that information with the Regional Biologist. Parameters highlighted in red exceed the 10.5% exceedance rate. Both scenarios warrant further
-                                                  investigation and may requre comments in the Station Table and ADB.'),
+                                                  investigation and may require comments in the Station Table and ADB.'),
                                           h5(strong('If no station table appears, then there is no data within the assessment window for the selected station.'), 
                                              'Please investigate the Historical Station Information table above for information as to why this station is
                                              included in the application.'),
@@ -176,7 +176,28 @@ shinyUI(fluidPage(theme="yeti.css",
                                           helpText(span("Any PWS violations should noted in a station's COMMENT field of the Stations Table. The table below organizes 
                                                   PWS information to expedite the comment process.", strong('Note: Chloride and Sulfate PWS criteria are only applicable at the intake.'))),
                                           DT::dataTableOutput('PWStable'),
-                                          br(),hr(),br()#,
+                                          br(),hr(),br(),
+                                          h3('Assessment Unit Raw Data Review and Visualization'),
+                                          tabsetPanel(
+                                            tabPanel('Conventionals Data',
+                                                     tabsetPanel(
+                                                       tabPanel('Raw Data',br(),
+                                                                DT::dataTableOutput('AURawData'),
+                                                                h4('Data Summary'),
+                                                                h5('Records Retrieved in Assessment Unit:'),
+                                                                fluidRow(column(1),column(10,textOutput('stationDataTableRecords'))),
+                                                                h5('Field and Lab Data in Assessment Window:'),
+                                                                fluidRow(column(1),column(10,tableOutput('uniqueStationDataTableRecords'))),
+                                                                h5('Assessment Window:'),
+                                                                fluidRow(column(1),column(10,textOutput('stationDataTableAssessmentWindow'))), br(),br()),
+                                                       tabPanel('Temperature',
+                                                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
+                                                                        in the TEMP_EXC, TEMP_SAMP, and TEMP_STAT columns in the station table.',
+                                                                        span('Users may adjust the WQS used for analysis in this modal by choosing a standard from
+                                                                              the `WQS for Analysis` drop down. The default WQS chosen is the WQS provided by the assessor
+                                                                              to the WQS Metadata Attribution App.', style="color:red"))  )#,
+                                                                #temperaturePlotlySingleStationUI('temperature')),
+                                                     )))
                                  )
                                  
                       )
