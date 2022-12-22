@@ -90,40 +90,35 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
   #output$test <- renderPrint({ nrow(lowFlowData())})
   
   # This did not work when threw module into app for some reason, so added hacky solution to modal dialog box below
-  # observe({  toggleState("reviewLowFlow", nrow(lowFlowData()) > 0)  }) # don't show button unless there is something to look at
-  
+ # observe({  toggleState("reviewLowFlow", nrow(lowFlowData()) > 0)  }) # don't show button unless there is something to look at
+
   # Button to visualize modal map of station proximity to low flow gage, table with low flow gage dates, and excceedance statistics recalculated
   observeEvent(input$reviewLowFlow,{
     if(nrow(lowFlowData()) > 0){ # hacky solution bc toggleState didnt work when put in whole shiny app
-      showModal(modalDialog(
-        title="Review Low Flow Information",
-        helpText('This modal displays low flow information for gages that fell below 7Q10 in the same major river basin as
+    showModal(modalDialog(
+      title="Review Low Flow Information",
+      helpText('This modal displays low flow information for gages that fell below 7Q10 in the same major river basin as
                the selected station. The map displays the selected station and any gages that fell below 7Q10 when
                data was collected at the station. The table below the map details all 7Q10 flags for the selected gages.
                See detailed gage information using the embedded hyperlink to the USGS website.'),
-        helpText('Lastly, should you agree that the data collected during a flagged Low flow event are not suitable for
+      helpText('Lastly, should you agree that the data collected during a flagged Low flow event are not suitable for
                assessment, the station exceedances are recaluated, dropping all sample events that fall within
                a low flow event.'),
-        helpText(span('For more information on how low flow statistics are calculated and applied to the assessment process,
-                 please see the ',
-                 a('Low Flow (7Q10) Data section of the DEQ Water Quality Automated Assessment User Guide.',
-                   href = "https://rconnect.deq.virginia.gov/WQAautomatedAssessmentUserManual/low-flow-7q10-data.html#low-flow-7q10-data)",
-                   target="_blank"))),
-        fluidRow(column(2), column(10, leafletOutput(ns('gageMap'), height = 400, width = 600))), # center map..ish
-        DT::dataTableOutput(ns('gageLowFlowData')),
-        br(),
-        h5('Individual temperature exceedance statistics for the ',span(strong('selected site with 7Q10 flagged data removed')),' are highlighted below.'),
-        dataTableOutput(ns("stationExceedanceRate7Q10")),
-        size = 'l', easyClose = TRUE) )
+      fluidRow(column(2), column(10, leafletOutput(ns('gageMap'), height = 400, width = 600))), # center map..ish
+      DT::dataTableOutput(ns('gageLowFlowData')),
+      br(),
+      h5('Individual temperature exceedance statistics for the ',span(strong('selected site with 7Q10 flagged data removed')),' are highlighted below.'),
+      dataTableOutput(ns("stationExceedanceRate7Q10")),
+      size = 'l', easyClose = TRUE) )
     } else {
       showModal(modalDialog(
         title="Review Low Flow Information",
         helpText('No low flow information to review for this site'),
         size = 'l', easyClose = TRUE) )
     }
-    
-  })
-  
+      
+        })
+
   # Modal map of station and low flow gage
   output$gageMap <- renderLeaflet({req(nrow(lowFlowData()) > 0)
     point <- dplyr::select(lowFlowData(),  FDT_STA_ID, Longitude, Latitude, SampleDate, `7Q10 Flag Gage` ) %>%
@@ -137,7 +132,7 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
       st_as_sf(coords = c("Longitude", "Latitude"),
                remove = F, # don't remove these lat/lon cols from df
                crs = 4326) # add projection
-    
+
     map1 <- mapview(point, color = 'yellow', lwd = 5, label= point$FDT_STA_ID, layer.name = c('Selected Station'),
                     popup=NULL, legend= FALSE) +
       mapview(gagePoint, color = 'blue', lwd = 5, label= gagePoint$`Gage ID`, layer.name = c('Gages below 7Q10 in major river basin'),
@@ -145,7 +140,7 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
                                                             "n7Q10", "7Q10 Flag", 
                                                             "BASIN_CODE", "BASIN_NAME")), legend= FALSE) 
     map1@map  })
-  
+
   # Low flow gage information for that water year
   output$gageLowFlowData <- renderDataTable({  req(ns(input$reviewLowFlow), oneStation(), nrow(lowFlowData()) > 0)
     uniqueGageID <- unlist(strsplit(lowFlowData()$`7Q10 Flag Gage`, ", "))
@@ -161,20 +156,20 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
       mutate(`See gage info` = paste0("<a href='",webLink1, "' target='_blank'>View Flow Data On USGS Website</a>")) %>%
       dplyr::select(-c(webLink1)) %>%
       dplyr::select(Agency:n7Q10, `See gage info`, everything() )#reformat for easier reading
-    
+
     datatable(z, rownames = FALSE, escape=F, # escape=F important to allow html link to passthrough DT as link
               options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "300px", dom='t'),
               selection = 'none') })
-  
-  
-  
+
+
+
   # Temperature Station Exceedance Rate 7Q10 flagged data removed
   output$stationExceedanceRate7Q10 <- renderDataTable({  req(ns(input$oneStationSelection), oneStation(), nrow(lowFlowData()) > 0)
     z <- tempExceedances(oneStation()) %>% quickStats('TEMP', drop7Q10 = TRUE) %>% dplyr::select(-TEMP_STAT)
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "100px", dom='t'),
               selection = 'none') })
-  
-  
+
+
   # modal parameter data
   output$parameterData <- DT::renderDataTable({    req(oneStation())
     parameterFilter <- dplyr::select(oneStation(), FDT_STA_ID, GROUP_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_COMMENT, 
@@ -232,33 +227,4 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "100px", dom='t'),
               selection = 'none') })
 }
-
-
-
-
-ui <- fluidPage(
-  helpText('Review each site using the single site visualization section, then 
-           proceed to the bottom of the page to find exceedance rate for the entire assessment unit.',br(),
-           span(strong('NOTE: The temperature exceedance analysis results at the bottom of the page include data
-                       from ALL stations within the assessment unit.'))),
-  temperaturePlotlySingleStationUI('temperature'))
-
-server <- function(input,output,session){
-  
-  assessmentWindowLowFlowsToModal <- reactive({assessmentWindowLowFlows})
-  
-  stationData <- eventReactive( input$stationSelection, {
-    filter(AUData, FDT_STA_ID %in% input$stationSelection) })
-  stationSelected <- reactive({input$stationSelection})
-  
-  
-  AUData <- reactive({filter_at(conventionals_HUC, vars(starts_with("ID305B")), any_vars(. %in% AUselection) ) })
-  
-  callModule(temperaturePlotlySingleStation,'temperature', AUData, stationSelected, assessmentWindowLowFlowsToModal)
-}
-
-shinyApp(ui,server)
-
-
-
 

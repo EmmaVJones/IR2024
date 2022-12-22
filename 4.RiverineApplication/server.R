@@ -14,6 +14,7 @@ WQSlookup <- pin_get("WQSlookup-withStandards",  board = "rsconnect")
 WQMstationFull <- pin_get("WQM-Station-Full", board = "rsconnect")
 stationsTemplate <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect')[0,] %>% 
   mutate(across(matches(c("LATITUDE", "LONGITUDE", "EXC", "SAMP")), as.numeric)) 
+assessmentWindowLowFlows <- pin_get('ejones/AssessmentWindowLowFlows', board = 'rsconnect')
 
 
 # Read in local data, don't want this saved on the server in case someone pulls and uses for unintended purposes
@@ -502,7 +503,8 @@ shinyServer(function(input, output, session) {
                                                      mutate(NUT_CHLA_STAT = NA)) %>% # don't show a real assessment decision) %>%
                                                left_join(dplyr::select(stationTable(), STATION_ID, COMMENTS),
                                                          by = 'STATION_ID') %>% 
-                                               dplyr::select(-ends_with(c('exceedanceRate','Assessment Decision', 'VERBOSE', 'StationID')))) %>% 
+                                               dplyr::select(-ends_with(c('exceedanceRate','Assessment Decision', 'VERBOSE', 'StationID', "PWSinfo",
+                                                                          'BACTERIADECISION', 'BACTERIASTATS')))) %>% 
       filter(!is.na(STATION_ID)) 
   })
   
@@ -580,10 +582,9 @@ shinyServer(function(input, output, session) {
   
   # Need this as a reactive to regenerate below modules when user changes station 
   stationSelected <- reactive({input$stationSelection})
-  
+
   
   ## Temperature Sub Tab ##------------------------------------------------------------------------------------------------------
-  callModule(temperaturePlotlySingleStation, 'temperature', AUData, stationSelected)
-  
+  callModule(temperaturePlotlySingleStation, 'temperature', AUData, stationSelected, reactive(assessmentWindowLowFlows)) 
   
 })
