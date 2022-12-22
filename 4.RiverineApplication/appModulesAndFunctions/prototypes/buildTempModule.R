@@ -224,7 +224,8 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
       filter(exceeds == TRUE) %>%
       dplyr::select(-exceeds)
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "300px", dom='t'),
-              selection = 'none')})
+              selection = 'none') %>%
+      formatSignif(columns=c('Criteria', 'Parameter Rounded to WQS Format'), digits=2) })
   
   # Temperature Station Exceedance Rate
   output$stationExceedanceRate <- renderDataTable({ req(ns(input$oneStationSelection), oneStation())

@@ -272,7 +272,8 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
       rename('Outside WQS Criteria' = 'exceeds', 'Parameter Rounded to WQS Format' = 'parameterRound') %>%
       dplyr::select(-c(FDT_STA_ID, FDT_DEPTH, limit, interval))
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "300px", dom='t'),
-              selection = 'none')})
+              selection = 'none') %>%
+      formatSignif(columns=c('pH Min', 'pH Max', 'Parameter Rounded to WQS Format'), digits=2) })
   
   
   output$stationExceedanceRate <- renderDataTable({

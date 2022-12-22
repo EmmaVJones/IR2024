@@ -270,7 +270,8 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
       filter(exceeds == TRUE) %>%
       dplyr::select(-c(exceeds, FDT_STA_ID))
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
-              selection = 'none')})
+              selection = 'none') %>%
+      formatSignif(columns=c('Criteria', 'Parameter Rounded to WQS Format'), digits=2) })
   
   
   output$dailyAverageTableSingleSite <- renderDataTable({ req(oneStation())
@@ -278,7 +279,8 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
       dplyr::select('Date' = date, `DO Daily Average (Rounded to WQS Format)` = DO_DailyAverage, 
                     `n Daily Samples` = n_Samples_Daily, 'Criteria' = limit )
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
-              selection = 'none')})
+              selection = 'none')  %>%
+      formatSignif(columns=c('Criteria', 'DO Daily Average (Rounded to WQS Format)'), digits=2) })
   
   output$stationExceedanceRate <- renderDataTable({req(input$oneStationSelection, oneStation())
     z <- DOExceedances_Min(oneStation()) %>% quickStats('DO') %>% dplyr::select(-DO_STAT)
