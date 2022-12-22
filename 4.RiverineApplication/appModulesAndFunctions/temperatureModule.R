@@ -180,9 +180,9 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
     parameterFilter <- dplyr::select(oneStation(), FDT_STA_ID, GROUP_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_COMMENT, 
                                      FDT_TEMP_CELCIUS, RMK_FDT_TEMP_CELCIUS, LEVEL_FDT_TEMP_CELCIUS, `7Q10 Flag Gage`, `7Q10 Flag`)
     
-    DT::datatable(parameterFilter, rownames = FALSE, extensions = 'FixedColumns',
-                  options= list(dom= 't', pageLength = nrow(parameterFilter), scrollX = TRUE, scrollY = "400px", dom='t',
-                                fixedColumns = list(leftColumns = 3)),
+    DT::datatable(parameterFilter, rownames = FALSE, extensions = c('Buttons',  'FixedColumns'),
+                  options= list(dom='Bt',pageLength = nrow(parameterFilter), scrollX = TRUE, scrollY = "400px", 
+                                fixedColumns = list(leftColumns = 3), buttons=list('copy')),
                   selection = 'none') %>%
       formatStyle(c( 'FDT_TEMP_CELCIUS', 'RMK_FDT_TEMP_CELCIUS', 'LEVEL_FDT_TEMP_CELCIUS'), 'LEVEL_FDT_TEMP_CELCIUS', 
                   backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray'))  })

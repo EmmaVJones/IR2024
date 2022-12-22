@@ -212,8 +212,58 @@ shinyUI(fluidPage(theme="yeti.css",
                                                                               the `WQS for Analysis` drop down. The default WQS chosen is the WQS provided by the assessor
                                                                               to the WQS Metadata Attribution App.', style="color:red"),
                                                                         'The Benthic Stressor Analysis background colors are provided as a guide to users, but all analyses are conducted against the chosen WQS.'),
-                                                                DOPlotlySingleStationUI('DO'))#,
-                                                     )))
+                                                                DOPlotlySingleStationUI('DO')),
+                                                       tabPanel("Specific Conductance",
+                                                                helpText('Review each site using the single site visualization section. There are no WQS for Specific Conductivity.'),
+                                                                SpCondPlotlySingleStationUI('SpCond')),
+                                                       tabPanel("Salinity", 
+                                                                helpText('Review each site using the single site visualization section. There are no WQS for Salinity.'),
+                                                                salinityPlotlySingleStationUI('salinity')),
+                                                       tabPanel("Total Nitrogen",
+                                                                helpText('Review each site using the single site visualization section. There are no WQS for Total Nitrogen.'),
+                                                                TNPlotlySingleStationUI('TN')),
+                                                       # tabPanel("Ammonia",
+                                                       #          helpText('Review each site using the single site visualization section. The results from this analysis are reflected
+                                                       #                  in the AMMONIA_EXC and AMMONIA_STAT columns in the station table. Since two columns must hold information regarding
+                                                       #                   three potential ways of analyzing the data, make sure you fully comment which method is represented in the
+                                                       #                   AMMONIA_EXC and AMMONIA_STAT columns in your COMMENTS field. The automated assessment stations table output
+                                                       #                   has reported results for all three methods in the COMMENTS field as a starting point.'),
+                                                       #          AmmoniaPlotlySingleStationUI('Ammonia')),
+                                                       tabPanel("Total Phosphorus",
+                                                                helpText('Review each site using the single site visualization section. There are no WQS for Total Nitrogen.'),
+                                                                TPPlotlySingleStationUI('TP')),
+                                                       tabPanel("Fecal Coliform",
+                                                                helpText('Review each site using the single site visualization section. There are no WQS for Fecal Coliform.'),
+                                                                fecalPlotlySingleStationUI('fecal')),
+                                                       # tabPanel("E. Coli",
+                                                       #          #verbatimTextOutput('testOutside'),
+                                                       #          helpText('Review each site using the single site visualization section. Both the old and the new E. coli assessment
+                                                       #                  methods are presented in the station visualization section. The results from the new analysis method are reflected
+                                                       #                  in the ECOLI_EXC, ECOLI_SAMP, ECOLI_GM_EXC, ECOLI_GM_SAMP, and ECOLI_STAT columns in the station table.'),
+                                                       #          EcoliPlotlySingleStationUI('Ecoli')),
+                                                       # tabPanel("Enterococci",
+                                                       #          #verbatimTextOutput('testOutside'),
+                                                       #          helpText('Review each site using the single site visualization section. Both the old and the new Enterococci assessment
+                                                       #                  methods are presented in the station visualization section. The results from the new analysis method are reflected
+                                                       #                  in the ENTER_EXC, ENTER_SAMP, ENTER_GM_EXC, ENTER_GM_SAMP, and ENTER_STAT columns in the station table.'),
+                                                       #          EnteroPlotlySingleStationUI('Entero')),
+                                                       tabPanel("Chlorophyll a",
+                                                                helpText('Review each site using the single site visualization section. There are no WQS for Chlorophyll a.'),
+                                                                chlAPlotlySingleStationUI('chlA')),
+                                                       tabPanel("Suspended Sediments",
+                                                                helpText('Review each site using the single site visualization section. There are no WQS for Suspended Sediments.'),
+                                                                SSCPlotlySingleStationUI('SSC'))#,
+                                                       # tabPanel("Nitrate",
+                                                       #          helpText('Review each site using the single site visualization section. Nitrate criteria only apply to stations with PWS designation.'),
+                                                       #          NitratePlotlySingleStationUI('Nitrate')),
+                                                       # tabPanel("Chloride",
+                                                       #          helpText('Review each site using the single site visualization section. Chloride criteria only apply to stations with PWS designation.'),
+                                                       #          ClPlotlySingleStationUI('Cl')),
+                                                       # tabPanel("Sulfate",
+                                                       #          helpText('Review each site using the single site visualization section. Total Sulfate criteria only apply to stations with PWS designation.'),
+                                                       #          DSulfatePlotlySingleStationUI('DSulfate'))
+                                                     ))#,
+                                                     )
                                  )
                                  
                       )

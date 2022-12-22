@@ -76,11 +76,12 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   # modal parameter data
   output$parameterData <- DT::renderDataTable({
     req(oneStation())
-    parameterFilter <- dplyr::select(oneStation(), FDT_STA_ID:FDT_COMMENT, FDT_FIELD_PH, RMK_FDT_FIELD_PH, LEVEL_FDT_FIELD_PH, `7Q10 Flag Gage`, `7Q10 Flag`)
+    parameterFilter <- dplyr::select(oneStation(), FDT_STA_ID, GROUP_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_COMMENT,
+                                     FDT_FIELD_PH, RMK_FDT_FIELD_PH, LEVEL_FDT_FIELD_PH, `7Q10 Flag Gage`, `7Q10 Flag`)
     
-    DT::datatable(parameterFilter, rownames = FALSE, extensions = 'FixedColumns',
-                  options= list(dom= 't', pageLength = nrow(parameterFilter), scrollX = TRUE, scrollY = "400px", dom='t',
-                                fixedColumns = list(leftColumns = 3)),
+    DT::datatable(parameterFilter, rownames = FALSE, extensions = c('Buttons',  'FixedColumns'),
+                  options= list(dom='Bt', pageLength = nrow(parameterFilter), scrollX = TRUE, scrollY = "400px",
+                                fixedColumns = list(leftColumns = 3), buttons=list('copy')),
                   selection = 'none') %>%
       formatStyle(c('FDT_FIELD_PH','RMK_FDT_FIELD_PH', 'LEVEL_FDT_FIELD_PH'), 'LEVEL_FDT_FIELD_PH', 
                   backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray'))

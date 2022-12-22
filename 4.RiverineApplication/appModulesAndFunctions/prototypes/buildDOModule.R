@@ -1,4 +1,5 @@
 # work through appTesting.R through the creation of stationData object
+# work through appTesting.R through the creation of stationData object
 
 
 DOPlotlySingleStationUI <- function(id){
@@ -72,11 +73,12 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   
   # modal parameter data
   output$parameterData <- DT::renderDataTable({  req(oneStation())
-    parameterFilter <- dplyr::select(oneStation(), FDT_STA_ID:FDT_COMMENT, DO_mg_L, RMK_DO, LEVEL_DO, `7Q10 Flag Gage`, `7Q10 Flag`)
+    parameterFilter <- dplyr::select(oneStation(), FDT_STA_ID, GROUP_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_COMMENT,
+                                     DO_mg_L, RMK_DO, LEVEL_DO, `7Q10 Flag Gage`, `7Q10 Flag`)
     
-    DT::datatable(parameterFilter, rownames = FALSE, extensions = 'FixedColumns',
-                  options= list(dom= 't', pageLength = nrow(parameterFilter), scrollX = TRUE, scrollY = "400px", dom='t',
-                                fixedColumns = list(leftColumns = 3)),
+    DT::datatable(parameterFilter, rownames = FALSE, extensions = c('Buttons',  'FixedColumns'),
+                  options= list(dom='Bt', pageLength = nrow(parameterFilter), scrollX = TRUE, scrollY = "400px", dom='t',
+                                fixedColumns = list(leftColumns = 3), buttons=list('copy')),
                   selection = 'none') %>%
       formatStyle(c('DO_mg_L','RMK_DO', 'LEVEL_DO'), 'LEVEL_DO',
                   backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray')) })
@@ -189,7 +191,7 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
     z <- DO_Assessment_DailyAvg(oneStation()) %>% quickStats('DO_Daily_Avg', drop7Q10 = TRUE) %>% dplyr::select(-DO_Daily_Avg_STAT)
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
               selection = 'none') })
-    
+  
   
   
   
@@ -279,7 +281,7 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
       dplyr::select('Date' = date, `DO Daily Average (Rounded to WQS Format)` = DO_DailyAverage, 
                     `n Daily Samples` = n_Samples_Daily, 'Criteria' = limit )
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
-              selection = 'none') %>%
+              selection = 'none')  %>%
       formatSignif(columns=c('Criteria', 'DO Daily Average (Rounded to WQS Format)'), digits=2) })
   
   output$stationExceedanceRate <- renderDataTable({req(input$oneStationSelection, oneStation())
@@ -294,6 +296,7 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
               selection = 'none') })
   
 }
+
 
 
 

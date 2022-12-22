@@ -593,4 +593,45 @@ shinyServer(function(input, output, session) {
   ## DO Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(DOPlotlySingleStation,'DO', AUData, stationSelected, reactive(assessmentWindowLowFlows)) 
   
+  ## Specific Conductivity Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(SpCondPlotlySingleStation,'SpCond', AUData, stationSelected)
+  
+  ## Salinity Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(salinityPlotlySingleStation,'salinity', AUData, stationSelected)
+  
+  ## Total Nitrogen Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(TNPlotlySingleStation,'TN', AUData, stationSelected)
+  
+  # ## Ammonia Sub Tab ##------------------------------------------------------------------------------------------------------
+  # callModule(AmmoniaPlotlySingleStation,'Ammonia', AUData, stationSelected, ammoniaAnalysis)
+  # 
+  ## Total Phosphorus Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(TPPlotlySingleStation,'TP', AUData, stationSelected)
+
+  ## Fecal Coliform Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(fecalPlotlySingleStation,'fecal', AUData, stationSelected)
+
+  # ## ECOLI Sub Tab ##------------------------------------------------------------------------------------------------------
+  # callModule(EcoliPlotlySingleStation,'Ecoli', AUData, stationSelected, ecoli)#siteData$ecoli)
+  # 
+  # ## Enteroccoci Sub Tab ##------------------------------------------------------------------------------------------------------
+  # callModule(EnteroPlotlySingleStation,'Entero', AUData, stationSelected, enter)#siteData$enter)
+  
+  ## Chlorophyll a Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(chlAPlotlySingleStation,'chlA', AUData, stationSelected)
+  
+  ## Suspended Sediments Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(SSCPlotlySingleStation,'SSC', AUData, stationSelected)
+  
+  # ## Nitrate Sub Tab ##------------------------------------------------------------------------------------------------------
+  # callModule(NitratePlotlySingleStation,'Nitrate', AUData, stationSelected)
+  # 
+  # ## Chloride Sub Tab ##------------------------------------------------------------------------------------------------------
+  # callModule(ClPlotlySingleStation,'Cl', AUData, stationSelected)
+  # 
+  # ## Sulfate Sub Tab ##------------------------------------------------------------------------------------------------------
+  # callModule(DSulfatePlotlySingleStation,'DSulfate', AUData, stationSelected)
+  
+  
+  
 })
