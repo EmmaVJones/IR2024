@@ -602,9 +602,9 @@ shinyServer(function(input, output, session) {
   ## Total Nitrogen Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(TNPlotlySingleStation,'TN', AUData, stationSelected)
   
-  # ## Ammonia Sub Tab ##------------------------------------------------------------------------------------------------------
-  # callModule(AmmoniaPlotlySingleStation,'Ammonia', AUData, stationSelected, ammoniaAnalysis)
-  # 
+  ## Ammonia Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(AmmoniaPlotlySingleStation,'Ammonia', AUData, stationSelected, ammoniaAnalysis)
+
   ## Total Phosphorus Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(TPPlotlySingleStation,'TP', AUData, stationSelected)
 

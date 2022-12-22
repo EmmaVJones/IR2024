@@ -30,9 +30,8 @@ board_register_rsconnect(key = conn$CONNECT_API_KEY,
 
 
 modulesToReadIn <- c('stationStatusMap','temperature','pH','DO', 'SpCond', 'salinity',
-                     'TN','chlA', 'TP', 'fecalColiform','SSC')
-#,'Ecoli', 'Enteroccoci','sulfate','Ammonia', 
-#                      'Chloride', 'Nitrate','metals', ,'Benthics', 'toxics')
+                     'TN','chlA', 'TP', 'fecalColiform','SSC', 'Ammonia')
+#,'Ecoli', 'Enteroccoci','sulfate', 'Chloride', 'Nitrate','metals', 'Benthics', 'toxics')
 for (i in 1:length(modulesToReadIn)){
   source(paste('appModulesAndFunctions/',modulesToReadIn[i],'Module.R',sep=''))
 }

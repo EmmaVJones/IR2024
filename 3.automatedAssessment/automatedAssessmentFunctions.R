@@ -1268,7 +1268,7 @@ annualRollingExceedanceAnalysis <- function(dataToAnalyze,
                               `Criteria Type` = as.character(NA),
                               `Years Analysis Rolled Over`= as.numeric(NA), 
                               `Exceedances in Rolled Window` = as.numeric(NA), 
-                              `Valid Chronic Window` = NA, 
+                              #`Valid Chronic Window` = NA, 
                               associatedData = list())
   dataToAnalyze <- dataToAnalyze %>% 
     mutate(Year = year(WindowDateTimeStart),
