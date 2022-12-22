@@ -1,7 +1,7 @@
 # work through appTesting.R through the creation of stationData object
 
 
-pHPlotlySingleStationUI <- function(id){
+DOPlotlySingleStationUI <- function(id){
   ns <- NS(id)
   tagList(
     wellPanel(
@@ -11,27 +11,27 @@ pHPlotlySingleStationUI <- function(id){
                column(2,br(),checkboxInput(ns('displayBSAcolors'), 'Display Benthic Stressor Analysis Colors on Plot', value = FALSE)),
                column(1),
                column(2,uiOutput(ns('changeWQSUI'))),
-               #column(1),
-               column(2,
-                      actionButton(ns('reviewData'),"Review Raw Parameter Data"),#,class='btn-block', width = '250px'),
-                      actionButton(ns('reviewLowFlow'), 'Review Low Flow Information')),#,class='btn-block', width = '250px'),
-               column(1)),
+               column(1),
+               column(2,actionButton(ns('reviewData'),"Review Raw Parameter Data",class='btn-block', width = '250px'),
+                      actionButton(ns('reviewLowFlow'), 'Review Low Flow Information',class='btn-block', width = '250px')),
+               column(1)),      
       uiOutput(ns('lowFlowFlagUI')),
       helpText('All data presented in the interactive plot is raw data. Rounding rules are appropriately applied to the 
                assessment functions utilized by the application.'),
       plotlyOutput(ns('plotly')),
       br(),hr(),br(),
       fluidRow(
-        column(8, h5('All pH records that are outside the criteria for the ',span(strong('selected site')),' are highlighted below.'),
-               dataTableOutput(ns('rangeTableSingleSite'))),
-        column(4, h5('Individual pH exceedance statistics for the ',span(strong('selected site')),' are highlighted below.'),
-               dataTableOutput(ns("stationExceedanceRate"))))
+        column(8, h5('All DO records that are outside the criteria for the ',span(strong('selected site')),' are highlighted below.'),
+               h6('All Dissolved Oxygen Measures'),dataTableOutput(ns("minTableSingleSite")), br(), hr(), br(),
+               h6('All Daily Average Dissolved Oxygen Measures'),dataTableOutput(ns("dailyAverageTableSingleSite"))),
+        column(4, h5('Individual DO exceedance statistics for the ',span(strong('selected site')),' are highlighted below.'),
+               h6('All Dissolved Oxygen Measures'), dataTableOutput(ns("stationExceedanceRate")),
+               h6('All Daily Average Dissolved Oxygen Measures'),dataTableOutput(ns("stationDailyAverageExceedanceRate"))))
     )
   )
 }
 
-
-pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedAbove, assessmentWindowLowFlowsModal){
+DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedAbove, assessmentWindowLowFlowsModal){
   ns <- session$ns
   
   # Select One station for individual review
@@ -44,22 +44,19 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   oneStation_original <- reactive({
     req(ns(input$oneStationSelection))
     filter(AUdata(),FDT_STA_ID %in% input$oneStationSelection) %>%
-      filter(!is.na(FDT_FIELD_PH)) %>%
-      # special step for pH to make the CLASS_BASIN update if pH special standards exist
-      mutate(CLASS_DESCRIPTION = case_when(str_detect(as.character(SPSTDS), '6.5-9.5') ~ 'SPSTDS = 6.5-9.5',
-                                           TRUE ~ CLASS_DESCRIPTION))})
-  
+      filter(!is.na(DO_mg_L))})
   
   # Option to change WQS used for modal
   output$changeWQSUI <- renderUI({
     req(oneStation_original())
     selectInput(ns('changeWQS'),strong('WQS For Analysis'),
-                choices= c(WQSvalues$CLASS_DESCRIPTION, 'SPSTDS = 6.5-9.5'), # special just for pH
+                choices= WQSvalues$CLASS_DESCRIPTION,
                 width='400px', selected = unique(oneStation_original()$CLASS_DESCRIPTION)) })
   
   # change WQS for rest of module if user chooses to do so
   oneStation <- reactive({req(oneStation_original(), input$changeWQS)
     changeWQSfunction(oneStation_original(), input$changeWQS) })
+  
   
   # Button to visualize modal table of available parameter data
   observeEvent(input$reviewData,{
@@ -74,17 +71,15 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
       size = 'l', easyClose = TRUE))  })
   
   # modal parameter data
-  output$parameterData <- DT::renderDataTable({
-    req(oneStation())
-    parameterFilter <- dplyr::select(oneStation(), FDT_STA_ID:FDT_COMMENT, FDT_FIELD_PH, RMK_FDT_FIELD_PH, LEVEL_FDT_FIELD_PH, `7Q10 Flag Gage`, `7Q10 Flag`)
+  output$parameterData <- DT::renderDataTable({  req(oneStation())
+    parameterFilter <- dplyr::select(oneStation(), FDT_STA_ID:FDT_COMMENT, DO_mg_L, RMK_DO, LEVEL_DO, `7Q10 Flag Gage`, `7Q10 Flag`)
     
     DT::datatable(parameterFilter, rownames = FALSE, extensions = 'FixedColumns',
                   options= list(dom= 't', pageLength = nrow(parameterFilter), scrollX = TRUE, scrollY = "400px", dom='t',
                                 fixedColumns = list(leftColumns = 3)),
                   selection = 'none') %>%
-      formatStyle(c('FDT_FIELD_PH','RMK_FDT_FIELD_PH', 'LEVEL_FDT_FIELD_PH'), 'LEVEL_FDT_FIELD_PH',
-                  backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray'))
-  })
+      formatStyle(c('DO_mg_L','RMK_DO', 'LEVEL_DO'), 'LEVEL_DO',
+                  backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray')) })
   
   
   
@@ -127,8 +122,9 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
         fluidRow(column(2), column(10, leafletOutput(ns('gageMap'), height = 400, width = 600))), # center map..ish
         DT::dataTableOutput(ns('gageLowFlowData')),
         br(),
-        h5('Individual pH exceedance statistics for the ',span(strong('selected site with 7Q10 flagged data removed')),' are highlighted below.'),
+        h5('Individual DO exceedance statistics for the ',span(strong('selected site with 7Q10 flagged data removed')),' are highlighted below.'),
         dataTableOutput(ns("stationExceedanceRate7Q10")),
+        dataTableOutput(ns("stationDailyAverageExceedanceRate7Q10")),
         size = 'l', easyClose = TRUE) )
     } else {
       showModal(modalDialog(
@@ -183,10 +179,15 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   
   
   
-  # pH Station Exceedance Rate 7Q10 flagged data removed
+  # DO Station Exceedance Rate 7Q10 flagged data removed
   output$stationExceedanceRate7Q10 <- renderDataTable({  req(ns(input$oneStationSelection), oneStation(), nrow(lowFlowData()) > 0)
-    z <- pHExceedances(oneStation()) %>% quickStats('PH', drop7Q10 = TRUE) %>% dplyr::select(-PH_STAT)  
+    z <- DOExceedances_Min(oneStation()) %>% quickStats('DO', drop7Q10 = TRUE) %>% dplyr::select(-DO_STAT) 
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "100px", dom='t'),
+              selection = 'none') })
+  
+  output$stationDailyAverageExceedanceRate7Q10 <- renderDataTable({ req(input$oneStationSelection, oneStation(),nrow(lowFlowData()) > 0) 
+    z <- DO_Assessment_DailyAvg(oneStation()) %>% quickStats('DO_Daily_Avg', drop7Q10 = TRUE) %>% dplyr::select(-DO_Daily_Avg_STAT)
+    datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
               selection = 'none') })
   
   
@@ -194,10 +195,8 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   
   
   
-  
-  output$plotly <- renderPlotly({
-    req(input$oneStationSelection, oneStation())
-    dat <- mutate(oneStation(),top = `pH Max`, bottom = `pH Min`)
+  output$plotly <- renderPlotly({  req(input$oneStationSelection, oneStation())
+    dat <- mutate(oneStation(), bottom = `Dissolved Oxygen Min (mg/L)`)
     dat$SampleDate <- as.POSIXct(dat$FDT_DATE_TIME, format="%m/%d/%y")
     
     # Fix look of single measure
@@ -207,107 +206,90 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                        tibble(SampleDate = c(dat$SampleDate- days(5), dat$SampleDate + days(5))))
     }
     
+    maxheight <- ifelse(max(dat$DO_mg_L, na.rm=T) < 10, 12, max(dat$DO_mg_L, na.rm=T)* 1.2)
+    
     if(input$displayBSAcolors == TRUE){
-      box1 <- data.frame(x = c(min(dat$SampleDate), min(dat$SampleDate), max(dat$SampleDate),max(dat$SampleDate)), y = c(9, 14, 14, 9))
-      box2 <- data.frame(x = c(min(dat$SampleDate), min(dat$SampleDate), max(dat$SampleDate),max(dat$SampleDate)), y = c(6, 9, 9, 6))
-      box3 <- data.frame(x = c(min(dat$SampleDate), min(dat$SampleDate), max(dat$SampleDate),max(dat$SampleDate)), y = c(0, 6, 6, 0))
+      box1 <- data.frame(SampleDate = c(min(dat$SampleDate), min(dat$SampleDate), max(dat$SampleDate),max(dat$SampleDate)), y = c(10, maxheight, maxheight, 10))
+      box2 <- data.frame(x = c(min(dat$SampleDate), min(dat$SampleDate), max(dat$SampleDate),max(dat$SampleDate)), y = c(8, 10, 10, 8))
+      box3 <- data.frame(x = c(min(dat$SampleDate), min(dat$SampleDate), max(dat$SampleDate),max(dat$SampleDate)), y = c(7, 8, 8, 7))
+      box4 <- data.frame(x = c(min(dat$SampleDate), min(dat$SampleDate), max(dat$SampleDate),max(dat$SampleDate)), y = c(0, 7, 7, 0))
       
-      plot_ly(data=dat)%>%
-        add_polygons(data = box1, x = ~x, y = ~y, fillcolor = "#F0E442",opacity=0.6, line = list(width = 0),
-                     hoverinfo="text", name =paste('Medium Probability of Stress to Aquatic Life')) %>%
+      plot_ly(data=box1)%>%
+        add_polygons(x = ~SampleDate, y = ~y, data = box1, fillcolor = "#0072B2",opacity=0.6, line = list(width = 0),
+                     hoverinfo="text", name =paste('No Probability of Stress to Aquatic Life')) %>%
         add_polygons(data = box2, x = ~x, y = ~y, fillcolor = "#009E73",opacity=0.6, line = list(width = 0),
                      hoverinfo="text", name =paste('Low Probability of Stress to Aquatic Life')) %>%
         add_polygons(data = box3, x = ~x, y = ~y, fillcolor = "#F0E442",opacity=0.6, line = list(width = 0),
                      hoverinfo="text", name =paste('Medium Probability of Stress to Aquatic Life')) %>%
-        
-        add_lines(data=dat, x=~SampleDate,y=~top, mode='line',line = list(color = 'black'),
-                  hoverinfo = "text",text="pH Standard", name="pH Standard") %>%
-        add_lines(data=dat, x=~SampleDate,y=~bottom, mode='line',line = list(color = 'black'),
-                  hoverinfo = "text", text="pH Standard", name="pH Standard") %>%
+        add_polygons(data = box4, x = ~x, y = ~y, fillcolor = "firebrick",opacity=0.6, line = list(width = 0),
+                     hoverinfo="text", name =paste('High Probability of Stress to Aquatic Life')) %>%
+        add_lines(data=dat, x=~SampleDate,y=~bottom, mode='line', line = list(color = 'black'),
+                  hoverinfo = "text", text="DO Standard", name="DO Standard") %>%
         add_markers(., data = lowFlowData(),
-                    x= ~SampleDate, y= ~FDT_FIELD_PH, mode = 'scatter', name="pH (unitless)",
+                    x= ~SampleDate, y= ~DO_mg_L, mode = 'scatter', name="DO (mg/L)",
                     marker = list(color= 'red'), size = 250,
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste("pH: ",FDT_FIELD_PH," (unitless)"),
+                                                 paste("DO: ",DO_mg_L," (mg/L)"),
                                                  paste("7Q10 Flag Gage: ",`7Q10 Flag Gage`))) %>%
         
-        add_markers(., data = dat, x= ~SampleDate, y= ~FDT_FIELD_PH,mode = 'scatter', name="pH (unitless)",  marker = list(color= '#535559'),
+        add_markers(., data = dat, x= ~SampleDate, y= ~DO_mg_L,mode = 'scatter', name="DO (mg/L)", marker = list(color= '#535559'),
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste("pH: ",FDT_FIELD_PH," (unitless)")))%>%
+                                                 paste("DO: ",DO_mg_L," (mg/L)")))%>%
         layout(showlegend=FALSE,
-               yaxis=list(title="pH (unitless)"),
+               yaxis=list(title="DO (mg/L)"),
                xaxis=list(title="Sample Date",tickfont = list(size = 10)))
     } else {
       plot_ly(data=dat)%>%
-        add_lines(data=dat, x=~SampleDate,y=~top, mode='line',line = list(color = 'black'),
-                  hoverinfo = "text",text="pH Standard", name="pH Standard") %>%
-        add_lines(data=dat, x=~SampleDate,y=~bottom, mode='line',line = list(color = 'black'),
-                  hoverinfo = "text", text="pH Standard", name="pH Standard") %>%
+        add_lines(data=dat, x=~SampleDate,y=~bottom, mode='line', line = list(color = 'black'),
+                  hoverinfo = "text", text="DO Standard", name="DO Standard") %>%
         add_markers(., data = lowFlowData(),
-                    x= ~SampleDate, y= ~FDT_FIELD_PH, mode = 'scatter', name="pH (unitless)",
+                    x= ~SampleDate, y= ~DO_mg_L, mode = 'scatter', name="DO (mg/L)",
                     marker = list(color= 'red'), size = 250,
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste("pH: ",FDT_FIELD_PH," (unitless)"),
+                                                 paste("DO: ",DO_mg_L," (mg/L)"),
                                                  paste("7Q10 Flag Gage: ",`7Q10 Flag Gage`))) %>%
         
-        add_markers(., data = dat, x= ~SampleDate, y= ~FDT_FIELD_PH,mode = 'scatter', name="pH (unitless)",  marker = list(color= '#535559'),
+        add_markers(., data = dat, x= ~SampleDate, y= ~DO_mg_L,mode = 'scatter', name="DO (mg/L)", marker = list(color= '#535559'),
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste("pH: ",FDT_FIELD_PH," (unitless)")))%>%
+                                                 paste("DO: ",DO_mg_L," (mg/L)")))%>%
         layout(showlegend=FALSE,
-               yaxis=list(title="pH (unitless)"),
+               yaxis=list(title="DO (mg/L)"),
                xaxis=list(title="Sample Date",tickfont = list(size = 10)))    }  })
   
-  output$rangeTableSingleSite <- renderDataTable({
-    req(oneStation())
-    z <- pHExceedances(oneStation()) %>%
+  output$minTableSingleSite <- renderDataTable({req(oneStation())
+    z <- DOExceedances_Min(oneStation()) %>%
+      rename("DO" = 'parameter', 'Criteria' = 'limit', 'Parameter Rounded to WQS Format' = 'parameterRound') %>%
       filter(exceeds == TRUE) %>%
-      rename('Outside WQS Criteria' = 'exceeds', 'Parameter Rounded to WQS Format' = 'parameterRound') %>%
-      dplyr::select(-c(FDT_STA_ID, FDT_DEPTH, limit, interval))
-    datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "300px", dom='t'),
+      dplyr::select(-c(exceeds, FDT_STA_ID))
+    datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
               selection = 'none')})
   
   
-  output$stationExceedanceRate <- renderDataTable({
-    req(ns(input$oneStationSelection), oneStation())
-    z <- pHExceedances(oneStation()) %>% quickStats('PH') %>% dplyr::select(-PH_STAT)
-    datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "150px", dom='t'),
+  output$dailyAverageTableSingleSite <- renderDataTable({ req(oneStation())
+    z <- DO_Assessment_DailyAvg(oneStation()) %>%
+      dplyr::select('Date' = date, `DO Daily Average (Rounded to WQS Format)` = DO_DailyAverage, 
+                    `n Daily Samples` = n_Samples_Daily, 'Criteria' = limit )
+    datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
+              selection = 'none')})
+  
+  output$stationExceedanceRate <- renderDataTable({req(input$oneStationSelection, oneStation())
+    z <- DOExceedances_Min(oneStation()) %>% quickStats('DO') %>% dplyr::select(-DO_STAT)
+    datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
+              selection = 'none') })
+  
+  output$stationDailyAverageExceedanceRate <- renderDataTable({
+    req(input$oneStationSelection, oneStation())
+    z <- DO_Assessment_DailyAvg(oneStation()) %>% quickStats('DO_Daily_Avg') %>% dplyr::select(-DO_Daily_Avg_STAT)
+    datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
               selection = 'none') })
   
 }
-
-
-
-
-ui <- fluidPage(
-  helpText('Review each site using the single site visualization section, then 
-           proceed to the bottom of the page to find exceedance rate for the entire assessment unit.',br(),
-           span(strong('NOTE: The pH exceedance analysis results at the bottom of the page include data
-                       from ALL stations within the assessment unit.'))),
-  pHPlotlySingleStationUI('pH') )
-
-server <- function(input,output,session){
-  
-  assessmentWindowLowFlowsToModal <- reactive({assessmentWindowLowFlows})
-  
-  stationData <- eventReactive( input$stationSelection, {
-    filter(AUData, FDT_STA_ID %in% input$stationSelection) })
-  stationSelected <- reactive({input$stationSelection})
-  
-  
-  AUData <- reactive({filter_at(conventionals_HUC, vars(starts_with("ID305B")), any_vars(. %in% AUselection) ) })
-  
-  callModule(pHPlotlySingleStation,'pH', AUData, stationSelected, assessmentWindowLowFlowsToModal)
-  
-}
-
-shinyApp(ui,server)
-
 

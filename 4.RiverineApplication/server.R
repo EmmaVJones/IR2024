@@ -587,4 +587,10 @@ shinyServer(function(input, output, session) {
   ## Temperature Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(temperaturePlotlySingleStation, 'temperature', AUData, stationSelected, reactive(assessmentWindowLowFlows)) 
   
+  ## pH Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(pHPlotlySingleStation,'pH', AUData, stationSelected, reactive(assessmentWindowLowFlows)) 
+  
+  ## DO Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(DOPlotlySingleStation,'DO', AUData, stationSelected, reactive(assessmentWindowLowFlows)) 
+  
 })

@@ -196,7 +196,23 @@ shinyUI(fluidPage(theme="yeti.css",
                                                                         span('Users may adjust the WQS used for analysis in this modal by choosing a standard from
                                                                               the `WQS for Analysis` drop down. The default WQS chosen is the WQS provided by the assessor
                                                                               to the WQS Metadata Attribution App.', style="color:red")),
-                                                                temperaturePlotlySingleStationUI('temperature'))#,
+                                                                temperaturePlotlySingleStationUI('temperature')),
+                                                       tabPanel('pH',
+                                                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
+                                                                        in the PH_EXC, PH_SAMP, and PH_STAT columns in the station table.',
+                                                                        span('Users may adjust the WQS used for analysis in this modal by choosing a standard from
+                                                                              the `WQS for Analysis` drop down. The default WQS chosen is the WQS provided by the assessor
+                                                                              to the WQS Metadata Attribution App.', style="color:red"),
+                                                                        'The Benthic Stressor Analysis background colors are provided as a guide to users, but all analyses are conducted against the chosen WQS.'),
+                                                                pHPlotlySingleStationUI('pH')),
+                                                       tabPanel("DO",
+                                                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
+                                                                        in the DO_EXC, DO_SAMP, and DO_STAT columns in the station table.',
+                                                                        span('Users may adjust the WQS used for analysis in this modal by choosing a standard from
+                                                                              the `WQS for Analysis` drop down. The default WQS chosen is the WQS provided by the assessor
+                                                                              to the WQS Metadata Attribution App.', style="color:red"),
+                                                                        'The Benthic Stressor Analysis background colors are provided as a guide to users, but all analyses are conducted against the chosen WQS.'),
+                                                                DOPlotlySingleStationUI('DO'))#,
                                                      )))
                                  )
                                  

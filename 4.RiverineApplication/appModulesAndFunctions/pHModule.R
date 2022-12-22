@@ -82,7 +82,7 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                   options= list(dom= 't', pageLength = nrow(parameterFilter), scrollX = TRUE, scrollY = "400px", dom='t',
                                 fixedColumns = list(leftColumns = 3)),
                   selection = 'none') %>%
-      formatStyle(c('FDT_FIELD_PH','RMK_FDT_FIELD_PH', 'LEVEL_FDT_FIELD_PH'), 'LEVEL_FDT_FIELD_PH',
+      formatStyle(c('FDT_FIELD_PH','RMK_FDT_FIELD_PH', 'LEVEL_FDT_FIELD_PH'), 'LEVEL_FDT_FIELD_PH', 
                   backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray'))
   })
   
@@ -285,29 +285,5 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
 
 
 
-
-ui <- fluidPage(
-  helpText('Review each site using the single site visualization section, then 
-           proceed to the bottom of the page to find exceedance rate for the entire assessment unit.',br(),
-           span(strong('NOTE: The pH exceedance analysis results at the bottom of the page include data
-                       from ALL stations within the assessment unit.'))),
-  pHPlotlySingleStationUI('pH') )
-
-server <- function(input,output,session){
-  
-  assessmentWindowLowFlowsToModal <- reactive({assessmentWindowLowFlows})
-  
-  stationData <- eventReactive( input$stationSelection, {
-    filter(AUData, FDT_STA_ID %in% input$stationSelection) })
-  stationSelected <- reactive({input$stationSelection})
-  
-  
-  AUData <- reactive({filter_at(conventionals_HUC, vars(starts_with("ID305B")), any_vars(. %in% AUselection) ) })
-  
-  callModule(pHPlotlySingleStation,'pH', AUData, stationSelected, assessmentWindowLowFlowsToModal)
-  
-}
-
-shinyApp(ui,server)
 
 
