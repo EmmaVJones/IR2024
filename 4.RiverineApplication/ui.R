@@ -235,18 +235,18 @@ shinyUI(fluidPage(theme="yeti.css",
                                                        tabPanel("Fecal Coliform",
                                                                 helpText('Review each site using the single site visualization section. There are no WQS for Fecal Coliform.'),
                                                                 fecalPlotlySingleStationUI('fecal')),
-                                                       # tabPanel("E. Coli",
-                                                       #          #verbatimTextOutput('testOutside'),
-                                                       #          helpText('Review each site using the single site visualization section. Both the old and the new E. coli assessment
-                                                       #                  methods are presented in the station visualization section. The results from the new analysis method are reflected
-                                                       #                  in the ECOLI_EXC, ECOLI_SAMP, ECOLI_GM_EXC, ECOLI_GM_SAMP, and ECOLI_STAT columns in the station table.'),
-                                                       #          EcoliPlotlySingleStationUI('Ecoli')),
-                                                       # tabPanel("Enterococci",
-                                                       #          #verbatimTextOutput('testOutside'),
-                                                       #          helpText('Review each site using the single site visualization section. Both the old and the new Enterococci assessment
-                                                       #                  methods are presented in the station visualization section. The results from the new analysis method are reflected
-                                                       #                  in the ENTER_EXC, ENTER_SAMP, ENTER_GM_EXC, ENTER_GM_SAMP, and ENTER_STAT columns in the station table.'),
-                                                       #          EnteroPlotlySingleStationUI('Entero')),
+                                                       tabPanel("E. Coli",
+                                                                #verbatimTextOutput('testOutside'),
+                                                                helpText('Review each site using the single site visualization section. Both the old and the new E. coli assessment
+                                                                        methods are presented in the station visualization section. The results from the new analysis method are reflected
+                                                                        in the ECOLI_EXC, ECOLI_SAMP, ECOLI_GM_EXC, ECOLI_GM_SAMP, and ECOLI_STAT columns in the station table.'),
+                                                                EcoliPlotlySingleStationUI('Ecoli')),
+                                                       tabPanel("Enterococci",
+                                                                #verbatimTextOutput('testOutside'),
+                                                                helpText('Review each site using the single site visualization section. Both the old and the new Enterococci assessment
+                                                                        methods are presented in the station visualization section. The results from the new analysis method are reflected
+                                                                        in the ENTER_EXC, ENTER_SAMP, ENTER_GM_EXC, ENTER_GM_SAMP, and ENTER_STAT columns in the station table.'),
+                                                                EnteroPlotlySingleStationUI('Entero')),
                                                        tabPanel("Chlorophyll a",
                                                                 helpText('Review each site using the single site visualization section. There are no WQS for Chlorophyll a.'),
                                                                 chlAPlotlySingleStationUI('chlA')),

@@ -611,12 +611,12 @@ shinyServer(function(input, output, session) {
   ## Fecal Coliform Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(fecalPlotlySingleStation,'fecal', AUData, stationSelected)
 
-  # ## ECOLI Sub Tab ##------------------------------------------------------------------------------------------------------
-  # callModule(EcoliPlotlySingleStation,'Ecoli', AUData, stationSelected, ecoli)#siteData$ecoli)
-  # 
-  # ## Enteroccoci Sub Tab ##------------------------------------------------------------------------------------------------------
-  # callModule(EnteroPlotlySingleStation,'Entero', AUData, stationSelected, enter)#siteData$enter)
-  
+  ## ECOLI Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(EcoliPlotlySingleStation,'Ecoli', AUData, stationSelected, ecoli)#siteData$ecoli)
+
+  ## Enteroccoci Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(EnteroPlotlySingleStation,'Entero', AUData, stationSelected, enter)#siteData$enter)
+
   ## Chlorophyll a Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(chlAPlotlySingleStation,'chlA', AUData, stationSelected)
   
