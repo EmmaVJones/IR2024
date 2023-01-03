@@ -1268,7 +1268,7 @@ annualRollingExceedanceAnalysis <- function(dataToAnalyze,
                               `Criteria Type` = as.character(NA),
                               `Years Analysis Rolled Over`= as.numeric(NA), 
                               `Exceedances in Rolled Window` = as.numeric(NA), 
-                              `Valid Chronic Window` = NA, 
+                              #`Valid Chronic Window` = NA, 
                               associatedData = list())
   dataToAnalyze <- dataToAnalyze %>% 
     mutate(Year = year(WindowDateTimeStart),
@@ -1279,11 +1279,14 @@ annualRollingExceedanceAnalysis <- function(dataToAnalyze,
   #for(k in unique(dataToAnalyze$FDT_DEPTH)){# k =  unique(dataToAnalyze$FDT_DEPTH)[1]
   #dataToAnalyze <- filter(dataToAnalyze, FDT_DEPTH == k)
   
-  # stop loop from repeating windows
-  windowRange <- unique(year(dataToAnalyze$WindowDateTimeStart))
-  #min(windowRange):(max(windowRange)- (yearsToRoll- 1))
+  # First, identify all window start options
+  windowOptions <- unique(year(dataToAnalyze$WindowDateTimeStart))
+  # Now, stop loop from repeating windows by capping the top end by yearsToRoll-1 (so don't have 3 yr windows exceeding assessment period), then remove any
+  #  windowRange options that don't actually have data in those years
+  windowRange <- (min(windowOptions):(max(windowOptions)- (yearsToRoll- 1)))[(min(windowOptions):(max(windowOptions)- (yearsToRoll- 1))) %in% windowOptions]
   
-  for(i in min(windowRange):(max(windowRange)- (yearsToRoll- 1))){ #i = min(min(windowRange):(max(windowRange)- (yearsToRoll- 1))[1])
+
+  for(i in windowRange){ #i = min(min(windowRange):(max(windowRange)- (yearsToRoll- 1))[1])
     # print(i)}
     dataWindow <- filter(dataToAnalyze, Year %in% i:(i + yearsToRoll- 1) ) # minus 1 year for math to work
     dataWindowAnalysis <- suppressMessages( dataWindow %>% 
