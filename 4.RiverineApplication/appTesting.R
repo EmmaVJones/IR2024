@@ -204,7 +204,7 @@ if(nrow(carryoverStations) > 0){
     stationSelection_  <- c(stationSelection_ , carryoverStationsInAU)  } }
 
 # user selection
-stationSelection <- stationSelection_[3]
+stationSelection <- stationSelection_[2]
 
 
 # Pull conventionals data for just selected AU

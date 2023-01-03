@@ -377,25 +377,39 @@ PCBmetalsDataExists <- function(datasetType, # any of the preorganized PCB or fi
 # The app doesn't use this function for modules because you need to be able to toggle assessment on/off with WQS adjustment on the
 # fly, but the automated functions need PWS filter programmed in to ease automating over thousands of sites
 
-assessPWS <- function(stationData, fieldName, commentName, PWSlimit, outputName){
+assessPWS <- function(stationData, fieldName, commentName, PWSlimit){
   if(unique(stationData$PWS) %in% c("Yes")){
     fieldName_ <- enquo(fieldName)
     commentName_ <- enquo(commentName)
     parameterData <- dplyr::select(stationData, FDT_DATE_TIME, !! fieldName_, !! commentName_) %>%
       filter(!( !! commentName_ %in% c('Level II', 'Level I'))) %>% # get lower levels out
       filter(!is.na(!!fieldName_ )) %>% #get rid of NA's
-      mutate(`Parameter Rounded to WQS Format` = signif(!! fieldName_, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
+      mutate(`Parameter Mean` = mean(!! fieldName_),
+             `Parameter Rounded to WQS Format` = signif(`Parameter Mean`, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
              limit =  PWSlimit) %>%
-      rename(parameter = !!names(.[4])) %>% # rename columns to make functions easier to apply
+      rename(parameter = !!names(.[5])) %>% # rename columns to make functions easier to apply
       mutate(exceeds = ifelse(parameter > limit, T, F)) # Identify where above WQS limit
-    return(quickStats(parameterData, outputName)) #%>% dplyr::select(-ends_with('STAT')))    
+    return(parameterData)
+  }
+  return(NULL)
+}
+
+#assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10)
+#assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250)
+#assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250)
+
+
+assessPWSsummary <- function(assessPWSresults, 
+                             outputName){
+  if(!is.null(assessPWSresults)){
+    return(quickStats(assessPWSresults, outputName))  
   }
   return(quickStats(tibble(limit = NA), outputName))
-  }
+}
 
-#assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10, 'PWS_Nitrate')
-#assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250, 'PWS_Chloride')
-#assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250, 'PWS_Total_Sulfate')
+#assessPWSsummary(assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10), 'PWS_Nitrate')
+#assessPWSsummary(assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250), 'PWS_Chloride')
+#assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate')
 
 
 # Nutrients pseudo-assessment functions (for Riverine applications)
