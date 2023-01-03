@@ -1,4 +1,3 @@
-
 AmmoniaPlotlySingleStationUI <- function(id){
   ns <- NS(id)
   tagList(
@@ -31,8 +30,12 @@ AmmoniaPlotlySingleStationUI <- function(id){
                results contain valid windows.'),
       dataTableOutput(ns('rangeTableSingleSite')),
       br(),
-      h5('All 3 year rolled window results for the ',span(strong('acute, chronic, or four day criteria')),' for the ',span(strong('selected site')),' are highlighted below.'),
-      dataTableOutput(ns('stationRolledExceedanceRate')),
+      h5('All 3 year rolled window results for the ',span(strong('acute, chronic, or four day criteria')),' for the ',span(strong('selected site')),' are highlighted below. 
+         Click on a row to show all the data contained within the chosen window in the table to the right.'),
+      fluidRow(column(6, h5("Three year window summaries"),
+                      dataTableOutput(ns('stationRolledExceedanceRate'))),
+               column(6, h5("All data within chosen three year window. Select a row to your left to reveal data analyzed within the chosen window/criteria combination."),
+                      dataTableOutput(ns('detailedStationRolledExceedanceRate')))),
       br(),
       helpText("For wildlife and aquatic life designated uses, ammonia in free-flowing and tidal waters, acute criteria are a one-hour average concentration not to be 
                exceeded more than once every three years on the average, and chronic criteria are 30-day average concentrations not to be exceeded more than once every 
@@ -158,17 +161,29 @@ AmmoniaPlotlySingleStation <- function(input,output,session, AUdata, stationSele
   
   
   # Rolled analysis by 3 year result
-  output$stationRolledExceedanceRate <- renderDataTable({
-    req(nrow(oneStation())> 0)
-    z <- annualRollingExceedanceAnalysis(oneStationAnalysis(), yearsToRoll = 3) %>% 
+  rolledAnalysis <- reactive({ req(nrow(oneStation())> 0)
+    annualRollingExceedanceAnalysis(oneStationAnalysis(), yearsToRoll = 3)   })
+  
+  ## 3 year window summaries by criteria
+  output$stationRolledExceedanceRate <- renderDataTable({   req(nrow(oneStation())> 0, rolledAnalysis())
+    z <- rolledAnalysis() %>% 
       dplyr::select(-c(associatedData))
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
-              selection = 'none') })
+              selection = 'single') })
+  
+  ## Data from selected window for detailed table
+  output$detailedStationRolledExceedanceRate <- renderDataTable({   req(nrow(oneStation())> 0, rolledAnalysis(), input$stationRolledExceedanceRate_rows_selected)
+    z <- rolledAnalysis()[input$stationRolledExceedanceRate_rows_selected, ] %>%
+      map_df(1)
+    z <- z$associatedData %>% 
+      dplyr::select(-c(associatedData))
+    datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
+              selection = 'none')    })
+  
   
   # rolled analysis 3 year summary result
-  output$stationExceedanceRate <- renderDataTable({
-    req(nrow(oneStation())> 0)
-    z <- annualRollingExceedanceSummary(annualRollingExceedanceAnalysis(oneStationAnalysis(), yearsToRoll = 3)) %>% 
+  output$stationExceedanceRate <- renderDataTable({    req(nrow(oneStation())> 0, rolledAnalysis())
+    z <- annualRollingExceedanceSummary(rolledAnalysis()) %>% 
       rename("Number of Windows Not Exceeding" = "n Windows Fine",
              "Number of Windows Exceeding" ="n Windows Exceeding")
     datatable(z, rownames = FALSE, extensions = 'Buttons', 
@@ -231,6 +246,3 @@ AmmoniaPlotlySingleStation <- function(input,output,session, AUdata, stationSele
   output$test <- renderPrint({ oneStationAnalysis()[input$criteriaData_rows_selected, ]})
   
 }
-
-
-
