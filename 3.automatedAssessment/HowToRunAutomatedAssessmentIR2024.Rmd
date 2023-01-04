@@ -369,18 +369,17 @@ for(i in 1:nrow(stationTable)){
   # trout presence is determined by WQS class, this can be changed in the app but is forced to be what the station
   # is attributed to in the automated assessment scripts
   
-  # PWS Criteria
+  # PWS Human Health Criteria
   if(nrow(stationData) > 0){
     if(is.na(unique(stationData$PWS))  ){
       PWSconcat <- tibble(PWS= NA)
    } else {
-     PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData$FDT_STA_ID)),
-                         assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10, 'PWS_Nitrate'),
-                         assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250, 'PWS_Chloride'),
-                         assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250, 'PWS_Total_Sulfate')) %>%
+     PWSconcat <- cbind(assessPWSsummary(assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10), 'PWS_Nitrate'),
+                        assessPWSsummary(assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250), 'PWS_Chloride'),
+                        assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate')) %>%
        dplyr::select(-ends_with('exceedanceRate')) }
     
-  # chloride assessment if data exists
+  # Freshwater Chloride Aquatic Life assessment, if data exists
     if(nrow(filter(stationData, !is.na(CHLORIDE_mg_L))) > 0){
       chlorideFreshwater <- rollingWindowSummary(
         annualRollingExceedanceSummary(

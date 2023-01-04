@@ -1198,7 +1198,8 @@ chlorideFreshwaterAnalysis <- function(stationData){
                                    Value = as.numeric(NA), ValueType = as.character(NA), 
                                    `Criteria Type` = as.character(NA), CriteriaValue = as.numeric(NA), 
                                    `Sample Count` = as.numeric(NA), 
-                                   parameterRound = as.numeric(NA), Exceedance = as.numeric(NA))
+                                   parameterRound = as.numeric(NA), Exceedance = as.numeric(NA),
+                                   associatedData = list())
     chronicCriteriaResults <- acuteCriteriaResults
     
     # loop through each row of data to correctly calculate criteria and find any chronic scenarios
@@ -1220,7 +1221,8 @@ chlorideFreshwaterAnalysis <- function(stationData){
           mutate(parameterRound = signif(Value, digits = 2), # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
                  Exceedance = ifelse(parameterRound > CriteriaValue, 1, 0 ), # use 1/0 to easily summarize multiple results later
                  WindowDateTimeStart = min(acuteDataWindow$FDT_DATE_TIME)) %>% 
-          dplyr::select(FDT_STA_ID, WindowDateTimeStart, everything(), -ID) )
+          dplyr::select(FDT_STA_ID, WindowDateTimeStart, everything(), -ID) ) %>% 
+          bind_cols(tibble(associatedData = list(dplyr::select(acuteDataWindow, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, CHLORIDE_mg_L) ) ))
         # Save the results for viewing later
         acuteCriteriaResults <- bind_rows(acuteCriteriaResults, acuteDataCriteriaAnalysis) 
       } else {acuteCriteriaResults <- acuteCriteriaResults }
@@ -1239,7 +1241,8 @@ chlorideFreshwaterAnalysis <- function(stationData){
           mutate(parameterRound = signif(Value, digits = 2), # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
                  Exceedance = ifelse(parameterRound > CriteriaValue, 1, 0 ), # use 1/0 to easily summarize multiple results later
                  WindowDateTimeStart = min(chronicDataWindow$FDT_DATE_TIME)) %>% 
-          dplyr::select(FDT_STA_ID, WindowDateTimeStart, everything(), -ID) )
+          dplyr::select(FDT_STA_ID, WindowDateTimeStart, everything(), -ID) ) %>% 
+          bind_cols(tibble(associatedData = list(dplyr::select(chronicDataWindow, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, CHLORIDE_mg_L) ) ))
         # Save the results for viewing later
         chronicCriteriaResults <- bind_rows(chronicCriteriaResults, chronicDataCriteriaAnalysis) 
       } else {chronicCriteriaResults <- chronicCriteriaResults }
@@ -1251,11 +1254,6 @@ chlorideFreshwaterAnalysis <- function(stationData){
       arrange(FDT_STA_ID, WindowDateTimeStart, FDT_DEPTH, `Criteria Type`)
     return(stationCriteriaResults)
   } else { return(NULL)}
-  # } else {return(tibble(FDT_STA_ID = as.character(NA), WindowDateTimeStart = as.POSIXct(NA), FDT_DEPTH = as.numeric(NA),
-  #                       Value = as.numeric(NA), ValueType = as.character(NA), 
-  #                       `Criteria Type` = as.character(NA), CriteriaValue = as.numeric(NA), 
-  #                       `Sample Count` = as.numeric(NA), 
-  #                       parameterRound = as.numeric(NA), Exceedance = as.numeric(NA)) ) }
 }
 # dataToAnalyze <- chlorideFreshwaterAnalysis(stationData) 
 

@@ -61,8 +61,8 @@ st_crs(VDHintakes)
 Buffer intake points. 
 
 ```{r intake buffer}
-VDHintakesBuffer250m <- st_buffer(VDHintakes, dist = 250) %>%
-    mutate(bufferWidth = 'Site within 250m VDH Intake Buffer') %>% 
+VDHintakesBuffer100m <- st_buffer(VDHintakes, dist = 100) %>%
+    mutate(bufferWidth = 'Site within 100m VDH Intake Buffer') %>% 
   st_transform(st_crs(conventionals_distinct)) # transform back to desired crs
 
 # how to quickly check out results
@@ -74,7 +74,7 @@ VDHintakesBuffer250m <- st_buffer(VDHintakes, dist = 250) %>%
 Now identify stations within said buffer 
 
 ```{r intersect and review}
-sites250m <- st_intersection(conventionals_distinct, VDHintakesBuffer250m)
+sites100m <- st_intersection(conventionals_distinct, VDHintakesBuffer100m)
 
 #mapview(VDHintakesBuffer100m) + mapview(sites100m)
 ```
@@ -110,5 +110,11 @@ DT::datatable(sites100m %>% st_drop_geometry(), rownames = F, extensions = 'Butt
               options = list(dom = 'Bt', scrollX= TRUE, scrollY = '300px',
                              pageLength = nrow(sites100m),
                              buttons=list('copy','csv'))) 
+```
+
+Save this data for easy import into shiny apps.
+
+```{r}
+saveRDS(sites100m, 'sites100mFromVDHintakes.RDS')
 ```
 
