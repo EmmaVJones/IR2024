@@ -74,7 +74,8 @@ VDHintakesBuffer100m <- st_buffer(VDHintakes, dist = 100) %>%
 Now identify stations within said buffer 
 
 ```{r intersect and review}
-sites100m <- st_intersection(conventionals_distinct, VDHintakesBuffer100m)
+sites100m <- st_intersection(conventionals_distinct, VDHintakesBuffer100m) %>% 
+  distinct(FDT_STA_ID, .keep_all = T) # run distinct here bc can get multiple rows per site if overlapping buffers from intake grabs site
 
 #mapview(VDHintakesBuffer100m) + mapview(sites100m)
 ```
@@ -115,6 +116,6 @@ DT::datatable(sites100m %>% st_drop_geometry(), rownames = F, extensions = 'Butt
 Save this data for easy import into shiny apps.
 
 ```{r}
-saveRDS(sites100m, 'sites100mFromVDHintakes.RDS')
+saveRDS(sites100m, 'data/sites100mFromVDHintakes.RDS')
 ```
 

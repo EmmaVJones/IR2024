@@ -22,6 +22,7 @@ template <- read_csv('userDataToUpload/stationTableResults.csv')
 lastUpdated <- as.Date(file.info('userDataToUpload/stationTableResults.csv')$mtime)
 historicalStationsTable <- readRDS('data/stationsTable2022.RDS')# last cycle stations table (forced into new station table format)
 historicalStationsTable2 <- readRDS('data/stationsTable2020.RDS') # two cycle ago stations table
+intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
 
 
 WCmetals <- pin_get("WCmetals-2022IRfinal",  board = "rsconnect")
@@ -434,9 +435,9 @@ shinyServer(function(input, output, session) {
           PWS= NA)
       } else {
         PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData()$FDT_STA_ID)),
-          assessPWS(stationData(), NITRATE_mg_L, LEVEL_NITRATE, 10, 'PWS_Nitrate'),
-          assessPWS(stationData(), CHLORIDE_mg_L, LEVEL_CHLORIDE, 250, 'PWS_Chloride'),
-          assessPWS(stationData(), SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250, 'PWS_Total_Sulfate')) %>%
+          assessPWSsummary(assessPWS(stationData(), NITRATE_mg_L, LEVEL_NITRATE, 10), 'PWS_Nitrate'),
+          assessPWSsummary(assessPWS(stationData(), CHLORIDE_mg_L, LEVEL_CHLORIDE, 250), 'PWS_Chloride'),
+                           assessPWSsummary(assessPWS(stationData(), SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate')) %>%
           dplyr::select(-ends_with('exceedanceRate')) }
       
       # chloride assessment if data exists
@@ -537,6 +538,11 @@ shinyServer(function(input, output, session) {
     
   })
   
+  ## Water Intake proximity flag for station
+  output$intakeProximityFlag <- renderUI({req(stationData())
+    if(unique(stationData()$FDT_STA_ID) %in% intakeSites$FDT_STA_ID){
+      wellPanel(h5(strong('This station is within 100 meters of a drinking water intake. Please review whether the station 
+                should be assessed for secondary human health criteria.', style = "color:red")) ) }    })
   
   ## PWS table output marked up
   output$PWStable <- DT::renderDataTable({  req(stationData(), waterToxics())

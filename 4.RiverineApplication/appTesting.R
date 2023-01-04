@@ -25,6 +25,7 @@ template <- read_csv('userDataToUpload/stationTableResults.csv')
 lastUpdated <- as.Date(file.info('userDataToUpload/stationTableResults.csv')$mtime)
 historicalStationsTable <- readRDS('data/stationsTable2022.RDS')# last cycle stations table (forced into new station table format)
 historicalStationsTable2 <- readRDS('data/stationsTable2020.RDS') # two cycle ago stations table
+intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
 
 
 WCmetals <- pin_get("WCmetals-2022IRfinal",  board = "rsconnect")
@@ -204,7 +205,7 @@ if(nrow(carryoverStations) > 0){
     stationSelection_  <- c(stationSelection_ , carryoverStationsInAU)  } }
 
 # user selection
-stationSelection <- stationSelection_[2]
+stationSelection <- stationSelection_[1]
 
 
 # Pull conventionals data for just selected AU
@@ -534,6 +535,11 @@ if(is.na(unique(stationData$PWS))){
       formatStyle(c("PWS_Nitrate_EXC","PWS_Nitrate_SAMP","PWS_Nitrate_STAT"), "PWS_Nitrate_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) %>%
       formatStyle(c("PWS_Chloride_EXC","PWS_Chloride_SAMP","PWS_Chloride_STAT"), "PWS_Chloride_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) %>%
       formatStyle(c("PWS_Total_Sulfate_EXC","PWS_Total_Sulfate_SAMP","PWS_Total_Sulfate_STAT"), "PWS_Total_Sulfate_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) } 
+
+# show text flag if a station is within 100m of a VDH intake, analysis conducted in 2.oragnizeMetadata/waterIntakeAnalysis.Rmd
+if(unique(stationData$FDT_STA_ID) %in% intakeSites$FDT_STA_ID){
+  print('This station is within 100 meters of a drinking water intake. Please review whether the station should be assessed for secondary human health criteria.')
+}
 
 #### Data Sub Tab ####---------------------------------------------------------------------------------------------------
 

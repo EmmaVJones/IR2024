@@ -18,12 +18,12 @@ ClPlotlySingleStationUI <- function(id){
                column(1),
                column(2,br(),actionButton(ns('reviewData'),"Review Raw Parameter Data",class='btn-block', width = '250px'))),
       helpText('All data presented in the interactive plot is raw data. Rounding rules are appropriately applied to the
-               assessment functions utilized by the application.'),
+               assessment functions utilized by the application.The orange dashed line is chloride averaged across the assessment window.'),
       plotlyOutput(ns('plotly')),
       fluidRow(
         column(8, h5('All chloride records that are above the PWS criteria (where applicable) for the ',span(strong('selected site')),' are highlighted below.'),
                div(style = 'height:150px;overflow-y: scroll', dataTableOutput(ns('rangeTableSingleSite')))),
-        column(4, h5('Individual chloride exceedance statistics for the ',span(strong('selected site')),' are highlighted below.
+        column(4, h5('Six year window average chloride exceedance statistics for the ',span(strong('selected site')),' are highlighted below.
                      If no data is presented, then the PWS criteria is not applicable to the station.'),
                dataTableOutput(ns("stationExceedanceRate")))),
       br(),hr(),br(),
@@ -57,9 +57,12 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   
   oneStation <- reactive({    req(ns(input$oneStationSelection))
     filter(AUdata(),FDT_STA_ID %in% input$oneStationSelection) %>%
-      filter(!is.na(CHLORIDE_mg_L)) %>%
-      mutate(`Parameter Rounded to WQS Format` = round(CHLORIDE_mg_L, digits = 0),
-             PWSlimit = 250)})
+      filter(!is.na(CHLORIDE_mg_L))})
+  
+  oneStationAssessment <- reactive({req(oneStation())
+    if(input$changeWQS == TRUE){
+      return(assessPWS(oneStation(), CHLORIDE_mg_L, LEVEL_CHLORIDE, 250))
+    } else {return( NULL )}    })
   
   # Option to change WQS used for modal
   output$changeWQSUI <- renderUI({    req(oneStation())
@@ -93,17 +96,22 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
       formatStyle(c('CHLORIDE_mg_L','RMK_CHLORIDE', 'LEVEL_CHLORIDE'), 'LEVEL_CHLORIDE', 
                   backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray'))  })
   
-  output$plotly <- renderPlotly({    req(input$oneStationSelection, oneStation())
-    dat <- oneStation() 
+  output$plotly <- renderPlotly({    req(input$oneStationSelection, oneStation(), oneStationAssessment())
+    dat <- oneStation() %>% 
+      left_join(dplyr::select(oneStationAssessment(), FDT_DATE_TIME, `Parameter Mean`),
+                by = 'FDT_DATE_TIME') %>% 
+      mutate(PWSlimit = 250)
     dat$SampleDate <- as.POSIXct(dat$FDT_DATE_TIME, format="%m/%d/%y")
     
     # Fix look of single measure
     if(nrow(dat) == 1){
       dat <- bind_rows(dat,
                        tibble(SampleDate = c(dat$SampleDate- days(5), dat$SampleDate + days(5)),
-                              PWSlimit = c(250, 250)))    }
+                              PWSlimit = c(250, 250))) %>%
+        fill(`Parameter Mean`)  } # fill average down so line will plot
     
     maxheight <- ifelse(max(dat$CHLORIDE_mg_L, na.rm=T) < 50, 55, max(dat$CHLORIDE_mg_L, na.rm=T)* 1.2)
+ 
     
     if(input$displayBSAcolors == TRUE){
       box1 <- data.frame(SampleDate = c(min(dat$SampleDate), min(dat$SampleDate), max(dat$SampleDate),max(dat$SampleDate)), y = c(50, maxheight, maxheight, 50))
@@ -123,6 +131,9 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                        hoverinfo="text", name =paste('No Probability of Stress to Aquatic Life')) %>%
           add_lines(data=dat, x=~SampleDate,y=~PWSlimit, mode='line', line = list(color = 'black'),
                     hoverinfo = "text", text= "PWS Criteria (250 mg/L)", name="PWS Criteria (250 mg/L)") %>%
+          add_lines(data=dat, x=~SampleDate,y=~`Parameter Mean`, mode='line', line = list(color = 'orange', dash= 'dash'), name="Chloride six year average",
+                    hoverinfo = "text", text= ~paste(sep="<br>",
+                                                    paste("Chloride six year average: ", `Parameter Mean`, "mg/L"))) %>%
           add_markers(data=dat, x= ~SampleDate, y= ~CHLORIDE_mg_L,mode = 'scatter', name="Dissolved Chloride (mg/L)",marker = list(color= '#535559'),
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
@@ -141,6 +152,9 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                        hoverinfo="text", name =paste('Low Probability of Stress to Aquatic Life')) %>%
           add_polygons(data = box4, x = ~x, y = ~y, fillcolor = "#0072B2",opacity=0.6, line = list(width = 0),
                        hoverinfo="text", name =paste('No Probability of Stress to Aquatic Life')) %>%
+          add_lines(data=dat, x=~SampleDate,y=~`Parameter Mean`, mode='line', line = list(color = 'orange', dash= 'dash'), name="Chloride six year average",
+                    hoverinfo = "text", text= ~paste(sep="<br>",
+                                                     paste("Chloride six year average: ", `Parameter Mean`, "mg/L"))) %>%
           add_markers(data=dat, x= ~SampleDate, y= ~CHLORIDE_mg_L, mode = 'scatter', name="Dissolved Chloride (mg/L)",marker = list(color= '#535559'),
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
@@ -156,6 +170,9 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
         plot_ly(data=dat)%>%
           add_lines(data=dat, x=~SampleDate,y=~PWSlimit, mode='line', line = list(color = 'black'),
                     hoverinfo = "text", text= "PWS Criteria (250 mg/L)", name="PWS Criteria (250 mg/L)") %>%
+          add_lines(data=dat, x=~SampleDate,y=~`Parameter Mean`, mode='line', line = list(color = 'orange', dash= 'dash'), name="Chloride six year average",
+                    hoverinfo = "text", text= ~paste(sep="<br>",
+                                                     paste("Chloride six year average: ", `Parameter Mean`, "mg/L"))) %>%
           add_markers(data=dat, x= ~SampleDate, y= ~CHLORIDE_mg_L,mode = 'scatter', name="Dissolved Chloride (mg/L)",marker = list(color= '#535559'),
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
@@ -166,6 +183,9 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                  xaxis=list(title="Sample Date",tickfont = list(size = 10)))
       } else {
         plot_ly(data=dat)%>%
+          add_lines(data=dat, x=~SampleDate,y=~`Parameter Mean`, mode='line', line = list(color = 'orange', dash= 'dash'), name="Chloride six year average",
+                    hoverinfo = "text", text= ~paste(sep="<br>",
+                                                     paste("Chloride six year average: ", `Parameter Mean`, "mg/L"))) %>%
           add_markers(data=dat, x= ~SampleDate, y= ~CHLORIDE_mg_L,mode = 'scatter', name="Dissolved Chloride (mg/L)",marker = list(color= '#535559'),
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
@@ -179,10 +199,10 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   })
   
   
-  output$rangeTableSingleSite <- renderDataTable({    req(oneStation())
+  output$rangeTableSingleSite <- renderDataTable({    req(oneStation(), oneStationAssessment())
     if(input$changeWQS == TRUE){
-      z <- filter(oneStation(), `Parameter Rounded to WQS Format` > PWSlimit) %>%
-        dplyr::select(FDT_DATE_TIME, CHLORIDE_mg_L, LEVEL_CHLORIDE, Criteria = PWSlimit, `Parameter Rounded to WQS Format`) 
+      z <-  oneStationAssessment() %>%
+        filter(exceeds == TRUE)
     } else { z <- NULL}
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "150px", dom='t'),
               selection = 'none') })
@@ -268,7 +288,7 @@ server <- function(input,output,session){
   
   
   #AUData <- reactive({filter_at(conventionals_HUC, vars(starts_with("ID305B")), any_vars(. %in% AUselection) ) })
-  AUData <- reactive({filter(conventionals, Huc6_Vahu6 %in% c('JM01','JM02', 'JM03', 'JM04', 'JM05', 'JM06')) %>%
+  AUData <- reactive({filter(conventionals, Huc6_Vahu6 %in% c('JM01','JM02', 'JM03', 'JM04', 'JM05', 'JM06', "JU11")) %>%
       left_join(dplyr::select(stationTable, STATION_ID:VAHU6,
                               WQS_ID:CLASS_DESCRIPTION),
                 #WQS_ID:`Max Temperature (C)`), 
