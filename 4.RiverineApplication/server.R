@@ -632,9 +632,9 @@ shinyServer(function(input, output, session) {
   # ## Nitrate Sub Tab ##------------------------------------------------------------------------------------------------------
   # callModule(NitratePlotlySingleStation,'Nitrate', AUData, stationSelected)
   # 
-  # ## Chloride Sub Tab ##------------------------------------------------------------------------------------------------------
-  # callModule(ClPlotlySingleStation,'Cl', AUData, stationSelected)
-  # 
+  ## Chloride Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(ClPlotlySingleStation,'Cl', AUData, stationSelected)
+
   # ## Sulfate Sub Tab ##------------------------------------------------------------------------------------------------------
   # callModule(DSulfatePlotlySingleStation,'DSulfate', AUData, stationSelected)
   

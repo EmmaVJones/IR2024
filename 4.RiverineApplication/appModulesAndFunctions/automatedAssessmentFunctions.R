@@ -1288,7 +1288,8 @@ annualRollingExceedanceAnalysis <- function(dataToAnalyze,
                               associatedData = list())
   dataToAnalyze <- dataToAnalyze %>% 
     mutate(Year = year(WindowDateTimeStart),
-           `Valid Window` = case_when(`Criteria Type` %in% c("Chronic", "Four Day")  & `Sample Count` > 1 ~ TRUE,
+           `Valid Window` = case_when(`Criteria Type` %in% c("Acute") ~ TRUE, # just to make people feel good later on
+                                      `Criteria Type` %in% c("Chronic", "Four Day")  & `Sample Count` > 1 ~ TRUE,
                                       TRUE ~ NA))
   
   # First, identify all window start options
