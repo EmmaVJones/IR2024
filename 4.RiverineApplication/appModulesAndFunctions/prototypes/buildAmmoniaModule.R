@@ -165,7 +165,7 @@ AmmoniaPlotlySingleStation <- function(input,output,session, AUdata, stationSele
   
   # Rolled analysis by 3 year result
   rolledAnalysis <- reactive({ req(nrow(oneStation())> 0)
-    annualRollingExceedanceAnalysis(oneStationAnalysis(), yearsToRoll = 3)   })
+    annualRollingExceedanceAnalysis(oneStationAnalysis(), yearsToRoll = 3, aquaticLifeUse = FALSE)   })
   
   ## 3 year window summaries by criteria
   output$stationRolledExceedanceRate <- renderDataTable({   req(nrow(oneStation())> 0, rolledAnalysis())

@@ -384,8 +384,8 @@ assessPWS <- function(stationData, fieldName, commentName, PWSlimit){
     parameterData <- dplyr::select(stationData, FDT_DATE_TIME, !! fieldName_, !! commentName_) %>%
       filter(!( !! commentName_ %in% c('Level II', 'Level I'))) %>% # get lower levels out
       filter(!is.na(!!fieldName_ )) %>% #get rid of NA's
-      mutate(`Parameter Mean` = mean(!! fieldName_),
-             `Parameter Rounded to WQS Format` = signif(`Parameter Mean`, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
+      mutate(`Parameter Median` = median(!! fieldName_),
+             `Parameter Rounded to WQS Format` = signif(`Parameter Median`, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
              limit =  PWSlimit) %>%
       rename(parameter = !!names(.[5])) %>% # rename columns to make functions easier to apply
       mutate(exceeds = ifelse(parameter > limit, T, F)) # Identify where above WQS limit
@@ -1269,7 +1269,11 @@ chlorideFreshwaterAnalysis <- function(stationData){
 #  using subsequent annualRollingExceedanceSummary()
 # analyze results by 3 year windows, not a strict rolling window, roll by year
 annualRollingExceedanceAnalysis <- function(dataToAnalyze,
-                                            yearsToRoll){
+                                            yearsToRoll, # number of years to roll analysis over
+                                            aquaticLifeUse = FALSE # whether or not this function is being used for Aquatic Life Use criteria
+                                            # default = FALSE, which uses the Ammonia definition for window validity for chronic and four day sampling criteria
+                                            # if TRUE, two samples across the rolled window length ensures a valid window
+                                            ){
   
   if(is.null(dataToAnalyze)){return(NULL)}
   
@@ -1287,10 +1291,6 @@ annualRollingExceedanceAnalysis <- function(dataToAnalyze,
            `Valid Window` = case_when(`Criteria Type` %in% c("Chronic", "Four Day")  & `Sample Count` > 1 ~ TRUE,
                                       TRUE ~ NA))
   
-  # need to run depths separately bc can get wonky results if only group by this for summarise step
-  #for(k in unique(dataToAnalyze$FDT_DEPTH)){# k =  unique(dataToAnalyze$FDT_DEPTH)[1]
-  #dataToAnalyze <- filter(dataToAnalyze, FDT_DEPTH == k)
-  
   # First, identify all window start options
   windowOptions <- unique(year(dataToAnalyze$WindowDateTimeStart))
   # Now, stop loop from repeating windows by capping the top end by yearsToRoll-1 (so don't have 3 yr windows exceeding assessment period), then remove any
@@ -1299,28 +1299,46 @@ annualRollingExceedanceAnalysis <- function(dataToAnalyze,
   
 
   for(i in windowRange){ #i = min(min(windowRange):(max(windowRange)- (yearsToRoll- 1))[1])
-    # print(i)}
     dataWindow <- filter(dataToAnalyze, Year %in% i:(i + yearsToRoll- 1) ) # minus 1 year for math to work
-    dataWindowAnalysis <- suppressMessages( dataWindow %>% 
-                                              group_by(FDT_STA_ID, #FDT_DEPTH, 
-                                                       `Criteria Type`) %>%
-                                              summarise(`Criteria Type` = unique(`Criteria Type`),
-                                                        `Window Begin` = year(min(WindowDateTimeStart)),
-                                                        `Years Analysis Rolled Over` = yearsToRoll, 
-                                                        `Exceedances in Rolled Window` = sum(Exceedance),
-                                                        `Valid Window` = all(`Valid Window` == T)) %>% 
-                                              bind_cols(tibble(associatedData = list(dataWindow))) ) 
-    dataWindowResults <- bind_rows(dataWindowResults, dataWindowAnalysis) 
-  }
-  # }
-  
-  
+    # unfortunately have to double loop this to attach the correct dataWindow by Criteria type instead of a simple summarize
+    # should be able to do something similar to this but filter the embedded dataWindow by the grouping variables but cant figure out right now
+    # dataWindowAnalysis <- suppressMessages( dataWindow %>% 
+    #                                           group_by(FDT_STA_ID, #FDT_DEPTH, 
+    #                                                    `Criteria Type`) %>%
+    #                                           summarise(`Criteria Type` = unique(`Criteria Type`),
+    #                                                     `Window Begin` = year(min(WindowDateTimeStart)),
+    #                                                     `Years Analysis Rolled Over` = yearsToRoll, 
+    #                                                     `Exceedances in Rolled Window` = sum(Exceedance),
+    #                                                     `Valid Window` = all(`Valid Window` == T)) %>% 
+    #                                           bind_cols(tibble(associatedData = list(dataWindow))) )
+
+    for(k in unique(dataWindow$`Criteria Type`)){
+      dataWindowCriteria <- filter(dataWindow, `Criteria Type` %in% k)
+      dataWindowAnalysis <- suppressMessages( dataWindowCriteria %>% 
+                                                group_by(FDT_STA_ID, #FDT_DEPTH, 
+                                                         `Criteria Type`) %>%
+                                                {if(aquaticLifeUse == FALSE)
+                                                  summarise(., `Criteria Type` = unique(`Criteria Type`),
+                                                            `Window Begin` = year(min(WindowDateTimeStart)),
+                                                            `Years Analysis Rolled Over` = yearsToRoll, 
+                                                            `Exceedances in Rolled Window` = sum(Exceedance),
+                                                            `Valid Window` = all(`Valid Window` == T))
+                                                  else summarise(., `Criteria Type` = unique(`Criteria Type`),
+                                                                 `Window Begin` = year(min(WindowDateTimeStart)),
+                                                                 `Years Analysis Rolled Over` = yearsToRoll, 
+                                                                 `Exceedances in Rolled Window` = sum(Exceedance),
+                                                                 `Valid Window` = ifelse(nrow(dataWindowCriteria) >= 2, TRUE, NA))
+                                                  }   %>% 
+                                                bind_cols(tibble(associatedData = list(dataWindowCriteria))) )
+      dataWindowResults <- bind_rows(dataWindowResults, dataWindowAnalysis) 
+      }
+    }
   return(dataWindowResults)
 }
 
 
 # Flag if more windows exceeding than not
-# rolledAnalysis <- annualRollingExceedanceAnalysis(dataToAnalyze, 3)
+# rolledAnalysis <- annualRollingExceedanceAnalysis(dataToAnalyze, 3, aquaticLifeUse = FALSE)
 annualRollingExceedanceSummary <- function(rolledAnalysis){
   
   if(is.null(rolledAnalysis)){return(NULL)}
@@ -1349,11 +1367,11 @@ annualRollingExceedanceSummary <- function(rolledAnalysis){
     
 }
 
-# annualRollingExceedanceSummaryOutput <- annualRollingExceedanceSummary(annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData), 3) )
+# annualRollingExceedanceSummaryOutput <- annualRollingExceedanceSummary(annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData), 3, aquaticLifeUse = FALSE) )
 # annualRollingExceedanceSummaryOutput <- annualRollingExceedanceSummary(
 #   annualRollingExceedanceAnalysis(
 #     freshwaterNH3limit(stationData, trout = ifelse(unique(stationData$CLASS) %in% c('V','VI'), TRUE, FALSE),
-#                        mussels = TRUE, earlyLife = TRUE) , 3) )
+#                        mussels = TRUE, earlyLife = TRUE) , 3, aquaticLifeUse = FALSE) )
 # annualRollingExceedanceSummaryOutput <- annualRollingExceedanceSummary(rolledAnalysis) # result with fake data to show alt options
 
 
@@ -1382,7 +1400,7 @@ rollingWindowSummary <- function(annualRollingExceedanceSummaryOutput, parameter
   return(z)
 }
 # rollingWindowSummary(annualRollingExceedanceSummaryOutput, "AMMONIA")
-# rollingWindowSummary(annualRollingExceedanceSummary(annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData), 3) ), "CHL")
+# rollingWindowSummary(annualRollingExceedanceSummary(annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData), 3, aquaticLifeUse = TRUE) ), "CHL")
 
 
 # Function to add a column to stations table output that summarizes 7Q10 information for relevant parameters

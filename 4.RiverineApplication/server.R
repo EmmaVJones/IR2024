@@ -444,7 +444,7 @@ shinyServer(function(input, output, session) {
       if(nrow(filter(stationData(), !is.na(CHLORIDE_mg_L)))){
         chlorideFreshwater <- chlorideFreshwater <- rollingWindowSummary(
           annualRollingExceedanceSummary(
-            annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData()), 3) ), "CHL")
+            annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData()), yearsToRoll = 3, aquaticLifeUse = TRUE) ), "CHL")
       } else {chlorideFreshwater <- tibble(CHL_EXC = NA, CHL_STAT= NA)}
       
       # Water toxics combination with PWS, Chloride Freshwater, and water column PCB data
@@ -483,7 +483,7 @@ shinyServer(function(input, output, session) {
                                                      
                                                    rollingWindowSummary(
                                                      annualRollingExceedanceSummary(
-                                                       annualRollingExceedanceAnalysis(ammoniaAnalysisStation(), yearsToRoll = 3)), parameterAbbreviation = "AMMONIA"),
+                                                       annualRollingExceedanceAnalysis(ammoniaAnalysisStation(), yearsToRoll = 3, aquaticLifeUse = FALSE)), parameterAbbreviation = "AMMONIA"),
                                                    
                                                    # Roger's water column metals analysis, transcribed
                                                    metalsData(filter(WCmetals, Station_Id %in% stationData()$FDT_STA_ID), 'WAT_MET'),

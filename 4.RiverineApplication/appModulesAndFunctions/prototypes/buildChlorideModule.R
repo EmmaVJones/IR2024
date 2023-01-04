@@ -1,10 +1,5 @@
 # work through appTesting.R through the creation of stationData object
 
-
-
-
-
-
 ClPlotlySingleStationUI <- function(id){
   ns <- NS(id)
   tagList(
@@ -22,19 +17,19 @@ ClPlotlySingleStationUI <- function(id){
       plotlyOutput(ns('plotly')),
       fluidRow(
         column(8, h5('All chloride records that are above the PWS criteria (where applicable) for the ',span(strong('selected site')),' are highlighted below.'),
-               div(style = 'height:150px;overflow-y: scroll', dataTableOutput(ns('rangeTableSingleSite')))),
+               div(style = 'height:150px;overflow-y: scroll', dataTableOutput(ns('PWSrangeTableSingleSite')))),
         column(4, h5('Six year window average chloride exceedance statistics for the ',span(strong('selected site')),' are highlighted below.
                      If no data is presented, then the PWS criteria is not applicable to the station.'),
-               dataTableOutput(ns("stationExceedanceRate")))),
+               dataTableOutput(ns("PWSstationExceedanceRate")))),
       br(),hr(),br(),
       h4('Freshwater Chloride Criteria'),
       helpText('Below are the results of the chloride freshwater acute and chronic criteria analysis. These results apply to all stations with
                CLASS II (Tidal Fresh Zone only) and III - VII. The acute and chronic criteria for each data window are presented on the plot below. 
                Turn the layers on/off to visualize the raw data averaged across each window.'),
       h4(strong("Combined Chloride Criteria Analysis Results")),
-      h5('All chloride records that are above the ',span(strong('acute or chronic criteria')),' for the ',span(strong('selected site')),' are highlighted below.'),
-      helpText('For chronic criteria to apply, there must be > 1 sample to evaluate in each window. The `Valid Window` field identifies whether these criteria 
-               results contain valid windows.'),
+      h5('All chloride records that are ',span(strong('above the acute or chronic criteria')),' for the ',span(strong('selected site')),' are highlighted below.'),
+      # helpText('For chronic criteria to apply, there must be > 1 sample to evaluate in each window. The `Valid Window` field identifies whether these criteria 
+      #          results contain valid windows.'),
       dataTableOutput(ns('rangeTableSingleSite')),
       br(),
       h5('All 3 year rolled window results for the ',span(strong('acute or chronic criteria')),' for the ',span(strong('selected site')),' are highlighted below. 
@@ -53,7 +48,7 @@ ClPlotlySingleStationUI <- function(id){
          the number of exceeding windows are higher than the number of windows not exceeding by criteria type.'),
       dataTableOutput(ns("stationExceedanceRate")),
       
-      br(),hr(),br(),
+      br(),hr(),br()#,
       
       
       # h4(strong('Chloride Criteria In Depth Analysis')),
@@ -230,7 +225,7 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   })
   
   
-  output$rangeTableSingleSite <- renderDataTable({    req(oneStation(), oneStationAssessment())
+  output$PWSrangeTableSingleSite <- renderDataTable({    req(oneStation(), oneStationAssessment())
     if(input$changeWQS == TRUE){
       z <-  oneStationAssessment() %>%
         filter(exceeds == TRUE)
@@ -239,7 +234,7 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
               selection = 'none') })
   
   
-  output$stationExceedanceRate <- renderDataTable({
+  output$PWSstationExceedanceRate <- renderDataTable({
     req(input$oneStationSelection, oneStation())
     if(input$changeWQS == TRUE){
       chloride <- dplyr::select(oneStation(), FDT_DATE_TIME, FDT_DEPTH, CHLORIDE_mg_L, LEVEL_CHLORIDE) %>%
@@ -273,7 +268,7 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   
   # Rolled analysis by 3 year result
   rolledAnalysis <- reactive({ req(nrow(oneStation())> 0)
-    annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(oneStation()), yearsToRoll = 3)   })
+    annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(oneStation()), yearsToRoll = 3, aquaticLifeUse = TRUE)   })
   
   ## 3 year window summaries by criteria
   output$stationRolledExceedanceRate <- renderDataTable({   req(nrow(oneStation())> 0, rolledAnalysis())
