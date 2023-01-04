@@ -384,8 +384,8 @@ assessPWS <- function(stationData, fieldName, commentName, PWSlimit){
     parameterData <- dplyr::select(stationData, FDT_DATE_TIME, !! fieldName_, !! commentName_) %>%
       filter(!( !! commentName_ %in% c('Level II', 'Level I'))) %>% # get lower levels out
       filter(!is.na(!!fieldName_ )) %>% #get rid of NA's
-      mutate(`Parameter Mean` = mean(!! fieldName_),
-             `Parameter Rounded to WQS Format` = signif(`Parameter Mean`, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
+      mutate(`Parameter Median` = median(!! fieldName_),
+             `Parameter Rounded to WQS Format` = signif(`Parameter Median`, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
              limit =  PWSlimit) %>%
       rename(parameter = !!names(.[5])) %>% # rename columns to make functions easier to apply
       mutate(exceeds = ifelse(parameter > limit, T, F)) # Identify where above WQS limit
