@@ -66,26 +66,26 @@ Smetals <- pin_get("Smetals-2022IRfinal",  board = "rsconnect")
 # IR2020Smetals <- pin_get("Smetals-2020IRfinal",  board = "rsconnect")
 VSCIresults <- pin_get("VSCIresults", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
-# VCPMI63results <- pin_get("VCPMI63results", board = "rsconnect") %>%
-#   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
-# VCPMI65results <- pin_get("VCPMI65results", board = "rsconnect") %>%
-#   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
-# benSampsStations <- st_as_sf(pin_get("ejones/benSampsStations", board = "rsconnect")) #%>%
-# benSamps <- pin_get("ejones/benSamps", board = "rsconnect") %>%
-#   filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2])) %>%# limit data to assessment window
-#   filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
-#   filter(`Target Count` == 110) %>% # only assess rarified data
-#   left_join(benSampsStations, by = 'StationID') %>% # update with spatial, assess reg, vahu6, basin/subbasin, & ecoregion info
-#   dplyr::select(StationID, Sta_Desc, everything()) %>%
-#   arrange(StationID)
-# habSamps <- pin_get("ejones/habSamps", board = "rsconnect") %>%
-#   filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]))# limit data to assessment window
-# habValues <- pin_get("ejones/habValues", board = "rsconnect")  %>%
-#   filter(HabSampID %in% habSamps$HabSampID)
-# habObs <- pin_get("ejones/habObs", board = "rsconnect") %>%
-#   filter(HabSampID %in% habSamps$HabSampID)
-# pinnedDecisions <- pin_get('IR2022bioassessmentDecisions_test', board = 'rsconnect') %>% ####################change to real when available
-#   dplyr::select(IRYear:FinalAssessmentRating)
+VCPMI63results <- pin_get("VCPMI63results", board = "rsconnect") %>%
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+VCPMI65results <- pin_get("VCPMI65results", board = "rsconnect") %>%
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+benSampsStations <- st_as_sf(pin_get("ejones/benSampsStations", board = "rsconnect")) #%>%
+benSamps <- pin_get("ejones/benSamps", board = "rsconnect") %>%
+  filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2])) %>%# limit data to assessment window
+  filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
+  filter(`Target Count` == 110) %>% # only assess rarified data
+  left_join(benSampsStations, by = 'StationID') %>% # update with spatial, assess reg, vahu6, basin/subbasin, & ecoregion info
+  dplyr::select(StationID, Sta_Desc, everything()) %>%
+  arrange(StationID)
+habSamps <- pin_get("ejones/habSamps", board = "rsconnect") %>%
+  filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]))# limit data to assessment window
+habValues <- pin_get("ejones/habValues", board = "rsconnect")  %>%
+  filter(HabSampID %in% habSamps$HabSampID)
+habObs <- pin_get("ejones/habObs", board = "rsconnect") %>%
+  filter(HabSampID %in% habSamps$HabSampID)
+pinnedDecisions <- pin_get('IR2022bioassessmentDecisions_test', board = 'rsconnect') %>% ####################change to real when available
+  dplyr::select(IRYear:FinalAssessmentRating)
 
 
 # Bring in local data (for now)
@@ -141,9 +141,9 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
 
 ## Watershed selection Tab
 # side panel arguments
-DEQregionSelection <- "NRO"#"BRRO"#"NRO"#"VRO"#"PRO"#"NRO"#'BRRO'#"PRO"#'BRRO'
-basinSelection <- "Potomac-Lower"#"James-Upper"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
-HUC6Selection <- "PL30"#"JU11"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+DEQregionSelection <- "BRRO"#"NRO"#"NRO"#"VRO"#"PRO"#"NRO"#'BRRO'#"PRO"#'BRRO'
+basinSelection <- "James-Upper"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
+HUC6Selection <- "JU11"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
 
 # pull together data based on user input on side panel
 # Pull AU data from server

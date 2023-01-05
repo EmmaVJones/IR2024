@@ -293,7 +293,32 @@ shinyUI(fluidPage(theme="yeti.css",
                                                                      please see the <a href='https://rconnect.deq.virginia.gov/WQAautomatedAssessmentUserManual/individual-parameter-analyses.html#individual-parameter-analyses' target='_blank'>Automated Assessment User Guide</a></p>"),
                                                                 helpText('Review each site using the single site visualization section. Total Sulfate criteria only apply to stations with PWS designation.'),
                                                                 DSulfatePlotlySingleStationUI('DSulfate'))
-                                                     ))#,
+                                                     )),
+                                            tabPanel('Benthic Data',
+                                                     helpText('Review each site using the single site visualization section. If no benthic information is presented, then there is no macroinvertebrate data for
+                                                             the station. Always review biologist fact sheets to assist assessment decisions.'),
+                                                     tabsetPanel(
+                                                       tabPanel('Default Biological Information',
+                                                                BenthicsPlotlySingleStationUI('Benthics')),
+                                                       tabPanel("Bioassessment Additional Information",
+                                                                wellPanel(
+                                                                  h4(strong('Information From Your Regional Biologist(s)')),
+                                                                  helpText('All data presented in this module was submitted by the Regional Biologist
+                                                                            referenced below into the Bioassessment Fact Sheet Generator Tool and saved on the R 
+                                                                            server. Please follow up with that biologist to answer any questions 
+                                                                            about this station.'),
+                                                                  tabsetPanel(
+                                                                    tabPanel('Current Integrated Report Window Bioassessment Information',
+                                                                             helpText("Information is available here if regional biological staff have completed the 
+                                                                                      bioassessment process in the current assessment cycle."),
+                                                                             DT::dataTableOutput('bioassessmentInfo'),
+                                                                             br(),
+                                                                             uiOutput('downloadReport_')),
+                                                                    tabPanel('Previous Integrated Report Windows Bioassessment Information',
+                                                                             helpText("Information is available here if regional biological staff have completed the 
+                                                                                      bioassessment process in previous assessment cycles."),
+                                                                             DT::dataTableOutput('historicalBioassessmentInfo')))
+                                                                  ))))#, 
                                                      )
                                  )
                                  

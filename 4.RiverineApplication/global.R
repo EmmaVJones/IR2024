@@ -21,6 +21,7 @@ library(round)
 source('appModulesAndFunctions/updatedBacteriaCriteria.R')
 source('appModulesAndFunctions/multipleDependentSelectizeArguments.R')
 source('appModulesAndFunctions/automatedAssessmentFunctions.R')
+source('appModulesAndFunctions/benthicAssessmentFunctions.R')
 
 
 # Connect to R server to bring in pinned data
@@ -31,8 +32,8 @@ board_register_rsconnect(key = conn$CONNECT_API_KEY,
 
 modulesToReadIn <- c('stationStatusMap','temperature','pH','DO', 'SpCond', 'salinity',
                      'TN','chlA', 'TP', 'fecalColiform','SSC', 'Ammonia', 'Ecoli','Enterococci',
-                     'Chloride','Sulfate', 'Nitrate')
-#,'metals', 'Benthics', 'toxics')
+                     'Chloride','Sulfate', 'Nitrate','Benthics')
+#,'metals',  'toxics')
 for (i in 1:length(modulesToReadIn)){
   source(paste('appModulesAndFunctions/',modulesToReadIn[i],'Module.R',sep=''))
 }

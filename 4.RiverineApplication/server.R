@@ -63,26 +63,26 @@ Smetals <- pin_get("Smetals-2022IRfinal",  board = "rsconnect")
 # IR2020Smetals <- pin_get("Smetals-2020IRfinal",  board = "rsconnect")
 VSCIresults <- pin_get("VSCIresults", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
-# VCPMI63results <- pin_get("VCPMI63results", board = "rsconnect") %>%
-#   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
-# VCPMI65results <- pin_get("VCPMI65results", board = "rsconnect") %>%
-#   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
-# benSampsStations <- st_as_sf(pin_get("ejones/benSampsStations", board = "rsconnect")) #%>%
-# benSamps <- pin_get("ejones/benSamps", board = "rsconnect") %>%
-#   filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2])) %>%# limit data to assessment window
-#   filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
-#   filter(`Target Count` == 110) %>% # only assess rarified data
-#   left_join(benSampsStations, by = 'StationID') %>% # update with spatial, assess reg, vahu6, basin/subbasin, & ecoregion info
-#   dplyr::select(StationID, Sta_Desc, everything()) %>%
-#   arrange(StationID)
-# habSamps <- pin_get("ejones/habSamps", board = "rsconnect") %>%
-#   filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]))# limit data to assessment window
-# habValues <- pin_get("ejones/habValues", board = "rsconnect")  %>%
-#   filter(HabSampID %in% habSamps$HabSampID)
-# habObs <- pin_get("ejones/habObs", board = "rsconnect") %>%
-#   filter(HabSampID %in% habSamps$HabSampID)
-# pinnedDecisions <- pin_get('IR2022bioassessmentDecisions_test', board = 'rsconnect') %>% ####################change to real when available
-#   dplyr::select(IRYear:FinalAssessmentRating)
+VCPMI63results <- pin_get("VCPMI63results", board = "rsconnect") %>%
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+VCPMI65results <- pin_get("VCPMI65results", board = "rsconnect") %>%
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+benSampsStations <- st_as_sf(pin_get("ejones/benSampsStations", board = "rsconnect")) #%>%
+benSamps <- pin_get("ejones/benSamps", board = "rsconnect") %>%
+  filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2])) %>%# limit data to assessment window
+  filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
+  filter(`Target Count` == 110) %>% # only assess rarified data
+  left_join(benSampsStations, by = 'StationID') %>% # update with spatial, assess reg, vahu6, basin/subbasin, & ecoregion info
+  dplyr::select(StationID, Sta_Desc, everything()) %>%
+  arrange(StationID)
+habSamps <- pin_get("ejones/habSamps", board = "rsconnect") %>%
+  filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]))# limit data to assessment window
+habValues <- pin_get("ejones/habValues", board = "rsconnect")  %>%
+  filter(HabSampID %in% habSamps$HabSampID)
+habObs <- pin_get("ejones/habObs", board = "rsconnect") %>%
+  filter(HabSampID %in% habSamps$HabSampID)
+pinnedDecisions <- pin_get('IR2022bioassessmentDecisions_test', board = 'rsconnect') %>% ####################change to real when available
+  dplyr::select(IRYear:FinalAssessmentRating)
 
 
 # Bring in local data (for now)
@@ -639,5 +639,80 @@ shinyServer(function(input, output, session) {
   callModule(DSulfatePlotlySingleStation,'DSulfate', AUData, stationSelected)
 
   
+  # Other Data Sources
+  
+  #### Benthics Sub Tab ####---------------------------------------------------------------------------------------------------
+  callModule(BenthicsPlotlySingleStation,'Benthics', AUData, stationSelected, VSCIresults, VCPMI63results, VCPMI65results)
+  
+  # Bioassessment Tab- This is included at this level because couldn't figure the download piece out inside a module
+  # empty reactive objects list
+  reactive_objects = reactiveValues() 
+  
+  assessmentDecision_UserSelection <- reactive({req(pinnedDecisions)
+    filter(pinnedDecisions, StationID %in% input$stationSelection) %>% 
+      filter(IRYear == assessmentCycle) })  # only show information from current cycle here
+  
+  # Bioassesment information from current cycle
+  output$bioassessmentInfo <- DT::renderDataTable({req(nrow(assessmentDecision_UserSelection())> 0)
+    DT::datatable(assessmentDecision_UserSelection(),  escape=F, rownames = F,
+                  options= list(dom= 't' , pageLength = nrow(assessmentDecision_UserSelection()),scrollX = TRUE, scrollY = "250px"),
+                  selection = 'none')})
+  
+  observe({req(nrow(assessmentDecision_UserSelection())> 0)
+    reactive_objects$SCI_UserSelection <- filter(VSCIresults, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VSCI')$StationID) %>%
+      bind_rows(
+        filter(VCPMI63results, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VCPMI63 + Chowan')$StationID)  ) %>%
+      bind_rows(
+        filter(VCPMI65results, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VCPMI65 - Chowan')$StationID)  ) %>%
+      # only use family level rarified data
+      filter(`Target Count` == 110) %>% 
+      # add back in description information
+      left_join(filter(benSamps, StationID %in% input$stationSelection) %>%
+                  dplyr::select(StationID, Sta_Desc, BenSampID,US_L3CODE, US_L3NAME, HUC_12, VAHU6, Basin, Basin_Code),
+                by = c('StationID', 'BenSampID')) %>%
+      dplyr::select(StationID, Sta_Desc, BenSampID, `Collection Date`, RepNum, everything())
+    reactive_objects$habitatUserSelection <- habitatConsolidation( input$stationSelection, habSamps, habValues)  })
+  
+  
+  # have to make separate reactive object in order to send appropriate station name to the download title
+  fileNameForReport <- reactive({paste("IR",assessmentCycle," ", as.character(unique(input$stationSelection))," Benthic Assessment Fact Sheet.html", sep = "")})
+  
+  
+  output$downloadReport_ <- renderUI({req(nrow(assessmentDecision_UserSelection())> 0)
+    list(helpText('If you would like to download a copy of the Bioassessment Fact Sheet for the selected station,
+                  click the Generate Report button below.'),
+         downloadButton('downloadReport', 'Generate Report'))})
+  
+  output$downloadReport <- downloadHandler(
+    filename = fileNameForReport,
+    content= function(file){
+      tempReport <- normalizePath('bioassessmentFactSheet.Rmd')
+      imageToSend1 <- normalizePath('images/riskCategories.PNG') #NEW
+      imageToSend2 <- normalizePath('images/HabitatColor.jpg') #NEW
+      
+      owd <- setwd(tempdir())
+      on.exit(setwd(owd))
+      
+      file.copy(tempReport, 'bioassessmentFactSheet.Rmd')
+      file.copy(imageToSend1, 'images/riskCategories.PNG') #NEW
+      file.copy(imageToSend2, 'images/HabitatColor.jpg') #NEW
+      
+      params <- list(assessmentDecision =  assessmentDecision_UserSelection(),
+                     SCI = reactive_objects$SCI_UserSelection,
+                     habitat = reactive_objects$habitatUserSelection)
+      
+      rmarkdown::render(tempReport,output_file = file,
+                        params=params,envir=new.env(parent = globalenv()))})
+  
+
+  
+  # Bioassesment information from previous cycles
+  output$historicalBioassessmentInfo <- DT::renderDataTable({req(pinnedDecisions)
+    z <- filter(pinnedDecisions, StationID %in% input$stationSelection)   %>%  # only show information from not current cycle here
+      filter(IRYear != assessmentCycle) %>% 
+      arrange(IRYear)
+    DT::datatable(z,  escape=F, rownames = F,
+                  options= list(dom= 't' , pageLength = nrow(assessmentDecision_UserSelection()),scrollX = TRUE, scrollY = "250px"),
+                  selection = 'none')})
   
 })
