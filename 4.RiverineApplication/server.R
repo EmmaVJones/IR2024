@@ -629,15 +629,15 @@ shinyServer(function(input, output, session) {
   ## Suspended Sediments Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(SSCPlotlySingleStation,'SSC', AUData, stationSelected)
   
-  # ## Nitrate Sub Tab ##------------------------------------------------------------------------------------------------------
-  # callModule(NitratePlotlySingleStation,'Nitrate', AUData, stationSelected)
-  # 
+  ## Nitrate Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(NitratePlotlySingleStation,'Nitrate', AUData, stationSelected)
+
   ## Chloride Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(ClPlotlySingleStation,'Cl', AUData, stationSelected)
 
-  # ## Sulfate Sub Tab ##------------------------------------------------------------------------------------------------------
-  # callModule(DSulfatePlotlySingleStation,'DSulfate', AUData, stationSelected)
-  
+  ## Sulfate Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(DSulfatePlotlySingleStation,'DSulfate', AUData, stationSelected)
+
   
   
 })
