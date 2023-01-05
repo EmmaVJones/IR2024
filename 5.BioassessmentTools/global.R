@@ -109,41 +109,55 @@ totalHabScore <- function(habValues){
     summarise(`Total Habitat Score` = sum(HabValue, na.rm = T))
 }
 
-averageTotHab_windows <- function(habValues_totHab){
-  habValues_totHab %>%
+averageTotHab_windows <- function(totalHab){
+  
+  # make these objects so dont need up update function cycle to cycle
+  recentTwoYears <- c(max(year(assessmentPeriod)) - 1, max(year(assessmentPeriod)))
+  yearsInCycle <- c(min(year(assessmentPeriod)):max(year(assessmentPeriod)))
+  
+  
+  totalHab %>%
     group_by(StationID) %>%
     summarise(`Total Habitat Average` = format(mean(`Total Habitat Score`, na.rm = T), digits = 3),
               `n Samples` = n()) %>% 
     mutate(Window = paste0('IR ', assessmentCycle, ' (6 year Average)')) %>%
     dplyr::select(StationID, Window, `Total Habitat Average`, `n Samples`) %>%
     # Two Year Average
-    bind_rows(habValues_totHab %>%
-                filter(year(`Collection Date`) %in% c(2019, 2020)) %>%
+    bind_rows(totalHab %>%
+                filter(year(`Collection Date`) %in% recentTwoYears) %>%
                 group_by(StationID) %>%
                 summarise(`Total Habitat Average` = format(mean(`Total Habitat Score`, na.rm = T), digits = 3),
                           `n Samples` = n()) %>% ungroup() %>%
-                mutate(Window = as.character('2019-2020 Average')) %>% 
+                mutate(Window =  paste0(paste(recentTwoYears, collapse = "-"), ' Average')) %>% 
                 dplyr::select(StationID, Window, everything())) %>%
-    bind_rows(habValues_totHab %>%
+    # Add seasonal averages
+    bind_rows(totalHab %>%
                 group_by(StationID, Season) %>%
                 summarise(`Total Habitat Average` = format(mean(`Total Habitat Score`, na.rm = T), digits = 3),
                           `n Samples` = n()) %>%
                 rename('Window' = 'Season') %>% ungroup()) %>%
-    bind_rows(habValues_totHab %>%
+    # Add Yearly Averages
+    bind_rows(totalHab %>%
                 mutate(Window = year(`Collection Date`)) %>%
                 group_by(StationID, Window) %>%
                 summarise(`Total Habitat Average` = format(mean(`Total Habitat Score`, na.rm = T), digits=3),
                           `n Samples` = n()) %>% ungroup() %>%
                 mutate(Window = as.character(Window))) %>% 
-    mutate(Window = factor(Window, levels = c('IR 2022 (6 year Average)', '2019-2020 Average',
-                                              'Spring', 'Fall', '2020', '2019', '2018', '2017', '2016', '2015'))) %>%
+    mutate(Window = factor(Window, levels = c(paste0('IR ', assessmentCycle, ' (6 year Average)'),
+                                              paste0(paste(recentTwoYears, collapse = "-"), ' Average'),
+                                              'Spring', 'Fall', yearsInCycle)))  %>%
     arrange(StationID, Window)
 }
 
 
-averageSCI_windows <- function(benSamps_Filter_fin, SCI_filter, assessmentCycle){
-  dat <- left_join(benSamps_Filter_fin, dplyr::select(SCI_filter, StationID, BenSampID, SCI, `SCI Score`),
+averageSCI_windows <- function(benSampsFilter, SCI_filter, assessmentCycle){
+  dat <- left_join(benSampsFilter, dplyr::select(SCI_filter, StationID, BenSampID, SCI, `SCI Score`),
                    by = c('StationID', 'BenSampID')) 
+  
+  # make these objects so dont need up update function cycle to cycle
+  recentTwoYears <- c(max(year(assessmentPeriod)) - 1, max(year(assessmentPeriod)))
+  yearsInCycle <- c(min(year(assessmentPeriod)):max(year(assessmentPeriod)))
+  
   dat %>%
     # IR window Average
     group_by(StationID, SCI) %>%
@@ -153,11 +167,11 @@ averageSCI_windows <- function(benSamps_Filter_fin, SCI_filter, assessmentCycle)
     dplyr::select(SCI, Window, `SCI Average`, `n Samples`) %>%
     # Two Year Average
     bind_rows(dat %>%
-                filter(year(`Collection Date`) %in% c(2019, 2020)) %>%
+                filter(year(`Collection Date`) %in% recentTwoYears) %>%
                 group_by(StationID, SCI) %>%
                 summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits=3),
                           `n Samples` = n()) %>% ungroup() %>%
-                mutate(Window = as.character('2019-2020 Average')) %>% 
+                mutate(Window = paste0(paste(recentTwoYears, collapse = "-"), ' Average')) %>% 
                 dplyr::select(StationID, SCI, Window, everything())) %>%
     # Add Yearly Averages
     bind_rows(dat %>%
@@ -172,8 +186,9 @@ averageSCI_windows <- function(benSamps_Filter_fin, SCI_filter, assessmentCycle)
                 summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits = 3),
                           `n Samples` = n()) %>%
                 rename('Window' = 'Season') %>% ungroup()) %>%
-    mutate(Window = factor(Window, levels = c('IR 2022 (6 year Average)', '2019-2020 Average',
-                                              'Spring', 'Fall', '2020', '2019', '2018', '2017', '2016', '2015'))) %>%
+    mutate(Window = factor(Window, levels = c(paste0('IR ', assessmentCycle, ' (6 year Average)'),
+                                              paste0(paste(recentTwoYears, collapse = "-"), ' Average'),
+                                              'Spring', 'Fall', yearsInCycle))) %>%
     arrange(StationID, SCI, Window)
 }
 

@@ -3,7 +3,8 @@ source('global.R')
 assessmentRegions <- st_read( 'data/GIS/AssessmentRegions_simple.shp')
 ecoregion <- st_read('data/GIS/vaECOREGIONlevel3__proj84.shp')
 # Get pinned decisions, don't want this in global so bioassessment fact sheet tool doesn't accidentally source this
-pinnedDecisions <- pin_get('IR2022bioassessmentDecisions_test', board = 'rsconnect') ########################################### change to production when time
+currentIRassessmentDecisions <- pin_get('ejones/CurrentIRbioassessmentDecisions', board = 'rsconnect')
+previousIRassessmentDecisions <- pin_get('ejones/PreviousIRbioassessmentDecisions', board = 'rsconnect')
 
 ui <- dashboardPage(
   
@@ -23,32 +24,32 @@ ui <- dashboardPage(
       tabPanel(title = span(tagList(icon("globe", lib = "glyphicon"), " Map")),
                leafletOutput('map'),
                h4('Selected Station Information'),
-               dataTableOutput('stationInfoTable')),
+               dataTableOutput('stationInfoTable'),br(),br()),
       tabPanel(title = span(tagList(icon("stats", lib = "glyphicon"), " SCI Scores")),
                plotlyOutput('SCIplot'), br(),
-               dataTableOutput('SCITable')),
+               dataTableOutput('SCITable'),br(),br()),
       tabPanel(title = span(tagList(icon("stats", lib = "glyphicon"), " Habitat Scores")),
                plotlyOutput('SCIplot1'), br(),
                #br(),
                #plotly::plotlyOutput('habitatPlot', width='100%', height='100%')), 
-               dataTableOutput('habitatTable')),
+               dataTableOutput('habitatTable'),br(),br()),
       tabPanel(title = span(tagList(icon("calculator"), " Station Summary")),
                h4('SCI Summary'), 
                dataTableOutput('SCIavgTable'),br(),
                h4('Total Habitat Summary'),
                dataTableOutput('totHabAvgTable'),
                br(), hr(),
-               h4('IR2020 Assessment Information'),
-               helpText('If you participated in the IR2020 automated bioassessment tools pilot project, you may have 
+               h4('Previous Integrated Report Cycle Bioassessment Information'),
+               helpText('If you participated in previous IR automated bioassessment tools projects, you may have 
                         information available below detailing the selected station(s) assessment decisions for the last cycle.'),
-               dataTableOutput('IR2020decisionTable')),
+               dataTableOutput('previousIRdecisionTable'),br(),br()),
       tabPanel(title = span(tagList(icon("balance-scale"), " Assessment Decision")),
                h4('Assessment Decision Summary'), 
                helpText('If you have uploaded information about the chosen station(s) to the VDEQ Benthic Assessment Fact Sheet Tool, 
                         you will see information that is saved on the server in the table below. If you upload new data about the 
                         selected station(s) to the VDEQ Benthic Assessment Fact Sheet Tool, that information will be reflect here after
                         you refresh the dashboard.'),
-               dataTableOutput('pinnedDataTable'))
+               dataTableOutput('pinnedDataTable'),br(),br())
       
       
     )
@@ -75,15 +76,6 @@ server <- function(input, output, session) {
                                   distinct(`Collected By`) %>% arrange(`Collected By`) %>% pull()
                               } else {distinct(benSamps, `Collected By`) %>% arrange(`Collected By`) %>% pull()} 
                               ) })
-  
-  # observe({ updateSelectInput(session, "basinFilter", "Basin Filter",
-  #                             #choices = sort(unique(benSampsFilter()$Basin_Code))) })
-  #                             choices = #if(!is.null(input$collectorFilter)){
-  #                               filter(benSamps, `Collected By` %in% input$collectorFilter) %>%
-  #                                 distinct(Basin_Code) %>% arrange(Basin_Code) %>% pull()
-  #                             #} #else {distinct(benSamps, Basin_Code) %>% arrange(Basin_Code) %>% pull()}
-  #                             ) })
-  # 
   observe({ updateSelectInput(session, "stationFilter", "StationID Filter",
                               choices = if(!is.null(input$basinFilter)){
                                 filter(benSamps,  Basin_Code %in% input$basinFilter) %>%
@@ -204,51 +196,46 @@ server <- function(input, output, session) {
   return(SCI_filter)  })
   
   output$SCIplot <- renderPlotly({ req(SCI_filter())
-    if(nrow(SCI_filter()) == 1){
-      plot_ly(SCI_filter(),  x = ~`Collection Date`, y = ~`SCI Score`, type = 'bar', 
-              color = ~SeasonGradient,  #marker = list(color = ~SeasonGradientColor,width = 0.5), # throws off color for some reason
-              stroke = list(color = 'rgb(0, 0, 0)', width = 3),
-              hoverinfo="text", text=~paste(sep="<br>",
-                                            paste("StationID: ", StationID),
-                                            paste("Collection Date: ", as.Date(`Collection Date`)),
-                                            paste('Replicate: ', RepNum),
-                                            paste("Collector ID: ",`Collected By`),
-                                            paste("BenSampID: ", BenSampID),
-                                            paste("SCI Score: ", format(`SCI Score`, digits=2)),
-                                            paste("Gradient: ", Gradient)),
-              name = ~paste('Rep ',RepNum, SeasonGradient)) %>%
-        layout(showlegend=TRUE,
-              yaxis=list(title="SCI"),
-              xaxis=list(title="Sample Date",tickfont = list(size = 10),
-                         type = 'date',tickformat = #"%B %Y"))   })
-                           "%Y")) 
-    } else {
-      plot_ly(SCI_filter() %>% mutate(`VSCI Criteria` = 60, `VCPMI Criteria` = 40),
-              x = ~`Collection Date`, y = ~`SCI Score`, type = 'bar', 
-              color = ~SeasonGradient,  #marker = list(color = ~SeasonGradientColor,width = 0.5), # throws off color for some reason
-              stroke = list(color = 'rgb(0, 0, 0)', width = 3),
-              hoverinfo="text", text=~paste(sep="<br>",
-                                            paste("StationID: ", StationID),
-                                            paste("Collection Date: ", as.Date(`Collection Date`)),
-                                            paste('Replicate: ', RepNum),
-                                            paste("Collector ID: ",`Collected By`),
-                                            paste("BenSampID: ", BenSampID),
-                                            paste("SCI Score: ", format(`SCI Score`, digits=2)),
-                                            paste("Gradient: ", Gradient)),
-              name = ~paste('Rep ',RepNum, SeasonGradient)) %>%
-        {if('VSCI' %in% SCI_filter()$SCI)
-          add_segments(., x = as.Date('2015-01-01'), xend =as.Date('2020-12-31'),  y = 60, yend = 60, 
-                       text = 'VSCI Criteria = 60', name = 'VSCI Criteria = 60',line = list(color = 'red'))
-          else . } %>%
-        {if(any(c('VCPMI63 + Chowan', 'VCPMI65 - Chowan') %in% SCI_filter()$SCI))
-          add_segments(., x = as.Date('2015-01-01'), xend =as.Date('2020-12-31'), y = 40, yend = 40, 
-                       text = 'VCPMI Criteria = 40', name = 'VCPMI Criteria = 40',line = list(color = 'red'))
-          else . }%>%
-        layout(showlegend=TRUE,
-               yaxis=list(title="SCI"),
-               xaxis=list(title="Sample Date",tickfont = list(size = 10),
-                          type = 'date',tickformat = #"%B %Y"))   })
-                            "%Y"))    }  })
+    # this doesnt seem to help lines show up with single measure
+    # # Fix look of single measure
+    # if(nrow(SCI_filter) == 1){
+    #   SCI_filter <- bind_rows(SCI_filter,
+    #                           tibble(`Collection Date` = c(SCI_filter$`Collection Date`- hours(1), SCI_filter$`Collection Date` + hours(1))))
+    # } # fill average down so line will plot
+    # 
+    
+    criteriaLine <- dplyr::select(SCI_filter(), `Collection Date`,SeasonGradient) %>% 
+      mutate(`VSCI Criteria` = 60, 
+             `VCPMI Criteria` = 40,
+             SeasonGradient = NA_character_)
+    
+    
+    
+    plot_ly(data = SCI_filter()) %>% 
+      add_trace(data = SCI_filter(), x = ~`Collection Date`, y = ~`SCI Score`, type = 'bar', 
+                color = ~SeasonGradient, #marker = list(color = ~SeasonGradientColor,width = 0.5), # throws off color for some reason
+                stroke = list(color = 'rgb(0, 0, 0)', width = 3),
+                hoverinfo="text", text=~paste(sep="<br>",
+                                              paste("StationID: ", StationID),
+                                              paste("Collection Date: ", as.Date(`Collection Date`)),
+                                              paste('Replicate: ', RepNum),
+                                              paste("Collector ID: ",`Collected By`),
+                                              paste("BenSampID: ", BenSampID),
+                                              paste("SCI Score: ", format(`SCI Score`, digits=2)),
+                                              paste("Gradient: ", Gradient)),
+                name = ~paste('Rep ',RepNum, SeasonGradient)) %>%
+      add_lines(data=criteriaLine, x= ~`Collection Date`, y=~`VSCI Criteria`, mode='line', 
+                line = list(color = 'red', dash= 'dash'), name= 'VSCI Criteria = 60',
+                hoverinfo = "text", text= 'VSCI Criteria = 60') %>%
+      add_lines(data=criteriaLine, x= ~`Collection Date`, y=~`VCPMI Criteria`, mode='line', 
+                line = list(color = 'red', dash= 'dash'), name= 'VCPMI Criteria = 40',
+                hoverinfo = "text", text= 'VCPMI Criteria = 40') %>%
+      layout(showlegend=TRUE,
+             yaxis=list(title="SCI"),
+             xaxis=list(title="Sample Date",tickfont = list(size = 10),
+                        type = 'date',
+                        tickformat = #"%B %Y"))   })
+                          "%Y"))   })
   
   output$SCITable <- renderDataTable({req(SCI_filter())
     z <- mutate(SCI_filter(), `Collection Date` = as.Date(`Collection Date`)) %>%
@@ -287,48 +274,52 @@ server <- function(input, output, session) {
       arrange(StationID, `Collection Date`)   })
   
   output$SCIplot1 <- renderPlotly({ req(SCI_filter())
+    # this doesnt seem to help lines show up with single measure
+    # #totalHab <- totalHab[1,]
+    # # Fix look of single measure
+    # if(nrow(totalHab) == 1){
+    #   totalHab <- bind_rows(totalHab,
+    #                    tibble(`Collection Date` = c(totalHab$`Collection Date`- hours(1), totalHab$`Collection Date` + hours(1))))
+    #                           } # fill average down so line will plot
     
-    if(nrow(totalHab()) == 1){
-      plot_ly(totalHab(), 
-              x = ~`Collection Date`, y = ~`Total Habitat Score` , type = 'bar', 
-              color = ~Season, 
-              stroke = list(color = 'rgb(0, 0, 0)', width = 3),
-              hoverinfo="text", text=~paste(sep="<br>",
-                                            paste("StationID: ", StationID),
-                                            paste("Collection Date: ", as.Date(`Collection Date`)),
-                                            paste("Gradient: ", Gradient)),
-              name = ~paste0(Season, " (", Gradient, " Gradient Method)")) %>%
-        layout(showlegend=TRUE,
-               yaxis=list(title="Total Habitat Score"),
-               xaxis=list(title="Sample Date",tickfont = list(size = 10),
-                          type = 'date',tickformat = "%B %Y")) 
-    } else {
-      plot_ly(totalHab(),
-              x = ~`Collection Date`, y = ~`Total Habitat Score` , type = 'bar', 
-              color = ~Season,  
-              stroke = list(color = 'rgb(0, 0, 0)', width = 3),
-              hoverinfo="text", text=~paste(sep="<br>",
-                                            paste("StationID: ", StationID),
-                                            paste("Collection Date: ", as.Date(`Collection Date`)),
-                                            paste("Gradient: ", Gradient)),
-              name = ~paste0(Season, " (", Gradient, " Gradient Method)")) %>%
-        add_segments(x = as.Date('2015-01-01'), xend =as.Date('2020-12-31'),  y = 200, yend = 200, 
-                     text = 'No Probability of Stress to Aquatic Life', 
-                     name = 'No Probability of Stress to Aquatic Life',line = list(color = '#0072B2')) %>%
-        add_segments(x = as.Date('2015-01-01'), xend =as.Date('2020-12-31'),  y = 150, yend = 150, 
-                     text = 'Low Probability of Stress to Aquatic Life', 
-                     name = 'Low Probability of Stress to Aquatic Life',line = list(color = '#009E73')) %>%
-        add_segments(x = as.Date('2015-01-01'), xend =as.Date('2020-12-31'),  y = 130, yend = 130, 
-                     text = 'Medium Probability of Stress to Aquatic Life', 
-                     name = 'Medium Probability of Stress to Aquatic Life',line = list(color = '#F0E442')) %>%
-        add_segments(x = as.Date('2015-01-01'), xend =as.Date('2020-12-31'),  y = 100, yend = 100, 
-                     text = 'High Probability of Stress to Aquatic Life', 
-                     name = 'High Probability of Stress to Aquatic Life',line = list(color = 'red')) %>%
-        layout(showlegend=TRUE,
-               yaxis=list(title="Total Habitat Score"),
-               xaxis=list(title="Sample Date",tickfont = list(size = 10),
-                          type = 'date',tickformat = #"%B %Y"))   })
-                            "%Y"))  }    })
+    
+    stressLine <- dplyr::select(totalHab(), `Collection Date`, Season) %>% 
+      mutate(`No Stress` = 200,
+             `Low Stress` = 150,
+             `Medium Stress` = 130,
+             `High Stress` = 100,
+             Season = NA_character_)
+    
+    plot_ly(data = totalHab()) %>% 
+      add_trace(data = totalHab(), x = ~`Collection Date`, y = ~`Total Habitat Score`, type = 'bar', 
+                color = ~Season,  
+                stroke = list(color = 'rgb(0, 0, 0)', width = 3),
+                hoverinfo="text", text=~paste(sep="<br>",
+                                              paste("StationID: ", StationID),
+                                              paste("Collection Date: ", as.Date(`Collection Date`)),
+                                              paste("Gradient: ", Gradient)),
+                name = ~paste0(Season, " (", Gradient, " Gradient Method)")) %>%
+      add_lines(data=stressLine, x= ~`Collection Date`, y=~`No Stress`, mode='line', 
+                line = list(color = '#0072B2', dash= 'dash'), 
+                text = 'No Probability of Stress to Aquatic Life', 
+                name = 'No Probability of Stress to Aquatic Life') %>%
+      add_lines(data=stressLine, x= ~`Collection Date`, y=~`Low Stress`, mode='line', 
+                line = list(color = '#009E73', dash= 'dash'), 
+                text = 'Low Probability of Stress to Aquatic Life', 
+                name = 'Low Probability of Stress to Aquatic Life') %>%
+      add_lines(data=stressLine, x= ~`Collection Date`, y=~`Medium Stress`, mode='line', 
+                line = list(color = '#F0E442', dash= 'dash'), 
+                text = 'Medium Probability of Stress to Aquatic Life', 
+                name = 'Medium Probability of Stress to Aquatic Life') %>%
+      add_lines(data=stressLine, x= ~`Collection Date`, y=~`High Stress`, mode='line', 
+                line = list(color = 'red', dash= 'dash'), 
+                text = 'High Probability of Stress to Aquatic Life', 
+                name = 'High Probability of Stress to Aquatic Life') %>%
+      layout(showlegend=TRUE,
+             yaxis=list(title="Total Habitat Score"),
+             xaxis=list(title="Sample Date",tickfont = list(size = 10),
+                        type = 'date',tickformat = #"%B %Y"))   })
+                          "%Y"))  })
   
   
   
@@ -371,14 +362,15 @@ server <- function(input, output, session) {
               options = list(dom = 'Bift', scrollX= TRUE, scrollY = '300px',
                              pageLength = nrow(avgTotalHab), buttons=list('copy','colvis'))) })
   
-  output$IR2020decisionTable <- renderDataTable({req(benSampsFilter())
-    z <- filter(IR2020assessmentDecisions, StationID %in% benSampsFilter()$StationID)
+  output$previousIRdecisionTable <- renderDataTable({req(benSampsFilter(), previousIRassessmentDecisions)
+    z <- filter(previousIRassessmentDecisions, StationID %in% benSampsFilter()$StationID) %>% 
+      arrange(desc(IRYear), StationID)
     datatable(z, rownames = F, escape= F, extensions = 'Buttons',
                 options = list(dom = 'Bift', scrollX= TRUE, scrollY = '300px',
                                pageLength = nrow(z), buttons=list('copy','colvis')))})
   
-  output$pinnedDataTable <- renderDataTable({req(benSampsFilter(), pinnedDecisions)
-    z <- filter(pinnedDecisions, StationID %in% benSampsFilter()$StationID)
+  output$pinnedDataTable <- renderDataTable({req(benSampsFilter(), currentIRassessmentDecisions)
+    z <- filter(currentIRassessmentDecisions, StationID %in% benSampsFilter()$StationID) 
     datatable(z, rownames = F, escape= F, extensions = 'Buttons',
               options = list(dom = 'Bift', scrollX= TRUE, scrollY = '300px',
                              pageLength = nrow(z), buttons=list('copy','colvis')))})
