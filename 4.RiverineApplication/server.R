@@ -437,15 +437,16 @@ shinyServer(function(input, output, session) {
         PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData()$FDT_STA_ID)),
           assessPWSsummary(assessPWS(stationData(), NITRATE_mg_L, LEVEL_NITRATE, 10), 'PWS_Nitrate'),
           assessPWSsummary(assessPWS(stationData(), CHLORIDE_mg_L, LEVEL_CHLORIDE, 250), 'PWS_Chloride'),
-                           assessPWSsummary(assessPWS(stationData(), SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate')) %>%
+          assessPWSsummary(assessPWS(stationData(), SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate')) %>%
           dplyr::select(-ends_with('exceedanceRate')) }
       
       # chloride assessment if data exists
       if(nrow(filter(stationData(), !is.na(CHLORIDE_mg_L)))){
-        chlorideFreshwater <- chlorideFreshwater <- rollingWindowSummary(
+        chlorideFreshwater <- rollingWindowSummary(
           annualRollingExceedanceSummary(
             annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData()), yearsToRoll = 3, aquaticLifeUse = TRUE) ), "CHL")
-      } else {chlorideFreshwater <- tibble(CHL_EXC = NA, CHL_STAT= NA)}
+      } else {
+        chlorideFreshwater <- tibble(CHL_EXC = NA, CHL_STAT= NA)}
       
       # Water toxics combination with PWS, Chloride Freshwater, and water column PCB data
       if(nrow(bind_cols(PWSconcat,
@@ -454,14 +455,13 @@ shinyServer(function(input, output, session) {
                                             filter(StationID %in% stationData()$FDT_STA_ID), 'WAT_TOX')) %>%
               dplyr::select(contains(c('_EXC','_STAT'))) %>%
               mutate(across( everything(),  as.character)) %>%
-              pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) ) > 1) {
+              pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) ) >= 1) {
         WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = 'Review',
-                           PWSinfo = list(PWSconcat)) # add in PWS information so you don't need to run this analysis again
+                           PWSinfo = list(PWSconcat))# add in PWS information so you don't need to run this analysis again
       } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
-                                  PWSinfo = list(PWSconcat))} # add in PWS information so you don't need to run this analysis again
+                                  PWSinfo = list(PWSconcat))}# add in PWS information so you don't need to run this analysis again
     } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
-                                PWSinfo = list(PWSconcat)) } # add in PWS information so you don't need to run this analysis again
-
+                                PWSinfo = list(PWSconcat))}# add in PWS information so you don't need to run this analysis again
     return(WCtoxics) })
   
 

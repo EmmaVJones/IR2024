@@ -1,5 +1,7 @@
 # work through appTesting.R through the creation of stationData object
 
+# work through appTesting.R through the creation of stationData object
+
 ClPlotlySingleStationUI <- function(id){
   ns <- NS(id)
   tagList(
@@ -49,28 +51,9 @@ ClPlotlySingleStationUI <- function(id){
          the number of exceeding windows are higher than the number of windows not exceeding by criteria type.'),
       dataTableOutput(ns("stationExceedanceRate")),
       
-      br(),hr(),br()#,
-      
-      
-      # h4(strong('Chloride Criteria In Depth Analysis')),
-      # helpText('Review the data windows (identified by each sample date) for each criteria analysis.
-      #          To view the dataset within any window, click the row in the table below to plot data within the window selected.'),
-      # fluidRow(
-      #   column(8, helpText('Below is the data analyzed by each criteria and the calculated ammonia criteria.'), 
-      #          h5(strong('Criteria Windows')),
-      #          DT::dataTableOutput(ns('criteriaData'))),
-      #   column(4, helpText('Click a row on the table to left to reveal a detailed interactive plot of the data
-      #                      included in the selected data window. The orange dashed line is the ammonia 
-      #                      averaged across the chosen window. The black dashed line is the criteria
-      #                      calculated from the averaged temperature and pH measures in the chosen window.
-      #                      For acute windows with only one measure, the plot draws the criteria lines +/- 1 day
-      #                      in order to ensure they are visible on the plot; however, acute criteria are only 
-      #                      applicable in the one hour window.'),
-      #          plotlyOutput(ns('windowPlotlyZoom'))))
-      # #      verbatimTextOutput(ns('test'))
-      
+      br(),hr(),br()
     )
-    )
+  )
 }
 
 
@@ -145,7 +128,7 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
         fill(`Parameter Median`)  } # fill average down so line will plot
     
     maxheight <- ifelse(max(dat$CHLORIDE_mg_L, na.rm=T) < 50, 55, max(dat$CHLORIDE_mg_L, na.rm=T)* 1.2)
- 
+    
     
     if(input$displayBSAcolors == TRUE){
       box1 <- data.frame(SampleDate = c(min(dat$SampleDate), min(dat$SampleDate), max(dat$SampleDate),max(dat$SampleDate)), y = c(50, maxheight, maxheight, 50))
@@ -167,7 +150,7 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                     hoverinfo = "text", text= "PWS Criteria (250 mg/L)", name="PWS Criteria (250 mg/L)") %>%
           add_lines(data=dat, x=~SampleDate,y=~`Parameter Median`, mode='line', line = list(color = 'orange', dash= 'dash'), name="Chloride six year average",
                     hoverinfo = "text", text= ~paste(sep="<br>",
-                                                    paste("Chloride six year average: ", `Parameter Median`, "mg/L"))) %>%
+                                                     paste("Chloride six year average: ", `Parameter Median`, "mg/L"))) %>%
           add_markers(data=dat, x= ~SampleDate, y= ~CHLORIDE_mg_L,mode = 'scatter', name="Dissolved Chloride (mg/L)",marker = list(color= '#535559'),
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
@@ -259,15 +242,17 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   
   
   # Freshwater Chloride Analysis
+  chlorideFreshwaterAnalysisResults <- reactive({ req(nrow(oneStation())> 0 )
+    chlorideFreshwaterAnalysis(oneStation())    })
   
   ## Combined Results
-  output$rangeTableSingleSite <- renderDataTable({  req(nrow(oneStation()) > 0)
-    z <- chlorideFreshwaterAnalysis(oneStation()) %>% 
+  output$rangeTableSingleSite <- renderDataTable({  req(!is.null(chlorideFreshwaterAnalysisResults()))
+    z <- chlorideFreshwaterAnalysisResults()  %>% 
       filter(Exceedance == TRUE) %>%
       rename("Chloride Average Value"  = "Value",
              'Chloride Rounded to WQS Format' = parameterRound) %>% 
       dplyr::select(-associatedData)
-
+    
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
               selection = 'none') %>%
       formatSignif(columns=c('CriteriaValue', 'Chloride Rounded to WQS Format'), digits=2)
@@ -275,8 +260,8 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   
   
   # Rolled analysis by 3 year result
-  rolledAnalysis <- reactive({ req(nrow(oneStation())> 0)
-    annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(oneStation()), yearsToRoll = 3, aquaticLifeUse = TRUE)   })
+  rolledAnalysis <- reactive({ req(!is.null(chlorideFreshwaterAnalysisResults()))
+    annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysisResults(), yearsToRoll = 3, aquaticLifeUse = TRUE)   })
   
   ## 3 year window summaries by criteria
   output$stationRolledExceedanceRate <- renderDataTable({   req(nrow(oneStation())> 0, rolledAnalysis())
@@ -309,105 +294,9 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                             buttons=list('copy')),
               selection = 'none') })
   
-  # ### Individual window analysis
-  # output$criteriaData <- DT::renderDataTable({  req(oneStationAnalysis())
-  #   z <- dplyr::select(oneStationAnalysis(), "Window Begin Date" = WindowDateTimeStart,
-  #                      FDT_DEPTH, 
-  #                      "Ammonia Average Value" = "Value", 
-  #                      ValueType, `Criteria Type`, CriteriaValue, `Sample Count`,
-  #                      'Ammonia Rounded to WQS Format' = parameterRound,
-  #                      "Criteria Exceedance" = "Exceedance") 
-  #   DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "300px", dom='ti'),
-  #                 selection = 'single') %>% 
-  #     formatSignif(columns=c('CriteriaValue', 'Ammonia Average Value'), digits=2) })
-  # 
-  # windowData <-  reactive({req(oneStationAnalysis(), input$criteriaData_rows_selected)
-  #   windowSelection <- oneStationAnalysis()[input$criteriaData_rows_selected, ]
-  #   
-  #   windowData <- dplyr::select(windowSelection, associatedData) %>%
-  #     unnest(cols = c(associatedData)) %>%
-  #     mutate(`Ammonia Average (Rounded)` = windowSelection$parameterRound,
-  #            `Criteria Value` = windowSelection$CriteriaValue)
-  #   windowData$`Date Time` <- as.Date(windowData$FDT_DATE_TIME, format="%m/%d/%y")
-  #   
-  #   # add some empty time data to make lines appear for single points
-  #   if(windowSelection$`Criteria Type` == "Acute"){
-  #     windowData <- windowData %>% 
-  #       bind_rows(tibble(`Date Time` = windowData$`Date Time`  + days(1),
-  #                        `Ammonia Average (Rounded)` = windowData$`Ammonia Average (Rounded)`,
-  #                        `Criteria Value` = windowData$`Criteria Value`)) %>% 
-  #       bind_rows(tibble(`Date Time` = windowData$`Date Time`  - days(1),
-  #                        `Ammonia Average (Rounded)` = windowData$`Ammonia Average (Rounded)`,
-  #                        `Criteria Value` = windowData$`Criteria Value`))    }
-  #   return(windowData)  })
-  # 
-  # 
-  # 
-  # output$windowPlotlyZoom <- renderPlotly({ req(windowData())
-  #   
-  #   plot_ly(data=windowData()) %>%
-  #     add_markers(x= ~`Date Time`, y= ~AMMONIA_mg_L, mode = 'scatter', name="Ammonia (mg/L as N)", marker = list(color= '#535559'),
-  #                 hoverinfo="text",text=~paste(sep="<br>",
-  #                                              paste("Date: ",`Date Time`),
-  #                                              paste("Depth: ",FDT_DEPTH, "m"),
-  #                                              paste("Ammonia: ",AMMONIA_mg_L,"mg/L as N"))) %>%
-  #     add_lines(data=windowData(), x=~`Date Time`, y=~`Ammonia Average (Rounded)`, mode='line', line = list(color = 'orange', dash= 'dash'),
-  #               hoverinfo = "text", text= ~paste("Window Ammonia Average: ", `Ammonia Average (Rounded)`," mg/L as N", sep=''),
-  #               name = "Window Ammonia Average") %>%
-  #     add_lines(data = windowData(), x=~`Date Time`,y=~`Criteria Value`, mode='line', line = list(color = '#484a4c',dash = 'dot'),
-  #               hoverinfo = "text", text= ~paste("Window Ammonia Criteria: ", `Criteria Value`," mg/L as N", sep=''),
-  #               name="Window Ammonia Criteria") %>%
-  #     layout(showlegend=FALSE,
-  #            yaxis=list(title="Ammonia (mg/L as N)"),
-  #            xaxis=list(title="Sample Date",tickfont = list(size = 10)))  })
-  # 
-  # output$test <- renderPrint({ oneStationAnalysis()[input$criteriaData_rows_selected, ]})
   
-  # chlorideFreshwater <- reactive({req(nrow(oneStation()) > 0)
-  #   chlorideFreshwaterAnalysis(oneStation())    })
-  # 
-  # 
-  # output$freshwaterPlotly <- renderPlotly({req(chlorideFreshwater(), nrow(oneStation()) > 0)
-  #   stationData <- oneStation()
-  #   stationData$SampleDate <- as.POSIXct(stationData$FDT_DATE_TIME, format="%m/%d/%y")
-  #   
-  #   plot_ly(data=stationData)%>%
-  #     add_markers(data=stationData, x= ~SampleDate, y= ~CHLORIDE_mg_L, mode = 'scatter', name="Dissolved Chloride (mg/L)",marker = list(color= '#535559'),
-  #                 hoverinfo="text",text=~paste(sep="<br>",
-  #                                              paste("Date: ",SampleDate),
-  #                                              paste("Depth: ",FDT_DEPTH, "m"),
-  #                                              paste("Dissolved Chloride: ",CHLORIDE_mg_L,"mg/L")))%>%
-  #     add_markers(data=chlorideFreshwater(), x= ~WindowDateTimeStart, y= ~Value, mode = 'scatter', name= ~paste0(`ValueType`, " Averaged Dissolved Chloride (mg/L)"),
-  #                 marker = list(color= ~Exceedance), colors = c('#535559', 'red'),#marker = list(color= '#535559'),
-  #                 symbol = ~`Criteria Type`, #symbols = c('diamond-dot','diamond'),# symbols = c('x','o'),
-  #                 hoverinfo="text",text=~paste(sep="<br>",
-  #                                              paste("Window Start: ",WindowDateTimeStart),
-  #                                              paste("Depth: ",FDT_DEPTH, "m"),
-  #                                              paste0(`ValueType`, " Averaged Dissolved Chloride: ",Value,"mg/L"),
-  #                                              paste0(`Criteria Type`," Dissolved Chloride Criteria: ",CriteriaValue,"mg/L")))%>%
-  #     layout(showlegend=TRUE,
-  #            yaxis=list(title="Dissolved Chloride (mg/L)"),
-  #            xaxis=list(title="Sample Date",tickfont = list(size = 10)))
-  # })
-  # 
-  # output$stationFreshwaterAnalysis <- renderDataTable({req(chlorideFreshwater())
-  #   datatable(chlorideFreshwater(), rownames = FALSE, options= list(pageLength = nrow(chlorideFreshwater()), scrollX = TRUE, scrollY = "350px", dom='t'),
-  #             selection = 'none') %>% 
-  #     formatStyle('Exceedance', target = 'row', backgroundColor = styleEqual(c(0, 1), c(NA, 'red')))      })
-  # 
-  # output$stationFreshwaterExceedanceRate <- renderDataTable({req(chlorideFreshwater())
-  #   z <- filter(chlorideFreshwater(), Exceedance == 1) %>% 
-  #     group_by(`Criteria Type`) %>% 
-  #     summarise(`Total Exceedances in Dataset` = sum(Exceedance, na.rm = T))
-  #   if(nrow(z) == 0){ # show them something just in case
-  #     z <- tibble(`Criteria Type` = c('Chronic', 'Acute'), `Total Exceedances in Dataset` = c(0, 0))
-  #   }
-  #   datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "150px", dom='t'),
-  #             selection = 'none')     })
-  # 
-  # #output$test <- renderPrint({chlorideFreshwater()})
-  # 
 }
+
 
 
 
@@ -421,7 +310,7 @@ ui <- fluidPage(
 
 server <- function(input,output,session){
   stationData <- eventReactive( input$stationSelection, {
-    filter(AUData, FDT_STA_ID %in% input$stationSelection) })
+    filter(AUData(), FDT_STA_ID %in% input$stationSelection) })
   stationSelected <- reactive({input$stationSelection})
   
   
@@ -434,7 +323,7 @@ server <- function(input,output,session){
       filter(!is.na(ID305B_1)) %>%
       pHSpecialStandardsCorrection() %>%
       filter(!is.na(CHLORIDE_mg_L))})
-  
+
   
   callModule(ClPlotlySingleStation,'Cl', AUData, stationSelected)
   
@@ -442,3 +331,134 @@ server <- function(input,output,session){
 
 shinyApp(ui,server)
 
+
+
+
+
+
+
+
+
+
+
+
+
+#,
+
+
+# h4(strong('Chloride Criteria In Depth Analysis')),
+# helpText('Review the data windows (identified by each sample date) for each criteria analysis.
+#          To view the dataset within any window, click the row in the table below to plot data within the window selected.'),
+# fluidRow(
+#   column(8, helpText('Below is the data analyzed by each criteria and the calculated ammonia criteria.'), 
+#          h5(strong('Criteria Windows')),
+#          DT::dataTableOutput(ns('criteriaData'))),
+#   column(4, helpText('Click a row on the table to left to reveal a detailed interactive plot of the data
+#                      included in the selected data window. The orange dashed line is the ammonia 
+#                      averaged across the chosen window. The black dashed line is the criteria
+#                      calculated from the averaged temperature and pH measures in the chosen window.
+#                      For acute windows with only one measure, the plot draws the criteria lines +/- 1 day
+#                      in order to ensure they are visible on the plot; however, acute criteria are only 
+#                      applicable in the one hour window.'),
+#          plotlyOutput(ns('windowPlotlyZoom'))))
+# #      verbatimTextOutput(ns('test'))
+
+
+# ### Individual window analysis
+# output$criteriaData <- DT::renderDataTable({  req(oneStationAnalysis())
+#   z <- dplyr::select(oneStationAnalysis(), "Window Begin Date" = WindowDateTimeStart,
+#                      FDT_DEPTH, 
+#                      "Ammonia Average Value" = "Value", 
+#                      ValueType, `Criteria Type`, CriteriaValue, `Sample Count`,
+#                      'Ammonia Rounded to WQS Format' = parameterRound,
+#                      "Criteria Exceedance" = "Exceedance") 
+#   DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "300px", dom='ti'),
+#                 selection = 'single') %>% 
+#     formatSignif(columns=c('CriteriaValue', 'Ammonia Average Value'), digits=2) })
+# 
+# windowData <-  reactive({req(oneStationAnalysis(), input$criteriaData_rows_selected)
+#   windowSelection <- oneStationAnalysis()[input$criteriaData_rows_selected, ]
+#   
+#   windowData <- dplyr::select(windowSelection, associatedData) %>%
+#     unnest(cols = c(associatedData)) %>%
+#     mutate(`Ammonia Average (Rounded)` = windowSelection$parameterRound,
+#            `Criteria Value` = windowSelection$CriteriaValue)
+#   windowData$`Date Time` <- as.Date(windowData$FDT_DATE_TIME, format="%m/%d/%y")
+#   
+#   # add some empty time data to make lines appear for single points
+#   if(windowSelection$`Criteria Type` == "Acute"){
+#     windowData <- windowData %>% 
+#       bind_rows(tibble(`Date Time` = windowData$`Date Time`  + days(1),
+#                        `Ammonia Average (Rounded)` = windowData$`Ammonia Average (Rounded)`,
+#                        `Criteria Value` = windowData$`Criteria Value`)) %>% 
+#       bind_rows(tibble(`Date Time` = windowData$`Date Time`  - days(1),
+#                        `Ammonia Average (Rounded)` = windowData$`Ammonia Average (Rounded)`,
+#                        `Criteria Value` = windowData$`Criteria Value`))    }
+#   return(windowData)  })
+# 
+# 
+# 
+# output$windowPlotlyZoom <- renderPlotly({ req(windowData())
+#   
+#   plot_ly(data=windowData()) %>%
+#     add_markers(x= ~`Date Time`, y= ~AMMONIA_mg_L, mode = 'scatter', name="Ammonia (mg/L as N)", marker = list(color= '#535559'),
+#                 hoverinfo="text",text=~paste(sep="<br>",
+#                                              paste("Date: ",`Date Time`),
+#                                              paste("Depth: ",FDT_DEPTH, "m"),
+#                                              paste("Ammonia: ",AMMONIA_mg_L,"mg/L as N"))) %>%
+#     add_lines(data=windowData(), x=~`Date Time`, y=~`Ammonia Average (Rounded)`, mode='line', line = list(color = 'orange', dash= 'dash'),
+#               hoverinfo = "text", text= ~paste("Window Ammonia Average: ", `Ammonia Average (Rounded)`," mg/L as N", sep=''),
+#               name = "Window Ammonia Average") %>%
+#     add_lines(data = windowData(), x=~`Date Time`,y=~`Criteria Value`, mode='line', line = list(color = '#484a4c',dash = 'dot'),
+#               hoverinfo = "text", text= ~paste("Window Ammonia Criteria: ", `Criteria Value`," mg/L as N", sep=''),
+#               name="Window Ammonia Criteria") %>%
+#     layout(showlegend=FALSE,
+#            yaxis=list(title="Ammonia (mg/L as N)"),
+#            xaxis=list(title="Sample Date",tickfont = list(size = 10)))  })
+# 
+# output$test <- renderPrint({ oneStationAnalysis()[input$criteriaData_rows_selected, ]})
+
+# chlorideFreshwater <- reactive({req(nrow(oneStation()) > 0)
+#   chlorideFreshwaterAnalysis(oneStation())    })
+# 
+# 
+# output$freshwaterPlotly <- renderPlotly({req(chlorideFreshwater(), nrow(oneStation()) > 0)
+#   stationData <- oneStation()
+#   stationData$SampleDate <- as.POSIXct(stationData$FDT_DATE_TIME, format="%m/%d/%y")
+#   
+#   plot_ly(data=stationData)%>%
+#     add_markers(data=stationData, x= ~SampleDate, y= ~CHLORIDE_mg_L, mode = 'scatter', name="Dissolved Chloride (mg/L)",marker = list(color= '#535559'),
+#                 hoverinfo="text",text=~paste(sep="<br>",
+#                                              paste("Date: ",SampleDate),
+#                                              paste("Depth: ",FDT_DEPTH, "m"),
+#                                              paste("Dissolved Chloride: ",CHLORIDE_mg_L,"mg/L")))%>%
+#     add_markers(data=chlorideFreshwater(), x= ~WindowDateTimeStart, y= ~Value, mode = 'scatter', name= ~paste0(`ValueType`, " Averaged Dissolved Chloride (mg/L)"),
+#                 marker = list(color= ~Exceedance), colors = c('#535559', 'red'),#marker = list(color= '#535559'),
+#                 symbol = ~`Criteria Type`, #symbols = c('diamond-dot','diamond'),# symbols = c('x','o'),
+#                 hoverinfo="text",text=~paste(sep="<br>",
+#                                              paste("Window Start: ",WindowDateTimeStart),
+#                                              paste("Depth: ",FDT_DEPTH, "m"),
+#                                              paste0(`ValueType`, " Averaged Dissolved Chloride: ",Value,"mg/L"),
+#                                              paste0(`Criteria Type`," Dissolved Chloride Criteria: ",CriteriaValue,"mg/L")))%>%
+#     layout(showlegend=TRUE,
+#            yaxis=list(title="Dissolved Chloride (mg/L)"),
+#            xaxis=list(title="Sample Date",tickfont = list(size = 10)))
+# })
+# 
+# output$stationFreshwaterAnalysis <- renderDataTable({req(chlorideFreshwater())
+#   datatable(chlorideFreshwater(), rownames = FALSE, options= list(pageLength = nrow(chlorideFreshwater()), scrollX = TRUE, scrollY = "350px", dom='t'),
+#             selection = 'none') %>% 
+#     formatStyle('Exceedance', target = 'row', backgroundColor = styleEqual(c(0, 1), c(NA, 'red')))      })
+# 
+# output$stationFreshwaterExceedanceRate <- renderDataTable({req(chlorideFreshwater())
+#   z <- filter(chlorideFreshwater(), Exceedance == 1) %>% 
+#     group_by(`Criteria Type`) %>% 
+#     summarise(`Total Exceedances in Dataset` = sum(Exceedance, na.rm = T))
+#   if(nrow(z) == 0){ # show them something just in case
+#     z <- tibble(`Criteria Type` = c('Chronic', 'Acute'), `Total Exceedances in Dataset` = c(0, 0))
+#   }
+#   datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "150px", dom='t'),
+#             selection = 'none')     })
+# 
+# #output$test <- renderPrint({chlorideFreshwater()})
+# 

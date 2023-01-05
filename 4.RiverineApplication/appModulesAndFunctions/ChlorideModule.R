@@ -240,10 +240,12 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   
   
   # Freshwater Chloride Analysis
+  chlorideFreshwaterAnalysisResults <- reactive({ req(nrow(oneStation())> 0 )
+    chlorideFreshwaterAnalysis(oneStation())    })
   
   ## Combined Results
-  output$rangeTableSingleSite <- renderDataTable({  req(nrow(oneStation()) > 0)
-    z <- chlorideFreshwaterAnalysis(oneStation()) %>% 
+  output$rangeTableSingleSite <- renderDataTable({  req(!is.null(chlorideFreshwaterAnalysisResults()))
+    z <- chlorideFreshwaterAnalysisResults()  %>% 
       filter(Exceedance == TRUE) %>%
       rename("Chloride Average Value"  = "Value",
              'Chloride Rounded to WQS Format' = parameterRound) %>% 
@@ -256,8 +258,8 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   
   
   # Rolled analysis by 3 year result
-  rolledAnalysis <- reactive({ req(nrow(oneStation())> 0)
-    annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(oneStation()), yearsToRoll = 3, aquaticLifeUse = TRUE)   })
+  rolledAnalysis <- reactive({ req(!is.null(chlorideFreshwaterAnalysisResults()))
+    annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysisResults(), yearsToRoll = 3, aquaticLifeUse = TRUE)   })
   
   ## 3 year window summaries by criteria
   output$stationRolledExceedanceRate <- renderDataTable({   req(nrow(oneStation())> 0, rolledAnalysis())

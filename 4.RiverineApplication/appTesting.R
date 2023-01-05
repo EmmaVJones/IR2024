@@ -412,7 +412,7 @@ z <- filter(ammoniaAnalysis, StationID %in% unique(stationData$FDT_STA_ID)) %>%
   map(1) 
 ammoniaAnalysisStation <- z$AmmoniaAnalysis 
 
-#waterToxics <- reactive({ req(stationData)
+
   # PWS stuff
   if(nrow(stationData) > 0){
     if(is.na(unique(stationData$PWS))  ){
@@ -427,10 +427,11 @@ ammoniaAnalysisStation <- z$AmmoniaAnalysis
     
     # chloride assessment if data exists
     if(nrow(filter(stationData, !is.na(CHLORIDE_mg_L)))){
-      chlorideFreshwater <- chlorideFreshwater <- rollingWindowSummary(
+      chlorideFreshwater <- rollingWindowSummary(
         annualRollingExceedanceSummary(
-          annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData), 3) ), "CHL")
-    } else {chlorideFreshwater <- tibble(CHL_EXC = NA, CHL_STAT= NA)}
+          annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData), 3, aquaticLifeUse = TRUE) ), "CHL")
+    } else {
+      chlorideFreshwater <- tibble(CHL_EXC = NA, CHL_STAT= NA)}
     
     # Water toxics combination with PWS, Chloride Freshwater, and water column PCB data
     if(nrow(bind_cols(PWSconcat,
@@ -441,11 +442,13 @@ ammoniaAnalysisStation <- z$AmmoniaAnalysis
             mutate(across( everything(),  as.character)) %>%
             pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) ) > 1) {
       WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = 'Review',
-                         PWSinfo = list(PWSconcat)) # add in PWS information so you don't need to run this analysis again
+                         PWSinfo = list(PWSconcat))# add in PWS information so you don't need to run this analysis again
     } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
-                                PWSinfo = list(PWSconcat)) } # add in PWS information so you don't need to run this analysis again
+                                PWSinfo = list(PWSconcat))}# add in PWS information so you don't need to run this analysis again
+
   } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
-                              PWSinfo = list(PWSconcat)) } # add in PWS information so you don't need to run this analysis again 
+                              PWSinfo = list(PWSconcat))}# add in PWS information so you don't need to run this analysis again
+
 waterToxics <- WCtoxics
 
 # Create station table row for each site
@@ -488,7 +491,8 @@ stationTableOutput <- bind_rows(stationsTemplate,
                                   # add in real comments from uploaded station table
                                   left_join(dplyr::select(stationTable, STATION_ID, COMMENTS),
                                             by = 'STATION_ID') %>% 
-                                  dplyr::select(-ends_with(c('exceedanceRate','Assessment Decision', 'VERBOSE', 'StationID')))) %>% 
+                                  dplyr::select(-ends_with(c('exceedanceRate','Assessment Decision', 'VERBOSE', 'StationID', "PWSinfo",
+                                                             'BACTERIADECISION', 'BACTERIASTATS')))) %>% 
   filter(!is.na(STATION_ID)) 
 
 # Display marked up station table row for each site
