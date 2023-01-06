@@ -1296,7 +1296,7 @@ annualRollingExceedanceAnalysis <- function(dataToAnalyze,
   windowOptions <- unique(year(dataToAnalyze$WindowDateTimeStart))
   # Now, stop loop from repeating windows by capping the top end by yearsToRoll-1 (so don't have 3 yr windows exceeding assessment period), then remove any
   #  windowRange options that don't actually have data in those years
-  windowRange <- (min(windowOptions):(max(windowOptions)- (yearsToRoll- 1)))[(min(windowOptions):(max(windowOptions)- (yearsToRoll- 1))) %in% windowOptions]
+  windowRange <- (min(windowOptions):(max(windowOptions)- (yearsToRoll- 1)))#[(min(windowOptions):(max(windowOptions)- (yearsToRoll- 1))) %in% windowOptions]
   
 
   for(i in windowRange){ #i = min(min(windowRange):(max(windowRange)- (yearsToRoll- 1))[1])
@@ -1313,19 +1313,19 @@ annualRollingExceedanceAnalysis <- function(dataToAnalyze,
     #                                                     `Valid Window` = all(`Valid Window` == T)) %>% 
     #                                           bind_cols(tibble(associatedData = list(dataWindow))) )
 
-    for(k in unique(dataWindow$`Criteria Type`)){
+    for(k in unique(dataWindow$`Criteria Type`)){ # this logic will skip years with no data
       dataWindowCriteria <- filter(dataWindow, `Criteria Type` %in% k)
       dataWindowAnalysis <- suppressMessages( dataWindowCriteria %>% 
                                                 group_by(FDT_STA_ID, #FDT_DEPTH, 
                                                          `Criteria Type`) %>%
                                                 {if(aquaticLifeUse == FALSE)
                                                   summarise(., `Criteria Type` = unique(`Criteria Type`),
-                                                            `Window Begin` = year(min(WindowDateTimeStart)),
+                                                            `Window Begin` = i , #year(min(WindowDateTimeStart)),
                                                             `Years Analysis Rolled Over` = yearsToRoll, 
                                                             `Exceedances in Rolled Window` = sum(Exceedance),
                                                             `Valid Window` = all(`Valid Window` == T))
                                                   else summarise(., `Criteria Type` = unique(`Criteria Type`),
-                                                                 `Window Begin` = year(min(WindowDateTimeStart)),
+                                                                 `Window Begin` = i, #year(min(WindowDateTimeStart)),
                                                                  `Years Analysis Rolled Over` = yearsToRoll, 
                                                                  `Exceedances in Rolled Window` = sum(Exceedance),
                                                                  `Valid Window` = ifelse(nrow(dataWindowCriteria) >= 2, TRUE, NA))
