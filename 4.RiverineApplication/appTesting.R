@@ -124,8 +124,21 @@ estuarineStations <- filter(stationTable, str_detect(ID305B_1, 'E_'))
 stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %>%
   filter(!STATION_ID %in% estuarineStations$STATION_ID) %>%
   
-  # add WQS information to stations
-  left_join(WQSlookup, by = c('STATION_ID'='StationID')) %>%
+  
+  #      # Citmon addition
+  #      # Special CitMon/Non Agency step until full WQS_ID inplementation in IR2028
+  #      left_join(citmonWQS, by = c('STATION_ID' = 'StationID')) %>% # (1)
+  
+  # Join to real WQS_ID's (do this second in case citmon station double listed, want proper WQS_ID if available) (1)
+  left_join(WQSlookup, by = c('STATION_ID' = 'StationID')) %>%
+  
+  #      # coalesce these similar fields together, taking WQS_ID info before citmon method
+  #      mutate(CLASS = coalesce(CLASS, `WQS Class`),
+  #             SEC = coalesce(SEC, `WQS Section`),
+  #             SPSTDS = coalesce(SPSTDS, `WQS Special Standard`)) %>% 
+  #      dplyr::select(-c(`WQS Section`, `WQS Class`, `WQS Special Standard`)) %>% 
+  
+  # Fix for Class II Tidal Waters in Chesapeake (bc complicated DO/temp/etc standard)
   mutate(CLASS_BASIN = paste(CLASS,substr(BASIN, 1,1), sep="_")) %>%
   mutate(CLASS_BASIN = ifelse(CLASS_BASIN == 'II_7', "II_7", as.character(CLASS))) %>%
   # Fix for Class II Tidal Waters in Chesapeake (bc complicated DO/temp/etc standard)
@@ -133,9 +146,21 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
   # data cleanup
   dplyr::select(-c(CLASS.y,CLASS_BASIN)) %>%
   rename('CLASS' = 'CLASS.x') %>%
+  
+  # As of 1/5/23, confirmed that water temperature criteria for class VII waters is determined by the former 
+  #  class of the water. Also confirmed that all class VII waters in TRO, PRO, and NRO were formerly class III,  
+  #  which means that these waters have a maximum temperature criteria of 32 degrees C.
+  mutate(`Max Temperature (C)` = case_when(
+    CLASS == "VII" & REGION == "TRO" ~ 32,
+    CLASS == "VII" & REGION == "PRO" ~ 32,
+    CLASS == "VII" & REGION == "NRO" ~ 32,
+    TRUE ~ as.numeric(`Max Temperature (C)`) )) %>% 
+  
+  # Join station ecoregion information (for benthic analyses)
   left_join(dplyr::select(WQMstationFull, WQM_STA_ID, EPA_ECO_US_L3CODE, EPA_ECO_US_L3NAME) %>%
               distinct(WQM_STA_ID, .keep_all = TRUE), by = c('STATION_ID' = 'WQM_STA_ID')) %>%
   mutate(lakeStation = FALSE)
+
 
 
 
