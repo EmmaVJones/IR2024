@@ -81,7 +81,8 @@ habValues <- pin_get("ejones/habValues", board = "rsconnect")  %>%
   filter(HabSampID %in% habSamps$HabSampID)
 habObs <- pin_get("ejones/habObs", board = "rsconnect") %>%
   filter(HabSampID %in% habSamps$HabSampID)
-pinnedDecisions <- pin_get('IR2022bioassessmentDecisions_test', board = 'rsconnect') %>% ####################change to real when available
+pinnedDecisions <- bind_rows(pin_get('ejones/CurrentIRbioassessmentDecisions', board = 'rsconnect'),
+                             pin_get('ejones/PreviousIRbioassessmentDecisions', board = 'rsconnect')) %>% 
   dplyr::select(IRYear:FinalAssessmentRating)
 
 
@@ -664,13 +665,20 @@ shinyServer(function(input, output, session) {
         filter(VCPMI63results, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VCPMI63 + Chowan')$StationID)  ) %>%
       bind_rows(
         filter(VCPMI65results, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VCPMI65 - Chowan')$StationID)  ) %>%
+      # only Current IR data
+      filter(between(`Collection Date`,assessmentPeriod[1], assessmentPeriod[2])) %>% # limit data to assessment window
       # only use family level rarified data
       filter(`Target Count` == 110) %>% 
+      filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
+      filter(Gradient != "Boatable") %>%  # don't assess where no SCI not validated
       # add back in description information
       left_join(filter(benSamps, StationID %in% input$stationSelection) %>%
                   dplyr::select(StationID, Sta_Desc, BenSampID,US_L3CODE, US_L3NAME, HUC_12, VAHU6, Basin, Basin_Code),
                 by = c('StationID', 'BenSampID')) %>%
       dplyr::select(StationID, Sta_Desc, BenSampID, `Collection Date`, RepNum, everything())
+  
+    reactive_objects$benSampsFilter <- filter(benSamps, BenSampID %in% reactive_objects$SCI_UserSelection$BenSampID)
+
     reactive_objects$habitatUserSelection <- habitatConsolidation( input$stationSelection, habSamps, habValues)  })
   
   
@@ -699,7 +707,9 @@ shinyServer(function(input, output, session) {
       
       params <- list(assessmentDecision =  assessmentDecision_UserSelection(),
                      SCI = reactive_objects$SCI_UserSelection,
-                     habitat = reactive_objects$habitatUserSelection)
+                     benSampsFilter = reactive_objects$benSampsFilter,
+                     habitat = reactive_objects$habitatUserSelection,
+                     assessmentCycle = assessmentCycle)
       
       rmarkdown::render(tempReport,output_file = file,
                         params=params,envir=new.env(parent = globalenv()))})

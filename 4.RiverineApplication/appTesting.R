@@ -84,7 +84,7 @@ habValues <- pin_get("ejones/habValues", board = "rsconnect")  %>%
   filter(HabSampID %in% habSamps$HabSampID)
 habObs <- pin_get("ejones/habObs", board = "rsconnect") %>%
   filter(HabSampID %in% habSamps$HabSampID)
-pinnedDecisions <- pin_get('IR2022bioassessmentDecisions_test', board = 'rsconnect') %>% ####################change to real when available
+pinnedDecisions <- pin_get('ejones/CurrentIRbioassessmentDecisions', board = 'rsconnect') %>% 
   dplyr::select(IRYear:FinalAssessmentRating)
 
 
@@ -142,8 +142,8 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
 ## Watershed selection Tab
 # side panel arguments
 DEQregionSelection <- "BRRO"#"NRO"#"NRO"#"VRO"#"PRO"#"NRO"#'BRRO'#"PRO"#'BRRO'
-basinSelection <- "James-Upper"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
-HUC6Selection <- "JU11"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+basinSelection <- "James-Middle"#"James-Upper"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
+HUC6Selection <- "JM01"#"JU11"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
 
 # pull together data based on user input on side panel
 # Pull AU data from server
@@ -184,7 +184,7 @@ AUselectionOptions <- unique(c(conventionals_HUC$ID305B_1,
 AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))] # double check nothing wonky in there before proceeding
 
 # user selection
-AUselection <- "VAN-A15R_ACO02A00"#"VAW-I04R_JKS03A00"##"VAV-B05R_BAR03A10"#"VAP-J17R_SFT01B98"#AUselectionOptions[1]#"VAN-A27R_AUA01A00"#
+AUselection <- AUselectionOptions[1]# "VAN-A15R_ACO02A00"#"VAW-I04R_JKS03A00"##"VAV-B05R_BAR03A10"#"VAP-J17R_SFT01B98"#AUselectionOptions[1]#"VAN-A27R_AUA01A00"#
 
 # Allow user to select from available stations in chosen AU to investigate further
 stationSelection_ <- filter(conventionals_HUC, ID305B_1 %in% AUselection | ID305B_2 %in% AUselection | 
@@ -562,7 +562,39 @@ AUData %>%
 withinAssessmentPeriod(AUData)
 
 
-## Temperature Sub Tab ##------------------------------------------------------------------------------------------------------
+
+
+
+#Benthic tab
+# the Benthics module handles data plotting and SCI choice stuff
+# this part of app that pulls together biologist assessment decisions and makes benthic fact sheets is 
+# purposely left at the server level of the app bc it was a pain to get the .Rmd to come out of a module correctly
+
+assessmentDecision_UserSelection <- filter(pinnedDecisions, StationID %in% stationSelection) 
+
+# Bioassesment information from current cycle
+DT::datatable(assessmentDecision_UserSelection,  escape=F, rownames = F,
+                options= list(dom= 't' , pageLength = nrow(assessmentDecision_UserSelection),scrollX = TRUE, scrollY = "250px"),
+                selection = 'none')
+
+SCI_UserSelection <- filter(VSCIresults, StationID %in% filter(assessmentDecision_UserSelection, AssessmentMethod == 'VSCI')$StationID) %>%
+    bind_rows(
+      filter(VCPMI63results, StationID %in% filter(assessmentDecision_UserSelection, AssessmentMethod == 'VCPMI63 + Chowan')$StationID)  ) %>%
+    bind_rows(
+      filter(VCPMI65results, StationID %in% filter(assessmentDecision_UserSelection, AssessmentMethod == 'VCPMI65 - Chowan')$StationID)  ) %>%
+  # only Current IR data
+  filter(between(`Collection Date`,assessmentPeriod[1], assessmentPeriod[2])) %>% # limit data to assessment window
+  filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
+  filter(`Target Count` == 110) %>% # only use family level rarified data
+  filter(Gradient != "Boatable") %>%  # don't assess where no SCI not validated
+    # add back in description information
+    left_join(filter(benSamps, StationID %in% stationSelection) %>%
+                dplyr::select(StationID, Sta_Desc, BenSampID,US_L3CODE, US_L3NAME, HUC_12, VAHU6, Basin, Basin_Code),
+              by = c('StationID', 'BenSampID')) %>%
+    dplyr::select(StationID, Sta_Desc, BenSampID, `Collection Date`, RepNum, everything())
+benSampsFilter <- filter(benSamps, BenSampID %in% SCI_UserSelection$BenSampID)
+habitatUserSelection <- habitatConsolidation(stationSelection, habSamps, habValues)  
+
 
 
 

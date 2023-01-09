@@ -1,5 +1,5 @@
 ---
-title: "Virginia Department of Environmental Quality Biomonitoring Assessment Factsheet"
+title: "Virginia Department of Environmental Quality Assessment Factsheet"
 html_document:
   toc: true
   toc_float: true
@@ -8,6 +8,8 @@ params:
   assessmentDecision: 'NULL'
   SCI: 'NULL'
   habitat: 'NULL'
+  benSampsFilter: 'NULL'
+  assessmentCycle: 'NULL'
 ---
 
 <style>
@@ -28,7 +30,9 @@ knitr::opts_chunk$set(echo = FALSE)
 
 assessmentDecision <- params$assessmentDecision
 SCI <- params$SCI
+benSampsFilter <- params$benSampsFilter
 habitat <- params$habitat
+assessmentCycle <- params$assessmentCycle
 ```
 
 <div class="col2">
@@ -79,7 +83,8 @@ datatable(SCImetricstable, rownames = F,  options= list(scrollX = TRUE, pageLeng
 *Note: Replicate samples are included in total and seasonal averages.*
 
 ```{r sci statistics, warning=FALSE, message=FALSE}
-SCIstatisticsResults <- SCIstatistics(SCI)
+SCIstatisticsResults <- averageSCI_windows(benSampsFilter, SCI, assessmentCycle)
+#SCIstatisticsResults <- SCIstatistics(SCI)
 datatable(SCIstatisticsResults, rownames = F,  options= list(scrollX = TRUE, pageLength = nrow(SCIstatisticsResults), #scrollY = "150px", 
                                                  dom='t'), selection = 'none') 
 ```

@@ -96,6 +96,8 @@ shinyServer(function(input, output, session) {
                 by = c('StationID', 'BenSampID')) %>%
       dplyr::select(StationID, Sta_Desc, BenSampID, `Collection Date`, RepNum, everything())
 
+    reactive_objects$benSampsFilter <- filter(benSampsAll, BenSampID %in% reactive_objects$SCI_UserSelection$BenSampID)
+
     habSampsIR <- filter(habSampsAll, between(`Collection Date`,
                                               filter(assessmentPeriodLookup, IRYear %in% input$userIRwindows)$PeriodStart,
                                               filter(assessmentPeriodLookup, IRYear %in% input$userIRwindows)$PeriodEnd))# limit data to assessment window
@@ -128,7 +130,9 @@ shinyServer(function(input, output, session) {
 
       params <- list(assessmentDecision =  assessmentDecision_UserSelection(),
                      SCI = reactive_objects$SCI_UserSelection,
-                     habitat = reactive_objects$habitatUserSelection)
+                     benSampsFilter = reactive_objects$benSampsFilter,
+                     habitat = reactive_objects$habitatUserSelection,
+                     assessmentCycle = assessmentCycle)
 
       rmarkdown::render(tempReport,output_file = file,
                         params=params,envir=new.env(parent = globalenv()))})

@@ -97,7 +97,7 @@ habObs <- habObsAll %>%
   filter(HabSampID %in% habSamps$HabSampID)
 #masterTaxaGenus <- pin_get("ejones/masterTaxaGenus", board = "rsconnect")
 
-IR2020assessmentDecisions <- read_excel('data/BioassessmentRegionalResultsIR2020.xlsx') # not fully filled out but will help the bios who participated last cycle
+#IR2020assessmentDecisions <- read_excel('data/BioassessmentRegionalResultsIR2020.xlsx') # not fully filled out but will help the bios who participated last cycle
 
 # Template to standardize variables for DT habitat heatmap across high and low gradients
 habitatTemplate <- tibble(StationID = NA, HabSampID = NA, `Collection Date` = NA, `HabSample Comment` = NA, `Total Habitat Score` = NA, `Bank Stability` = NA, 
@@ -200,7 +200,7 @@ averageSCI_windows <- function(benSampsFilter, SCI_filter, assessmentCycle){
                 rename('Window' = 'Season') %>% ungroup()) %>%
     mutate(Window = factor(Window, levels = c(paste0('IR ', assessmentCycle, ' (6 year Average)'),
                                               paste0(paste(recentTwoYears, collapse = "-"), ' Average'),
-                                              'Spring', 'Fall', yearsInCycle))) %>%
+                                              'Spring', 'Fall', 'Outside Sample Window', yearsInCycle))) %>%
     arrange(StationID, SCI, Window)
 }
 
@@ -299,77 +299,55 @@ rawBugData <- function(SCI){
     arrange(`Collection Date`, `Replicate Number`)
 }
 
-# SCI Statistics for report
-SCIstatistics <- function(SCI1){
-  suppressMessages(suppressWarnings(
-    SCI1 %>%
-      # IR window Average
-      group_by(StationID, SCI) %>%
-      summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits = 3),
-                `n Samples` = n()) %>% 
-      mutate(Window = paste0('IR ', assessmentCycle, ' (6 year) Average'))  %>%
-      dplyr::select(SCI, Window, `SCI Average`, `n Samples`) %>%
-      # Two Year Average
-      bind_rows(SCI1 %>%
-                  filter(year(`Collection Date`) %in% c(2019, 2020)) %>%
-                  group_by(StationID, SCI) %>%
-                  summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits=3),
-                            `n Samples` = n()) %>% ungroup() %>%
-                  mutate(Window = as.character('2019-2020 Average')) %>% 
-                  dplyr::select(StationID, SCI, Window, everything())) %>%
-      # Two Year Spring Average
-      bind_rows(SCI1 %>%
-                  filter(year(`Collection Date`) %in% c(2019, 2020) & Season == 'Spring') %>%
-                  group_by(StationID, SCI) %>%
-                  summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits=3),
-                            `n Samples` = n()) %>% ungroup() %>%
-                  mutate(Window = as.character('2019-2020 Spring Average')) %>% 
-                  dplyr::select(StationID, SCI, Window, everything())) %>%
-      # Two Year Fall Average
-      bind_rows(SCI1 %>%
-                  filter(year(`Collection Date`) %in% c(2019, 2020) & Season == 'Fall') %>%
-                  group_by(StationID, SCI) %>%
-                  summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits=3),
-                            `n Samples` = n()) %>% ungroup() %>%
-                  mutate(Window = as.character('2019-2020 Fall Average')) %>% 
-                  dplyr::select(StationID, SCI, Window, everything())) %>%
-      # Add seasonal averages
-      bind_rows(SCI1 %>%
-                  group_by(StationID, SCI, Season) %>%
-                  mutate(Season = paste0('IR ', assessmentCycle, ' (6 year) ', Season,' Average')) %>%
-                  summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits = 3),
-                            `n Samples` = n()) %>%
-                  rename('Window' = 'Season') %>% ungroup()) %>%
-      mutate(Window = factor(Window, levels = c('2019-2020 Average', '2019-2020 Spring Average', '2019-2020 Fall Average', 'IR 2022 (6 year) Average', 
-                                                'IR 2022 (6 year) Spring Average', 'IR 2022 (6 year) Fall Average'))) %>%
-      arrange(StationID, SCI, Window)  %>% ungroup() ) )
-}
-
-
 # SCI plot for report
 SCIresultsPlot <- function(SCI, assessmentMethod){
   if(unique(assessmentMethod) == 'VSCI'){
-    mutate(SCI, `Collection Date` = as.Date(`Collection Date`)) %>% 
-      ggplot(aes(x = `Collection Date`, y = `SCI Score`, fill=Season)) +
-      geom_col()+
-      scale_fill_manual("Season", values = c("Fall" = "black", "Spring" = "dark grey"))+
-      labs(x="Collection Year", y="VSCI Score") +
-      scale_y_continuous(#name="VSCI", 
-        breaks=seq(0, 100, 10),limits=c(0,100)) +
-      scale_x_date(date_labels = '%Y') +
-      geom_hline(yintercept=60, color="red", size=1)+
-      theme(axis.text.x=element_text(angle=45,hjust=1))
+    if("Outside Sample Window" %in% SCI$Season){
+      mutate(SCI, `Collection Date` = as.Date(`Collection Date`)) %>% 
+        ggplot(aes(x = `Collection Date`, y = `SCI Score`, fill=Season)) +
+        geom_col()+
+        scale_fill_manual("Season", values = c("Fall" = "black", "Spring" = "dark grey", "Outside Sample Window" = "light grey"))+
+        labs(x="Collection Year", y="VSCI Score") +
+        scale_y_continuous(#name="VSCI", 
+          breaks=seq(0, 100, 10),limits=c(0,100)) +
+        scale_x_date(date_labels = '%Y') +
+        geom_hline(yintercept=60, color="red", size=1)+
+        theme(axis.text.x=element_text(angle=45,hjust=1))
+    } else {
+      mutate(SCI, `Collection Date` = as.Date(`Collection Date`)) %>% 
+        ggplot(aes(x = `Collection Date`, y = `SCI Score`, fill=Season)) +
+        geom_col()+
+        scale_fill_manual("Season", values = c("Fall" = "black", "Spring" = "dark grey"))+
+        labs(x="Collection Year", y="VSCI Score") +
+        scale_y_continuous(#name="VSCI", 
+          breaks=seq(0, 100, 10),limits=c(0,100)) +
+        scale_x_date(date_labels = '%Y') +
+        geom_hline(yintercept=60, color="red", size=1)+
+        theme(axis.text.x=element_text(angle=45,hjust=1)) }
+    
   } else {
-    mutate(SCI, `Collection Date` = as.Date(`Collection Date`)) %>% 
-      ggplot(aes(x = `Collection Date`, y = `SCI Score`, fill=Season)) +
-      geom_col()+
-      scale_fill_manual("Season", values = c("Fall" = "black", "Spring" = "dark grey"))+
-      labs(x="Collection Year", y="VCPMI Score") +
-      scale_y_continuous(#name="VSCI", 
-        breaks=seq(0, 100, 10),limits=c(0,100)) +
-      scale_x_date(date_labels = '%Y') +
-      geom_hline(yintercept=40, color="red", size=1)+
-      theme(axis.text.x=element_text(angle=45,hjust=1))
+    if("Outside Sample Window" %in% SCI$Season){
+      mutate(SCI, `Collection Date` = as.Date(`Collection Date`)) %>% 
+        ggplot(aes(x = `Collection Date`, y = `SCI Score`, fill=Season)) +
+        geom_col()+
+        scale_fill_manual("Season", values = c("Fall" = "black", "Spring" = "dark grey", "Outside Sample Window" = "light grey"))+
+        labs(x="Collection Year", y="VCPMI Score") +
+        scale_y_continuous(#name="VSCI", 
+          breaks=seq(0, 100, 10),limits=c(0,100)) +
+        scale_x_date(date_labels = '%Y') +
+        geom_hline(yintercept=40, color="red", size=1)+
+        theme(axis.text.x=element_text(angle=45,hjust=1))
+    } else {
+      mutate(SCI, `Collection Date` = as.Date(`Collection Date`)) %>% 
+        ggplot(aes(x = `Collection Date`, y = `SCI Score`, fill=Season)) +
+        geom_col()+
+        scale_fill_manual("Season", values = c("Fall" = "black", "Spring" = "dark grey"))+
+        labs(x="Collection Year", y="VCPMI Score") +
+        scale_y_continuous(#name="VSCI", 
+          breaks=seq(0, 100, 10),limits=c(0,100)) +
+        scale_x_date(date_labels = '%Y') +
+        geom_hline(yintercept=40, color="red", size=1)+
+        theme(axis.text.x=element_text(angle=45,hjust=1)) }
   }
 }
 
@@ -390,9 +368,8 @@ SCImetricsTable <- function(SCI){
 ## Habitat plot for report
 habitatPlot <- function(habitat){
   if(nrow(habitat) > 0){
-    minDate <- as.Date(as.character("2015-01-01") , origin ="%Y-%m-%d")
-    maxDate <- as.Date(as.character("2020-12-31"), origin ="%Y-%m-%d")# add min and max dates to make rectagle plotting easier, starting at 6 month buffer by can play with
-    
+    minDate <- as.Date(as.character(min(habitat$`Collection Date`) - months(6)) , origin ="%Y-%m-%d")
+    maxDate <- as.Date(as.character(max(habitat$`Collection Date`) + months(6)), origin ="%Y-%m-%d")# add min and max dates to make rectagle plotting easier
     habitat %>%
       mutate(`Collection Date` = as.Date(`Collection Date`)) %>% 
       ggplot(aes(x = `Collection Date`, y = `Total Habitat Score`))+

@@ -57,6 +57,49 @@ SCIchooser <- function(x){
 
 
 
+averageSCI_windows <- function(benSampsFilter, SCI_filter, assessmentCycle){
+  dat <- left_join(benSampsFilter, dplyr::select(SCI_filter, StationID, BenSampID, SCI, `SCI Score`),
+                   by = c('StationID', 'BenSampID')) 
+  
+  # make these objects so dont need up update function cycle to cycle
+  recentTwoYears <- c(max(year(assessmentPeriod)) - 1, max(year(assessmentPeriod)))
+  yearsInCycle <- c(min(year(assessmentPeriod)):max(year(assessmentPeriod)))
+  
+  dat %>%
+    # IR window Average
+    group_by(StationID, SCI) %>%
+    summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits = 3),
+              `n Samples` = n()) %>% 
+    mutate(Window = paste0('IR ', assessmentCycle, ' (6 year Average)'))  %>%
+    dplyr::select(SCI, Window, `SCI Average`, `n Samples`) %>%
+    # Two Year Average
+    bind_rows(dat %>%
+                filter(year(`Collection Date`) %in% recentTwoYears) %>%
+                group_by(StationID, SCI) %>%
+                summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits=3),
+                          `n Samples` = n()) %>% ungroup() %>%
+                mutate(Window = paste0(paste(recentTwoYears, collapse = "-"), ' Average')) %>% 
+                dplyr::select(StationID, SCI, Window, everything())) %>%
+    # Add Yearly Averages
+    bind_rows(dat %>%
+                mutate(Window = year(`Collection Date`)) %>%
+                group_by(StationID, SCI, Window) %>%
+                summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits=3),
+                          `n Samples` = n()) %>% ungroup() %>%
+                mutate(Window = as.character(Window))) %>%
+    # Add seasonal averages
+    bind_rows(dat %>%
+                group_by(StationID, SCI, Season) %>%
+                summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits = 3),
+                          `n Samples` = n()) %>%
+                rename('Window' = 'Season') %>% ungroup()) %>%
+    mutate(Window = factor(Window, levels = c(paste0('IR ', assessmentCycle, ' (6 year Average)'),
+                                              paste0(paste(recentTwoYears, collapse = "-"), ' Average'),
+                                              'Spring', 'Fall', 'Outside Sample Window', yearsInCycle))) %>%
+    arrange(StationID, SCI, Window)
+}
+
+
 ## functions for Bioassessment use
 # Template to standardize variables for DT habitat heatmap across high and low gradients
 habitatTemplate <- tibble(StationID = NA, HabSampID = NA, `Collection Date` = NA, `HabSample Comment` = NA, `Total Habitat Score` = NA, `Bank Stability` = NA, 
@@ -124,51 +167,6 @@ rawBugData <- function(SCI){
     arrange(`Collection Date`, `Replicate Number`)
 }
 
-# SCI Statistics for report
-SCIstatistics <- function(SCI1){
-  suppressMessages(suppressWarnings(
-    SCI1 %>%
-      # IR window Average
-      group_by(StationID, SCI) %>%
-      summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits = 3),
-                `n Samples` = n()) %>% 
-      mutate(Window = paste0('IR ', assessmentCycle, ' (6 year) Average'))  %>%
-      dplyr::select(SCI, Window, `SCI Average`, `n Samples`) %>%
-      # Two Year Average
-      bind_rows(SCI1 %>%
-                  filter(year(`Collection Date`) %in% c(2019, 2020)) %>%
-                  group_by(StationID, SCI) %>%
-                  summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits=3),
-                            `n Samples` = n()) %>% ungroup() %>%
-                  mutate(Window = as.character('2019-2020 Average')) %>% 
-                  dplyr::select(StationID, SCI, Window, everything())) %>%
-      # Two Year Spring Average
-      bind_rows(SCI1 %>%
-                  filter(year(`Collection Date`) %in% c(2019, 2020) & Season == 'Spring') %>%
-                  group_by(StationID, SCI) %>%
-                  summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits=3),
-                            `n Samples` = n()) %>% ungroup() %>%
-                  mutate(Window = as.character('2019-2020 Spring Average')) %>% 
-                  dplyr::select(StationID, SCI, Window, everything())) %>%
-      # Two Year Fall Average
-      bind_rows(SCI1 %>%
-                  filter(year(`Collection Date`) %in% c(2019, 2020) & Season == 'Fall') %>%
-                  group_by(StationID, SCI) %>%
-                  summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits=3),
-                            `n Samples` = n()) %>% ungroup() %>%
-                  mutate(Window = as.character('2019-2020 Fall Average')) %>% 
-                  dplyr::select(StationID, SCI, Window, everything())) %>%
-      # Add seasonal averages
-      bind_rows(SCI1 %>%
-                  group_by(StationID, SCI, Season) %>%
-                  mutate(Season = paste0('IR ', assessmentCycle, ' (6 year) ', Season,' Average')) %>%
-                  summarise(`SCI Average` = format(mean(`SCI Score`, na.rm = T), digits = 3),
-                            `n Samples` = n()) %>%
-                  rename('Window' = 'Season') %>% ungroup()) %>%
-      mutate(Window = factor(Window, levels = c('2019-2020 Average', '2019-2020 Spring Average', '2019-2020 Fall Average', 'IR 2022 (6 year) Average', 
-                                                'IR 2022 (6 year) Spring Average', 'IR 2022 (6 year) Fall Average'))) %>%
-      arrange(StationID, SCI, Window)  %>% ungroup() ) )
-}
 
 
 # SCI plot for report
@@ -240,9 +238,8 @@ SCImetricsTable <- function(SCI){
 ## Habitat plot for report
 habitatPlot <- function(habitat){
   if(nrow(habitat) > 0){
-    minDate <- as.Date(as.character("2015-01-01") , origin ="%Y-%m-%d")
-    maxDate <- as.Date(as.character("2020-12-31"), origin ="%Y-%m-%d")# add min and max dates to make rectagle plotting easier, starting at 6 month buffer by can play with
-    
+    minDate <- as.Date(as.character(min(habitat$`Collection Date`) - months(6)) , origin ="%Y-%m-%d")
+    maxDate <- as.Date(as.character(max(habitat$`Collection Date`) + months(6)), origin ="%Y-%m-%d")# add min and max dates to make rectagle plotting easier
     habitat %>%
       mutate(`Collection Date` = as.Date(`Collection Date`)) %>% 
       ggplot(aes(x = `Collection Date`, y = `Total Habitat Score`))+
@@ -259,6 +256,7 @@ habitatPlot <- function(habitat){
       scale_x_date(date_breaks='1 year', date_labels =  "%Y")+
       theme(axis.text.x=element_text(angle=45,hjust=1))  }
 }
+
 
 # Habitat Table for final Report
 habitatDTcoloredTable <- function(habitat){

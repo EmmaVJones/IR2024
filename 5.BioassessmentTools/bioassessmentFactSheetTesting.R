@@ -52,6 +52,9 @@ SCI_UserSelection <- filter(VSCIresultsAll, StationID %in% filter(assessmentDeci
             by = c('StationID', 'BenSampID')) %>%
   dplyr::select(StationID, Sta_Desc, BenSampID, `Collection Date`, RepNum, everything())
 
+benSampsFilter <- filter(benSampsAll, BenSampID %in% SCI_UserSelection$BenSampID)
+averageSCI_windows(benSampsFilter, SCI_UserSelection, assessmentCycle)
+
 habSampsIR <- filter(habSampsAll, between(`Collection Date`, 
                                         filter(assessmentPeriodLookup, IRYear %in% userIRwindows)$PeriodStart, 
                                         filter(assessmentPeriodLookup, IRYear %in% userIRwindows)$PeriodEnd))# limit data to assessment window
@@ -64,6 +67,12 @@ fileNameForReport <- paste("IR",assessmentCycle," ", as.character(unique(userSta
 
 
 
+# test the report with these objects
+assessmentDecision <- assessmentDecision_UserSelection
+SCI <- SCI_UserSelection
+benSampsFilter <- benSampsFilter
+habitat <- habitatUserSelection
+assessmentCycle <- assessmentCycle
 
 
 ## User uploads decisions and then decides to make fact sheet
