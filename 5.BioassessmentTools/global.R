@@ -21,6 +21,15 @@ library(rmarkdown)
 # Establish Assessment Period 
 assessmentPeriod <- as.POSIXct(c("2017-01-01 00:00:00 UTC","2022-12-31 23:59:59 UTC"),tz='UTC')
 assessmentCycle <- '2024'
+
+
+assessmentPeriodLookup <- tibble(IRYear = c(2020, 2022, 2024, 2026, 2028),
+                                 PeriodStart = as.POSIXct(c("2013-01-01 00:00:00 UTC", "2015-01-01 00:00:00 UTC", "2017-01-01 00:00:00 UTC",
+                                                              "2019-01-01 00:00:00 UTC", "2021-01-01 00:00:00 UTC"),
+                                                          tz='UTC'),
+                                 PeriodEnd = as.POSIXct(c("2018-12-31 23:59:59 UTC", "2020-12-31 23:59:59 UTC", "2022-12-31 23:59:59 UTC",
+                                                          "2024-12-31 23:59:59 UTC", "2026-12-31 23:59:59 UTC"),
+                                                        tz='UTC'))
 ##################################################################################################################
 
 source('helperFunctions/VSCI_metrics_GENUS.R')
@@ -60,6 +69,9 @@ WQM_Stations <- pin_get("ejones/WQM-Sta-GIS-View", board = "rsconnect") %>%
 #  distinct(WQM_STA_ID, .keep_all = T) %>%
 benSampsStations <- st_as_sf(pin_get("ejones/benSampsStations", board = "rsconnect")) #%>%
   #filter(StationID %in% benSamps$StationID)
+benSampsAll <- left_join(benSampsAll, benSampsStations, by = 'StationID') %>% # update with spatial, assess reg, vahu6, basin/subbasin, & ecoregion info
+  dplyr::select(StationID, Sta_Desc, everything()) %>% 
+  arrange(StationID)
 benSamps <- left_join(benSamps, benSampsStations, by = 'StationID') %>% # update with spatial, assess reg, vahu6, basin/subbasin, & ecoregion info
   dplyr::select(StationID, Sta_Desc, everything()) %>% 
   arrange(StationID)
@@ -234,14 +246,15 @@ pinCheck <- function(pinName, userUpload){
   if(nrow(filter(overwriteOld, n > 1)) == 0 ){
     # pin back to server
     pin(dplyr::select(overwriteOld, -n), 
-        name = 'IR2022bioassessmentDecisions_test', 
-        description = paste0('Test dataset for developing IR2022 bioassessment fact sheet tool ', Sys.time()), 
+        name = 'ejones/CurrentIRbioassessmentDecisions', 
+        description = paste0('This dataset is the working dataset of bioassessment decisions for the
+                             current IR cycle using one standardized format for use in the IR tools.', Sys.time()), 
         board = 'rsconnect')
     return('pin updated on server')
   } else {
     return(filter(filter(overwriteOld, n > 1)))  }
 }
-#pinCheck('IR2022bioassessmentDecisions_test', userUpload)
+#pinCheck('ejones/CurrentIRbioassessmentDecisions', userUpload)
 
 # Do all habitat things efficiently
 
