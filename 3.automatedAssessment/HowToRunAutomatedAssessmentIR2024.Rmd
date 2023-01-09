@@ -309,7 +309,7 @@ That dataset is money. We want to use that one in the shiny applications, so mak
 ```
 
 
-Reorganize water column metals data to enable better exceedance analyses across automated scripts and applications.
+We need to reorganize raw water column metals data to enable better exceedance analyses across automated scripts and applications.
 
 ```{r manipulate metals for analysis}
 # Separate object for analysis, tack on METALS and RMK designation to make the filtering of certain lab comment codes easier
