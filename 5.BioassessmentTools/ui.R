@@ -17,6 +17,7 @@ shinyUI(fluidPage(theme="yeti.css",
                                         from data uploaded to the application. Once a station is chosen, the `Generate Report` button
                                         compiles benthic and habitat data within the IR window with biologist assessment decisions and writes a report,
                                         downloaded to the users Downloads folder.'),
+                                      HTML("<p>To download a copy of the data upload template, <a href='https://covgov-my.sharepoint.com/:x:/g/personal/emma_jones_deq_virginia_gov/EcckR_eno0ZIiHTymTRmVy4BqPJIM4kAb5ZD3ACdNKeRAg?e=cG6yxA' target='_blank'>click here.</a></p>"),
                                       h4('General Purpose Biological Fact Sheet Usage'),
                                       p('Users may choose from any station that has benthic macroinvertebrate information. Once a station is chosen, the `Generate Report` button
                                         compiles benthic and habitat data within the collection window chosen by the user and writes a Microsoft Word report with some basic plots
@@ -47,8 +48,10 @@ shinyUI(fluidPage(theme="yeti.css",
                                         fileInput('userData','Upload Assessment Decisions (.xlsx)',accept='.xlsx',width='100%'),
                                         helpText("All data uploaded to the application must follow a specific template. The template is available for
                                                  download by ",
-                                                 span(tagList(a("emailing Emma Jones.",
-                                                                href="https://mail.google.com/mail/?view=cm&fs=1&to=emma.jones@deq.virginia.gov", target = 'blank'))))
+                                                 span(tagList(a("here.",
+                                                                href="https://covgov-my.sharepoint.com/:x:/g/personal/emma_jones_deq_virginia_gov/EcckR_eno0ZIiHTymTRmVy4BqPJIM4kAb5ZD3ACdNKeRAg?e=cG6yxA", target = 'blank'))))
+                                        
+
                                       ),
                                       mainPanel(
                                         #verbatimTextOutput('test'),
@@ -61,7 +64,7 @@ shinyUI(fluidPage(theme="yeti.css",
                                                       " with potential issues.")),
                                         dataTableOutput('inputTable')
                                       )),
-                             tabPanel('General Puropose Biological Fact Sheet',
+                             tabPanel('General Purpose Biological Fact Sheet',
                                       sidebarPanel(
                                         helpText("To generate a fact sheet for ", span(strong('PURPOSES OTHER THAN THE ASSESSMENT')),
                                                  " you must choose a station and collection window from the list of stations below."),
