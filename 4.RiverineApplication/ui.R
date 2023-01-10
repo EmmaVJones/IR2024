@@ -167,7 +167,7 @@ shinyUI(fluidPage(theme="yeti.css",
                                                   in different colors to indicate further review may be necessary. Parameters highlighted in yellow have at least one 
                                                   violation of a standard. When BENTHIC_STAT is highlighed, it indicates there is benthic data present for that site
                                                   and the assessor should review that information with the Regional Biologist. Parameters highlighted in red exceed the 10.5% exceedance rate. Both scenarios warrant further
-                                                  investigation and may require comments in the Station Table and ADB.'),
+                                                  investigation and may require comments in the Station Table and CEDS WQA.'),
                                           h5(strong('If no station table appears, then there is no data within the assessment window for the selected station.'), 
                                              'Please investigate the Historical Station Information table above for information as to why this station is
                                              included in the application.'),

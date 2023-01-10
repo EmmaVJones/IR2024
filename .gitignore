@@ -65,6 +65,12 @@ AssessorQuestions.txt
 4.RiverineApplication/data/
 4.RiverineApplication/userDataToUpload/
 4.RiverineApplication/config.yml
+4.RiverineApplication/www/
+
+4.LakesApplication/data/
+4.LakesApplication/userDataToUpload/
+4.LakesApplication/config.yml
+4.LakesApplication/www/
 
 5.BioassessmentTools/data
 5.BioassessmentTools/reports
