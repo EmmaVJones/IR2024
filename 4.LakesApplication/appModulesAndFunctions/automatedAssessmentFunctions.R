@@ -47,7 +47,11 @@ WQSvalues <- tibble(CLASS_BASIN = c('I',"II","II_7","III","IV","V","VI","VII"),
 
 # Lake name standardization
 lakeNameStandardization <- function(x){
+  # flexibility to handle new and old naming conventions
   x %>% 
+    {if("WaterName" %in% names(x))
+      rename(x, WATER_NAME = WaterName)
+      else .} %>% 
     mutate(Lake_Name = case_when(WATER_NAME %in% c('Abel Lake Reservoir (Long Branch)') ~ 'Abel Lake',
                                  WATER_NAME %in% c('Big Cherry Reservior') ~ 'Big Cherry Lake',
                                  WATER_NAME %in% c('Dan River','Buffalo Creek','Bluestone Creek') ~ 'Kerr Reservoir',
@@ -94,8 +98,7 @@ lakeNameStandardization <- function(x){
                                  WATER_NAME %in% c('Unsegmented lakes in G03') ~ 'West Run',
                                  TRUE ~ as.character(WATER_NAME))) 
 }
-#test <- regionalAUs %>%
-#  lakeNameStandardization()
+# regionalAUs %>% lakeNameStandardization()
 
 
 quickStats <- function(parameterDataset, # dataset from one station that has been run through a parameter exceedance analysis function 

@@ -160,7 +160,6 @@ shinyServer(function(input, output, session) {
       # Fix for Class II Tidal Waters in Chesapeake (bc complicated DO/temp/etc standard)
       mutate(CLASS_BASIN = paste(CLASS,substr(BASIN, 1,1), sep="_")) %>%
       mutate(CLASS_BASIN = ifelse(CLASS_BASIN == 'II_7', "II_7", as.character(CLASS))) %>%
-      # Fix for Class II Tidal Waters in Chesapeake (bc complicated DO/temp/etc standard)
       left_join(WQSvalues, by = 'CLASS_BASIN') %>%
       # data cleanup
       dplyr::select(-c(CLASS.y,CLASS_BASIN)) %>%

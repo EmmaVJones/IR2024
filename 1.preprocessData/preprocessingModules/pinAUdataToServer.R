@@ -62,7 +62,7 @@ lakesPBfin %>%
   arrange(desc(n)) %>% 
   View()
 
-pin(lakesPBfin, name = 'AUreservoir_EVJ', description = "2022IR final AU reservoir", board = "rsconnect")
+pin(lakesPBfin, name = 'AUreservoir', description = "2022IR final AU reservoir", board = "rsconnect")
 
 rm(list=c('lakesP','lakesPB', 'lakesPBfin'))
 
