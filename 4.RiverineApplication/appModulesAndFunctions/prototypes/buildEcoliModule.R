@@ -157,7 +157,7 @@ EcoliPlotlySingleStation <- function(input,output,session, AUdata, stationSelect
   ### New standard ----------------------------------------------------------------------------------
   
   output$exceedancesNEWStdTableSingleSite <- DT::renderDataTable({    req(oneStation(),!is.na(oneStationRecreationDecisionData()))
-    z <- oneStationRecreationDecisionData()[['associatedDecisionData']][[1]] %>% 
+    z <- oneStationDecisionData() %>% #oneStationRecreationDecisionData()[['associatedDecisionData']][[1]] %>% 
       filter(`STV Exceedances In Window` > 0 | `Geomean In Window` > 126) %>%
       dplyr::select(-associatedData) %>% # remove embedded tibble to make table work
       mutate(`Date Window Starts` = as.Date(`Date Window Starts`),

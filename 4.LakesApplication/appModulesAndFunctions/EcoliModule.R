@@ -7,7 +7,8 @@ EcoliPlotlySingleStationUI <- function(id){
       fluidRow(column(6, helpText('Station used for this module is the station selected above to expedite app rendering.')),#uiOutput(ns('oneStationSelectionUI'))),
                column(6,actionButton(ns('reviewData'),"Review Raw Parameter Data",class='btn-block', width = '250px'))),
       helpText('All data presented in the interactive plot is raw data. Rounding rules are appropriately applied to the 
-               assessment functions utilized by the application.'),
+               assessment functions utilized by the application. The gray box indicates the data window valid for recreational use assessment for the current 
+               assessment period.'),
       plotlyOutput(ns('plotly')),
       br(),hr(),br(),
       fluidRow(
@@ -25,26 +26,14 @@ EcoliPlotlySingleStationUI <- function(id){
                br()),
         column(6, br(), br(),br(), br(),br(), br(),br(), br(),
                h5('Individual E. coli exceedance statistics for the ',span(strong('selected site')),' are highlighted below.'),
+               h5("Note: This analysis is based only on data collected during the ",span(strong('two most recent calendar years of the six-year assessment window')),". For the ",
+                  assessmentCycle, " IR cycle this would mean only bacteria data collected between January 1, ",
+                  year(assessmentPeriod[1] + years(4)),
+                  " and  December 31, ", year(assessmentPeriod[2]), " is assessed for recreation use support."),
                DT::dataTableOutput(ns("newStdTableSingleSite")),
                h4(strong('See below section for detailed analysis with new recreation standard.')),
                br())),
       br(),hr(),
-      fluidRow(
-        h4(strong('Old Standard (Single Sample Maximum = 235 CFU / 100 mL, Monthly Geomean = 126 CFU / 100 mL)')),
-        column(6,
-               h5('All E. coli records that are ',span(strong('above the criteria')),' for the ',
-                  span(strong('selected site')),' are highlighted below.',
-                  span(strong('If no data are reflected in below tables then no data exceeded the respective criteria.'))),
-               h4(strong('Single Sample Maximum = 235 CFU / 100 mL')),
-               DT::dataTableOutput(ns('exceedancesOldStdTableSingleSiteSTV')), 
-               h4(strong('Monthly Geomean = 126 CFU / 100 mL')),
-               DT::dataTableOutput(ns('exceedancesOldStdTableSingleSitegeomean')),
-               br()),
-        column(6,
-               br(),br(),br(),
-               h5('Individual E. coli exceedance statistics for the ',span(strong('selected site')),' are highlighted below.'),
-               DT::dataTableOutput(ns("oldStdTableSingleSite")))),
-      hr(),br(),
       h4(strong('New Recreation Standard In Depth Analysis')),
       helpText('Review the 90 day windows (identified by each sample date) for STV and geomean exceedances.
                Comments are specific to each row of data. To view the dataset within each 90 day window, use
@@ -53,7 +42,7 @@ EcoliPlotlySingleStationUI <- function(id){
         #verbatimTextOutput(ns('test')),
         column(4, helpText('Below is the raw data associated with the ',span('selected site'),'. Click on a row to reveal the
                            data included in the selected 90 day window in the plot to the right and to highlight the specific 
-                           assessment logic in the table below the plot.'), 
+                           assessment logic in the table below the plot. Data valid for recreational use assessment are colored in gray.'), 
                h5(strong('Raw Data')),DT::dataTableOutput(ns('rawData'))),
         column(8, helpText('Click a row on the table to left to reveal a detailed interactive plot of the data
                            included in the selected 90 day window. The orange line corresponds to the window geomean; wide black dashed line
@@ -64,20 +53,33 @@ EcoliPlotlySingleStationUI <- function(id){
       br(), br(),
       h5(strong('Analyzed Data (Each window with an individual STV and geomean assessment decisions)')),
       helpText('This dataset shows all assessment logic for each 90 day window assessment.'),
-      DT::dataTableOutput(ns('analysisTable')))
+      helpText('Per assessment guidance, each 90-day period that is assessed should be evaluated using a dataset containing at least one sample that is not 
+               used in a preceding or subsequent 90-day period. In practice, all data collected begin a rolling 90-day period; however, the field called 
+               `Valid Assessment Window` indicates whether a given window contains unique data for analysis. All suggested assessment decisions are only based
+               upon data where `Valid Assessment Window` are true.'),
+      DT::dataTableOutput(ns('analysisTable'))),
+    hr(), br(),
+    fluidRow(
+      h4(strong('Old Standard (Single Sample Maximum = 235 CFU / 100 mL, Monthly Geomean = 126 CFU / 100 mL)')),
+      column(6,
+             h5('All E. coli records that are ',span(strong('above the criteria')),' for the ',
+                span(strong('selected site')),' are highlighted below.',
+                span(strong('If no data are reflected in below tables then no data exceeded the respective criteria.'))),
+             h4(strong('Single Sample Maximum = 235 CFU / 100 mL')),
+             DT::dataTableOutput(ns('exceedancesOldStdTableSingleSiteSTV')), 
+             h4(strong('Monthly Geomean = 126 CFU / 100 mL')),
+             DT::dataTableOutput(ns('exceedancesOldStdTableSingleSitegeomean')),
+             br()),
+      column(6,
+             br(),br(),br(),
+             h5('Individual E. coli exceedance statistics for the ',span(strong('selected site')),' are highlighted below.'),
+             DT::dataTableOutput(ns("oldStdTableSingleSite"))))
   )
 }
 
 
 EcoliPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedAbove, analyzedData){
   ns <- session$ns
-  
-  # Doesn't work bc analyzedData could be from a different station  
-  # Select One station for individual review
-  #  output$oneStationSelectionUI <- renderUI({
-  #    req(stationSelectedAbove)
-  #    selectInput(ns('oneStationSelection'),strong('Select Station to Review'),choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))),#unique(AUdata())$FDT_STA_ID,
-  #                width='300px', selected = stationSelectedAbove())})
   
   oneStation <- reactive({
     filter(AUdata(), FDT_STA_ID %in% as.character(stationSelectedAbove())) %>% #input$oneStationSelection) %>%
@@ -86,8 +88,9 @@ EcoliPlotlySingleStation <- function(input,output,session, AUdata, stationSelect
   # Bring in pre analyzed data to expedite process
   oneStationAnalysis <- reactive({analyzedData()})# bc not updating in full app unless this is reactive
   oneStationDecisionData <- reactive({oneStationAnalysis()[['associatedDecisionData']][[1]]}) # bc not updating in full app unless this is reactive
-  
-  #output$test <- renderPrint({analyzedData()})
+  oneStationRecreationDecisionData <- reactive({req(oneStation())
+    bacteriaAssessmentDecision( # NEW for IR2024, bacteria only assessed in two most recent years of assessment period
+      filter(oneStation(), between(FDT_DATE_TIME, assessmentPeriod[1] + years(4), assessmentPeriod[2])), 'ECOLI', 'LEVEL_ECOLI', 10, 410, 126)     })
   
   
   # Button to visualize modal table of available parameter data
@@ -116,13 +119,19 @@ EcoliPlotlySingleStation <- function(input,output,session, AUdata, stationSelect
       formatStyle(c('ECOLI','RMK_ECOLI', 'LEVEL_ECOLI'), 'LEVEL_ECOLI', backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray'))
   })
   
-  output$plotly <- renderPlotly({
-    req(oneStation())
+  output$plotly <- renderPlotly({    req(oneStation())
     dat <- oneStation() %>%
       mutate(newSTV = 410, geomean = 126, oldSTV = 235)
     dat$SampleDate <- as.POSIXct(dat$FDT_DATE_TIME, format="%m/%d/%y")
+    
+    if(max(dat$ECOLI, na.rm = T) * 1.1 > 410){boxHeight <- max(dat$ECOLI, na.rm = T) * 1.1}else{boxHeight <- 410}
+    box1 <- data.frame(x = c(assessmentPeriod[1]+ years(4), assessmentPeriod[1]+ years(4), assessmentPeriod[2],assessmentPeriod[2]),
+                       y = c(0, boxHeight, boxHeight, 0))
+    
     plot_ly(data=dat) %>%
-      add_markers(x= ~SampleDate, y= ~ECOLI,mode = 'scatter', name="E. coli (CFU / 100 mL)", marker = list(color= '#535559'),
+      add_polygons(data = box1, x = ~x, y = ~y, fillcolor = "#949391",opacity=0.6, line = list(width = 0),
+                   hoverinfo="text", name =paste('Most Recent Two Years of Assessment Period')) %>%
+      add_markers(data=dat, x= ~SampleDate, y= ~ECOLI,mode = 'scatter', name="E. coli (CFU / 100 mL)", marker = list(color= '#535559'),
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
@@ -141,9 +150,8 @@ EcoliPlotlySingleStation <- function(input,output,session, AUdata, stationSelect
   
   ### New standard ----------------------------------------------------------------------------------
   
-  output$exceedancesNEWStdTableSingleSite <- DT::renderDataTable({
-    req(oneStation(),!is.na(oneStationDecisionData()))
-    z <- oneStationDecisionData() %>% 
+  output$exceedancesNEWStdTableSingleSite <- DT::renderDataTable({ req(oneStation(),!is.na(oneStationRecreationDecisionData()))
+    z <- oneStationRecreationDecisionData()[['associatedDecisionData']][[1]] %>% 
       filter(`STV Exceedances In Window` > 0 | `Geomean In Window` > 126) %>%
       dplyr::select(-associatedData) %>% # remove embedded tibble to make table work
       mutate(`Date Window Starts` = as.Date(`Date Window Starts`),
@@ -151,11 +159,70 @@ EcoliPlotlySingleStation <- function(input,output,session, AUdata, stationSelect
     DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='ti'), selection = 'none')  })
   
   
-  output$newStdTableSingleSite <- DT::renderDataTable({
-    req(oneStation(),oneStationAnalysis())
-    z <- oneStationAnalysis() %>% 
+  output$newStdTableSingleSite <- DT::renderDataTable({  req(oneStationRecreationDecisionData())
+    z <- oneStationRecreationDecisionData() %>%
       dplyr::select(ECOLI_EXC:ECOLI_GM_SAMP, 'Verbose Assessment Decision' = ECOLI_STATECOLI_VERBOSE) #only grab decision
     DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'), selection = 'none') })
+  
+  
+  
+  ### Raw Data and Individual window analysis
+  
+  output$rawData <- DT::renderDataTable({    req(oneStation())
+    z <- dplyr::select(oneStation(), FDT_STA_ID, FDT_DATE_TIME, ECOLI, RMK_ECOLI, LEVEL_ECOLI)  %>% 
+      mutate(FDT_DATE_TIME = as.Date(FDT_DATE_TIME, format = '%Y-%m-%D %H:%M:S'),
+             RecValid = ifelse(FDT_DATE_TIME >= assessmentPeriod[1] + years(4), 1, NA))
+    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "400px", dom='ti'),
+                  selection = 'single')  %>% 
+      formatStyle('RecValid',  target = 'row', backgroundColor = styleEqual(c(1), c('lightgray')))})
+  
+  
+  windowData <- reactive({ req(oneStation(), input$rawData_rows_selected, !is.na(oneStationDecisionData()))
+    windowDat <- filter(oneStationDecisionData(), as.character(`Date Window Starts`) %in% as.character(as.Date(oneStation()$FDT_DATE_TIME[input$rawData_rows_selected]))) %>% #input$windowChoice_) %>%
+      dplyr::select( associatedData) %>%
+      unnest(cols = c(associatedData)) %>%
+      mutate(newSTV = 410, geomeanLimit = 126,
+             `Date Time` = as.POSIXct(strptime(FDT_DATE_TIME, format="%Y-%m-%d")))
+    bind_rows(windowDat,
+              tibble(`Date Time` = c(min(windowDat$`Date Time`)- days(5), max(windowDat$`Date Time`) + days(5)),
+                     newSTV = 410, geomeanLimit = 126))  })
+  
+  
+  output$plotlyZoom <- renderPlotly({ req(windowData(), oneStation(), !is.na(oneStationDecisionData()))
+    
+    windowData <- windowData()
+    
+    plot_ly(data=windowData) %>%
+      add_markers(x= ~`Date Time`, y= ~Value,mode = 'scatter', name="E. coli (CFU / 100 mL)", marker = list(color= '#535559'),
+                  hoverinfo="text",text=~paste(sep="<br>",
+                                               paste("Date: ",`Date Time`),
+                                               paste("E. coli: ",Value,"CFU / 100 mL"))) %>%
+      add_lines(data=windowData, x=~`Date Time`, y=~geomean, mode='line', line = list(color = 'orange', dash= 'dash'),
+                hoverinfo = "text", text= ~paste("Window Geomean: ", format(geomean,digits=3)," CFU / 100 mL", sep=''), 
+                name="Window Geomean") %>%
+      add_lines(data=windowData, x=~`Date Time`,y=~newSTV, mode='line', line = list(color = '#484a4c',dash = 'dot'),
+                hoverinfo = "text", text= "New STV: 410 CFU / 100 mL", name="New STV: 410 CFU / 100 mL") %>%
+      add_lines(data=windowData, x=~`Date Time`,y=~geomeanLimit, mode='line', line = list(color = 'black', dash= 'dash'),
+                hoverinfo = "text", text= "Geomean Criteria: 126 CFU / 100 mL", name="Geomean Criteria: 126 CFU / 100 mL") %>%
+      layout(showlegend=FALSE,
+             yaxis=list(title="E. coli (CFU / 100 mL)"),
+             xaxis=list(title="Sample Date",tickfont = list(size = 10))) 
+  })
+  
+  output$analysisTableZoom <- DT::renderDataTable({    req(!is.na(oneStationDecisionData()), nrow(windowData()) > 0)
+    z <- oneStationDecisionData()[input$rawData_rows_selected,] %>%
+      dplyr::select(-associatedData) # remove embedded tibble to make table work
+    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "140px", dom='t'), selection = 'none')  })
+  
+  
+  
+  output$analysisTable <- DT::renderDataTable({    req(!is.na(oneStationDecisionData()))
+    z <- oneStationDecisionData() %>%
+      dplyr::select(-associatedData) %>% # remove embedded tibble to make table work
+      mutate(RecValid = ifelse(`Date Window Starts` >= assessmentPeriod[1] + years(4), 1, NA))
+    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "400px", dom='ti'), 
+                  selection = 'none')   %>% 
+      formatStyle('RecValid',  target = 'row', backgroundColor = styleEqual(c(1), c('lightgray')))})
   
   
   #### Old Standard ---------------------------------------------------------------------------------
@@ -194,81 +261,6 @@ EcoliPlotlySingleStation <- function(input,output,session, AUdata, stationSelect
   })
   
   
-  ### Raw Data and Individual window analysis
-  
-  output$rawData <- DT::renderDataTable({
-    req(oneStation())
-    z <- dplyr::select(oneStation(), FDT_STA_ID, FDT_DATE_TIME, ECOLI, RMK_ECOLI, LEVEL_ECOLI) %>% 
-      mutate(FDT_DATE_TIME = as.Date(FDT_DATE_TIME, format = '%Y-%m-%D %H:%M:S'))
-    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "400px", dom='ti'),
-                  selection = 'single')  })
-  
-  #output$windowChoice <- renderUI({
-  #  req(oneStationAnalysis(), !is.na(oneStationDecisionData()))
-  #  fluidRow(
-  #    column(4, selectInput(ns('windowChoice_'),'Select 90 day window start date',
-  #                          choices = unique(oneStationDecisionData()$`Date Window Starts`), width = '100%')),
-  #    column(8, helpText('Orange line corresponds to the window geomean; wide black dashed line
-  #                       corresponds to the geomean criteria; thin black dashed line corresponds
-  #                       to the STV limit.')))})
-  
-  windowData <- reactive({ req(oneStation(), input$rawData_rows_selected, !is.na(oneStationDecisionData()))
-    windowDat <- filter(oneStationDecisionData(), as.character(`Date Window Starts`) %in% as.character(as.Date(oneStation()$FDT_DATE_TIME[input$rawData_rows_selected]))) %>% #input$windowChoice_) %>%
-      dplyr::select( associatedData) %>%
-      unnest(cols = c(associatedData)) %>%
-      mutate(newSTV = 410, geomeanLimit = 126,
-             `Date Time` = as.POSIXct(strptime(FDT_DATE_TIME, format="%Y-%m-%d")))
-    bind_rows(windowDat,
-              tibble(`Date Time` = c(min(windowDat$`Date Time`)- days(5), max(windowDat$`Date Time`) + days(5)),
-                     newSTV = 410, geomeanLimit = 126))  })
-  
-  output$test <- renderPrint({
-    windowData()
-  })
-  
-  
-  
-  
-  output$plotlyZoom <- renderPlotly({
-    req(windowData(), oneStation(), !is.na(oneStationDecisionData()))
-    
-    windowData <- windowData()
-    
-    plot_ly(data=windowData) %>%
-      add_markers(x= ~`Date Time`, y= ~Value,mode = 'scatter', name="E. coli (CFU / 100 mL)", marker = list(color= '#535559'),
-                  hoverinfo="text",text=~paste(sep="<br>",
-                                               paste("Date: ",`Date Time`),
-                                               paste("E. coli: ",Value,"CFU / 100 mL"))) %>%
-      add_lines(data=windowData, x=~`Date Time`, y=~geomean, mode='line', line = list(color = 'orange', dash= 'dash'),
-                hoverinfo = "text", text= ~paste("Window Geomean: ", format(geomean,digits=3)," CFU / 100 mL", sep=''), 
-                name="Window Geomean") %>%
-      add_lines(data=windowData, x=~`Date Time`,y=~newSTV, mode='line', line = list(color = '#484a4c',dash = 'dot'),
-                hoverinfo = "text", text= "New STV: 410 CFU / 100 mL", name="New STV: 410 CFU / 100 mL") %>%
-      add_lines(data=windowData, x=~`Date Time`,y=~geomeanLimit, mode='line', line = list(color = 'black', dash= 'dash'),
-                hoverinfo = "text", text= "Geomean Criteria: 126 CFU / 100 mL", name="Geomean Criteria: 126 CFU / 100 mL") %>%
-      layout(showlegend=FALSE,
-             yaxis=list(title="E. coli (CFU / 100 mL)"),
-             xaxis=list(title="Sample Date",tickfont = list(size = 10))) 
-  })
-  
-  output$analysisTableZoom <- DT::renderDataTable({
-    req(!is.na(oneStationDecisionData()), nrow(windowData()) > 0)
-    z <- oneStationDecisionData()[input$rawData_rows_selected,] %>%
-      dplyr::select(-associatedData) # remove embedded tibble to make table work
-    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "140px", dom='t'), selection = 'none')  })
-  
-  
-  
-  output$analysisTable <- DT::renderDataTable({
-    req(!is.na(oneStationDecisionData()))
-    z <- oneStationDecisionData() %>%
-      dplyr::select(-associatedData) # remove embedded tibble to make table work
-    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "400px", dom='ti'), selection = 'none')  })
-  
-  
-  # these kill app when shifting to stations with no bacteria data
-  #DTproxy = dataTableProxy('analysisTable')
-  # observeEvent(nrow(windowData()) > 0, {
-  #  DTproxy %>% selectRows(as.numeric(input$rawData_rows_selected)) })
-  
 }
+
+

@@ -14,7 +14,8 @@ EcoliPlotlyAUUI <- function(id){
                column(6,actionButton(ns('reviewData'),"Review Raw Parameter Data",class='btn-block', width = '250px'))),
       helpText('All data presented in the interactive plot is raw data. Rounding rules are appropriately applied to the 
                assessment functions utilized by the application. Each unique station is colored a different color on the 
-               plot below.'),
+               plot below. The gray box indicates the data window valid for recreational use assessment for the current 
+               assessment period.'),
       #verbatimTextOutput(ns('test')),
       plotlyOutput(ns('plotly')),
       br(),hr(),br(),
@@ -33,6 +34,10 @@ EcoliPlotlyAUUI <- function(id){
                br()),
         column(6, br(), br(),br(), br(),br(), br(),br(), br(),
                h5('E. coli exceedance statistics for the ',span(strong('selected Assessment Unit')),' are highlighted below.'),
+               h5("Note: This analysis is based only on data collected during the ",span(strong('two most recent calendar years of the six-year assessment window')),". For the ",
+                  assessmentCycle, " IR cycle this would mean only bacteria data collected between January 1, ",
+                  year(assessmentPeriod[1] + years(4)),
+                  " and  December 31, ", year(assessmentPeriod[2]), " is assessed for recreation use support."),
                DT::dataTableOutput(ns("newStdTableAU")),
                h4(strong('See below section for detailed analysis with new recreation standard.')),
                br())),
@@ -44,7 +49,7 @@ EcoliPlotlyAUUI <- function(id){
       fluidRow(
         column(4, helpText('Below is the raw daily median calculation associated with the ',span('selected AU.'),' Click on a row to reveal the
                            data included in the selected 90 day window in the plot to the right and to highlight the specific 
-                           assessment logic in the table below the plot.'), 
+                           assessment logic in the table below the plot.  Data valid for recreational use assessment are colored in gray.'), 
                h5(strong('Raw Data')),DT::dataTableOutput(ns('rawData'))),
         column(8, helpText('Click a row on the table to left to reveal a detailed interactive plot of the data
                            included in the selected 90 day window. The orange line corresponds to the window geomean; wide black dashed line
@@ -55,6 +60,10 @@ EcoliPlotlyAUUI <- function(id){
       br(), br(),
       h5(strong('Analyzed Data (Each window with an individual STV and geomean assessment decisions)')),
       helpText('This dataset shows all assessment logic for each 90 day window assessment.'),
+      helpText('Per assessment guidance, each 90-day period that is assessed should be evaluated using a dataset containing at least one sample that is not 
+               used in a preceding or subsequent 90-day period. In practice, all data collected begin a rolling 90-day period; however, the field called 
+               `Valid Assessment Window` indicates whether a given window contains unique data for analysis. All suggested assessment decisions are only based
+               upon data where `Valid Assessment Window` are true.'),
       DT::dataTableOutput(ns('analysisTable')))
   )
 }
@@ -68,6 +77,11 @@ EcoliPlotlyAU <- function(input,output,session, AUdata, medianAUdistinct, median
   # Bring in pre analyzed data to expedite process
   oneAUAnalysis <- reactive({analyzedData()})# bc not updating in full app unless this is reactive
   oneAUDecisionData <- reactive({ oneAUAnalysis()[['associatedDecisionData']][[1]]}) # bc not updating in full app unless this is reactive
+  oneAURecreationDecisionData <- reactive({req(AU())
+    bacteriaAssessmentDecision( # NEW for IR2024, bacteria only assessed in two most recent years of assessment period
+      filter(medianAUForAnalysis(), between(FDT_DATE_TIME, assessmentPeriod[1] + years(4), assessmentPeriod[2])), 'ECOLI', 'LEVEL_ECOLI', 10, 410, 126)     })
+  
+  
   
   # Button to visualize modal table of available parameter data
   observeEvent(input$reviewData,{
@@ -94,8 +108,16 @@ EcoliPlotlyAU <- function(input,output,session, AUdata, medianAUdistinct, median
   output$plotly <- renderPlotly({    req(medianAUdistinct())
     dat <- medianAUdistinct() %>%
       mutate(newSTV = 410, geomean = 126, oldSTV = 235)
+    
+    if(max(dat$ECOLI, na.rm = T) * 1.1 > 410){boxHeight <- max(dat$ECOLI, na.rm = T) * 1.1}else{boxHeight <- 410}
+    box1 <- data.frame(x = c(assessmentPeriod[1]+ years(4), assessmentPeriod[1]+ years(4), assessmentPeriod[2],assessmentPeriod[2]),
+                       y = c(0, boxHeight, boxHeight, 0))
+    
+    
     plot_ly(data=dat) %>%
-      add_markers(x= ~SampleDate, y= ~ECOLI,mode = 'scatter', name="E. coli (CFU / 100 mL)", 
+      add_polygons(data = box1, x = ~x, y = ~y, fillcolor = "#949391",opacity=0.6, line = list(width = 0),
+                   hoverinfo="text", name =paste('Most Recent Two Years of Assessment Period')) %>%
+      add_markers(data=dat, x= ~SampleDate, y= ~ECOLI,mode = 'scatter', name="E. coli (CFU / 100 mL)", 
                   color = ~FDT_STA_ID, #list(color= '#535559'),
                   colors = "Dark2",
                   hoverinfo="text",text=~paste(sep="<br>",
@@ -116,9 +138,8 @@ EcoliPlotlyAU <- function(input,output,session, AUdata, medianAUdistinct, median
   
   ### New standard ----------------------------------------------------------------------------------
   
-  output$exceedancesNEWStdTableAU <- DT::renderDataTable({
-    req(AU(),!is.na(oneAUDecisionData()))
-    z <- oneAUDecisionData() %>% 
+  output$exceedancesNEWStdTableAU <- DT::renderDataTable({    req(AU(), !is.na(oneAURecreationDecisionData()))
+    z <- oneAURecreationDecisionData()[['associatedDecisionData']][[1]] %>% 
       filter(`STV Exceedances In Window` > 0 | `Geomean In Window` > 126) %>%
       dplyr::select(-associatedData) %>% # remove embedded tibble to make table work
       mutate(`Date Window Starts` = as.Date(`Date Window Starts`),
@@ -126,20 +147,20 @@ EcoliPlotlyAU <- function(input,output,session, AUdata, medianAUdistinct, median
     DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'), selection = 'none')  })
   
   
-  output$newStdTableAU <- DT::renderDataTable({
-    req(AU(),oneAUAnalysis())
-    z <- oneAUAnalysis() %>% 
+  output$newStdTableAU <- DT::renderDataTable({    req(AU(), oneAURecreationDecisionData())
+    z <- oneAURecreationDecisionData() %>% 
       dplyr::select(ECOLI_EXC:ECOLI_GM_SAMP, 'Verbose Assessment Decision' = ECOLI_STATECOLI_VERBOSE) #only grab decision
     DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'), selection = 'none') })
   
   ### Raw Data and Individual window analysis
   
-  output$rawData <- DT::renderDataTable({
-    req(medianAUForAnalysis())
+  output$rawData <- DT::renderDataTable({    req(medianAUForAnalysis())
     z <- dplyr::select(medianAUForAnalysis(), SampleDate, ECOLI) %>% 
-      rename('Daily E.coli Median' = 'ECOLI')
+      rename('Daily E.coli Median' = 'ECOLI')  %>% 
+      mutate(RecValid = ifelse(SampleDate >= as.Date(assessmentPeriod[1] + years(4)), 1, NA))
     DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "400px", dom='ti'),
-                  selection = 'single')  })
+                  selection = 'single')   %>% 
+      formatStyle('RecValid',  target = 'row', backgroundColor = styleEqual(c(1), c('lightgray')))})
   
   windowData <- reactive({ req(AU(), input$rawData_rows_selected, !is.na(oneAUDecisionData()))
     windowDat <- filter(oneAUDecisionData(), as.character(`Date Window Starts`) %in% as.character(as.Date(medianAUForAnalysis()$SampleDate[input$rawData_rows_selected]))) %>% #input$windowChoice_) %>%
