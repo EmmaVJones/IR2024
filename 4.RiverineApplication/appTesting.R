@@ -495,9 +495,15 @@ stationTableOutput <- bind_rows(stationsTemplate,
                                         annualRollingExceedanceSummary(
                                           annualRollingExceedanceAnalysis(ammoniaAnalysisStation, yearsToRoll = 3)), parameterAbbreviation = "AMMONIA"),
                                       
-                                      # Roger's water column metals analysis, transcribed
-                                      metalsData(filter(WCmetals, Station_Id %in% stationData$FDT_STA_ID), 'WAT_MET'),
-                                      dplyr::select(waterToxics, -PWSinfo), 
+                                      # Water Column Metals
+                                      filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID) %>% 
+                                        metalsAnalysis(stationData, WER= 1) %>% 
+                                        metalsAssessmentFunction(), 
+                                      
+                                      # Water Toxics combo fields
+                                      waterToxics, 
+                                      
+                                      
                                       # Roger's sediment metals analysis, transcribed
                                       metalsData(filter(Smetals, Station_Id %in% stationData$FDT_STA_ID), 'SED_MET'),
                                       # Mark's sediment PCB results, flagged

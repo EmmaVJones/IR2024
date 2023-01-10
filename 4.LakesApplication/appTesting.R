@@ -176,7 +176,7 @@ lakeSelection_ <- regionalAUs %>%
   distinct(Lake_Name) %>% 
   arrange(Lake_Name) %>% 
   pull()
-lakeSelection <- lakeSelection_[7]
+lakeSelection <- "Cherrystone Reservoir"#lakeSelection_[7]
 
 AUs <- filter(regionalAUs, Lake_Name %in% lakeSelection & ASSESS_REG %in% DEQregionSelection)
 lake_filter <- filter_at(stationTable, vars(starts_with('ID305B')), any_vars(. %in% AUs$ID305B)) 
@@ -184,6 +184,51 @@ lakeStations <- lake_filter %>%
   st_as_sf(coords = c("LONGITUDE", "LATITUDE"), 
            remove = F, # don't remove these lat/lon cols from df
            crs = 4326)  # add projection, needs to be geographic for now bc entering lat/lng
+
+
+### ------- Just for testing, skip front matter and jump to picking station for module testing---------------------------------------------------------
+# Pull Conventionals data for selected lake on click
+conventionalsLake <- filter(conventionals, FDT_STA_ID %in% lake_filter$STATION_ID) %>%
+  left_join(dplyr::select(stationTable, STATION_ID:VAHU6, lakeStation,
+                          WQS_ID:`Total Phosphorus (mg/L)`),
+            #WQS_ID:`Max Temperature (C)`), 
+            by = c('FDT_STA_ID' = 'STATION_ID')) %>%
+  filter(!is.na(ID305B_1)) %>%
+  # Special Standards Correction step. This is done on the actual data bc some special standards have temporal components
+  pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
+  temperatureSpecialStandardsCorrection() %>% # correct temperature special standards where necessary
+  thermoclineDepth()  # adds thermocline information and SampleDate
+
+
+# Allow user to select from available AUs to investigate further
+AUselectionOptions <- unique(dplyr::select(lake_filter, ID305B_1:ID305B_10) %>% 
+                               mutate_at(vars(starts_with("ID305B")), as.character) %>%
+                               pivot_longer(ID305B_1:ID305B_10, names_to = 'ID305B', values_to = 'keep') %>%
+                               pull(keep) )
+AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))]
+
+inputAUselection <- AUselectionOptions[1]
+AUselection <- filter(regionalAUs, ID305B %in% inputAUselection) %>% st_set_geometry(NULL) %>% as.data.frame()
+
+
+# Allow user to select from available stations in chosen AU to investigate further
+stationSelectionOptions <- filter_at(lake_filter, vars(starts_with("ID305B")), any_vars(. %in% inputAUselection)) %>%
+  distinct(STATION_ID) %>% arrange(STATION_ID) %>%  pull()
+stationSelection <- stationSelectionOptions[1]
+
+# Pull conventionals data for just selected AU
+AUData <- filter_at(conventionalsLake, vars(starts_with("ID305B")), any_vars(. %in% inputAUselection) ) 
+
+# Pull conventionals data for just selected station
+stationData <- filter(AUData, FDT_STA_ID %in% stationSelection) 
+### ------- End Just for testing, skip front matter and jump to picking station for module testing---------------------------------------------------------
+
+
+
+
+
+
+
 
   
 # Lake Map
@@ -323,3 +368,190 @@ DT::datatable(z, options= list(pageLength = nrow(z), scrollY = "250px", dom='t')
               selection = 'none')  
 
 
+
+
+
+## Station Table View Section
+
+# Run longer analyses first
+# still running both of these on entire dataset for visualization purposes and so assessors can understand previous assessment decisions
+ecoli <- bacteriaAssessmentDecision(stationData, 'ECOLI', 'LEVEL_ECOLI', 10, 410, 126)
+# save individual ecoli results for later
+AUmedians <- AUData %>%
+    filter(ID305B_1 %in% inputAUselection) %>%# run ecoli by only 1 AU at a time
+    group_by(SampleDate) %>%
+    filter(!is.na(ECOLI)) %>%
+    mutate(EcoliDailyMedian = median(ECOLI, na.rm = TRUE)) %>%
+    dplyr::select(ID305B_1, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, SampleDate, EcoliDailyMedian, ECOLI, RMK_ECOLI, LEVEL_ECOLI) %>%
+    arrange(SampleDate) %>% ungroup() 
+
+# need to run analysis on only one point per day
+AUmediansForAnalysis <- AUmedians %>% 
+    filter(! LEVEL_ECOLI %in% c('Level I', 'Level II')) %>%
+    mutate(ECOLI_Station = ECOLI,
+           ECOLI = EcoliDailyMedian,
+           FDT_STA_ID = unique(ID305B_1),
+           FDT_DATE_TIME = SampleDate) %>%
+    dplyr::select(FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, SampleDate, ECOLI, ECOLI_Station, RMK_ECOLI, LEVEL_ECOLI) %>%
+    distinct(SampleDate, .keep_all = T) 
+
+ecoliAU <-  bacteriaAssessmentDecision(AUmediansForAnalysis, 'ECOLI', 'LEVEL_ECOLI', 10, 410, 126)
+
+
+z <- filter(ammoniaAnalysis, StationID %in% unique(stationData$FDT_STA_ID)) %>%
+  map(1) 
+ammoniaAnalysisStation <- z$AmmoniaAnalysis   
+
+# Water Toxics
+# PWS stuff
+if(nrow(stationData) > 0){
+  if(is.na(unique(stationData$PWS))  ){
+    PWSconcat <- tibble(#STATION_ID = unique(stationData$FDT_STA_ID),
+      PWS= NA)
+  } else {
+    PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData$FDT_STA_ID)),
+      assessPWSsummary(assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10), 'PWS_Nitrate'),
+      assessPWSsummary(assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250), 'PWS_Chloride'),
+      assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate')) %>%
+      dplyr::select(-ends_with('exceedanceRate')) }
+  
+  # chloride assessment if data exists
+  if(nrow(filter(stationData, !is.na(CHLORIDE_mg_L)))){
+    chlorideFreshwater <- rollingWindowSummary(
+      annualRollingExceedanceSummary(
+        annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData), yearsToRoll = 3, aquaticLifeUse = TRUE) ), "CHL")
+  } else {
+    chlorideFreshwater <- tibble(CHL_EXC = NA, CHL_STAT= NA)}
+  
+  # Water toxics combination with PWS, Chloride Freshwater, and water column PCB data
+  if(nrow(bind_cols(PWSconcat,
+                    chlorideFreshwater,
+                    PCBmetalsDataExists(filter(markPCB, str_detect(SampleMedia, 'Water')) %>%
+                                        filter(StationID %in% stationData$FDT_STA_ID), 'WAT_TOX')) %>%
+          dplyr::select(contains(c('_EXC','_STAT'))) %>%
+          mutate(across( everything(),  as.character)) %>%
+          pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) ) >= 1) {
+    WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = 'Review',
+                       PWSinfo = list(PWSconcat))# add in PWS information so you don't need to run this analysis again
+  } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
+                              PWSinfo = list(PWSconcat))}# add in PWS information so you don't need to run this analysis again
+} else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
+                            PWSinfo = list(PWSconcat))}# add in PWS information so you don't need to run this analysis again
+waterToxics <- WCtoxics
+
+
+# Create station table row for each site
+stationTableOutput <- bind_rows(stationsTemplate,
+                                cbind(StationTableStartingData(stationData),
+                                      tempExceedances(stationData) %>% quickStats('TEMP'),
+                                      DOExceedances_Min(stationData) %>% quickStats('DO'), 
+                                      pHExceedances(stationData) %>% quickStats('PH'),
+                                      
+                                      # this runs the bacteria assessment again (unfortunately), but it suppresses 
+                                      # any unnecessary bacteria fields for the stations table to avoid unnecessary flags
+                                      # and it only runs the 2 year analysis per IR2024 rules
+                                      bacteriaAssessmentDecisionClass( # NEW for IR2024, bacteria only assessed in two most recent years of assessment period
+                                        filter(stationData, between(FDT_DATE_TIME, assessmentPeriod[1] + years(4), assessmentPeriod[2])),
+                                        uniqueStationName = unique(stationData$FDT_STA_ID)),
+                                      
+                                      rollingWindowSummary(
+                                        annualRollingExceedanceSummary(
+                                          annualRollingExceedanceAnalysis(ammoniaAnalysisStation, yearsToRoll = 3, aquaticLifeUse = FALSE)), parameterAbbreviation = "AMMONIA"),
+                                      
+                                      # Water Column Metals
+                                      filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID) %>% 
+                                        metalsAnalysis(stationData, WER= 1) %>% 
+                                        metalsAssessmentFunction(), 
+                                      
+                                      # Water Toxics combo fields
+                                      waterToxics, 
+                                      
+                                      
+                                      # Roger's sediment metals analysis, transcribed
+                                      metalsData(filter(Smetals, Station_Id %in% stationData$FDT_STA_ID), 'SED_MET'),
+                                      
+                                      # Mark's sediment PCB results, flagged
+                                      PCBmetalsDataExists(filter(markPCB, str_detect(SampleMedia, 'Sediment')) %>%
+                                                            filter(StationID %in%  stationData$FDT_STA_ID), 'SED_TOX'),
+                                      # Gabe's fish metals results, flagged
+                                      PCBmetalsDataExists(filter(fishMetals, Station_ID %in% stationData$FDT_STA_ID), 'FISH_MET'),
+                                      # Gabe's fish PCB results, flagged
+                                      PCBmetalsDataExists(filter(fishPCB, `DEQ rivermile` %in%  stationData$FDT_STA_ID), 'FISH_TOX'),
+                                      # add in benthic placeholders
+                                      tibble(BENTHIC_STAT = NA, BENTHIC_WOE_CAT= NA, BIBI_SCORE = NA),
+                                      TP_Assessment(stationData),
+                                      chlA_Assessment(stationData) ) %>%
+                                  # add in real comments from uploaded station table
+                                  left_join(dplyr::select(stationTable, STATION_ID, COMMENTS),
+                                            by = 'STATION_ID') %>% 
+                                  dplyr::select(-ends_with(c('exceedanceRate','Assessment Decision', 'VERBOSE', 'StationID', "PWSinfo",
+                                                             'BACTERIADECISION', 'BACTERIASTATS')))) %>% 
+  filter(!is.na(STATION_ID)) 
+
+
+
+# Display marked up station table row for each site
+datatable(stationTableOutput, extensions = 'Buttons', escape=F, rownames = F, editable = TRUE,
+            options= list(scrollX = TRUE, pageLength = nrow(stationTableOutput),
+                          # adjust COMMENTS column width
+                          autoWidth = TRUE, columnDefs = list(list(width = '400px', targets = c(71))), # DT starts counting at 0
+                          dom='Bt', buttons=list('copy',
+                                                 list(extend='csv',filename=paste('AssessmentResults_',paste(assessmentCycle,stationSelection, collapse = "_"),Sys.Date(),sep='')),
+                                                 list(extend='excel',filename=paste('AssessmentResults_',paste(assessmentCycle,stationSelection, collapse = "_"),Sys.Date(),sep='')))),
+            selection = 'none') %>% 
+    formatStyle(c('TEMP_EXC','TEMP_SAMP','TEMP_STAT'), 'TEMP_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
+    formatStyle(c('DO_EXC','DO_SAMP','DO_STAT'), 'DO_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
+    formatStyle(c('PH_EXC','PH_SAMP','PH_STAT'), 'PH_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
+    formatStyle(c('ECOLI_EXC','ECOLI_SAMP','ECOLI_GM_EXC','ECOLI_GM_SAMP','ECOLI_STAT'), 'ECOLI_STAT', backgroundColor = styleEqual(c('IM'), c('red'))) %>%
+    formatStyle(c('AMMONIA_EXC','AMMONIA_STAT'), 'AMMONIA_STAT', backgroundColor = styleEqual(c('Review', 'IM'), c('yellow','red'))) %>%
+    formatStyle(c('WAT_MET_EXC','WAT_MET_STAT'), 'WAT_MET_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
+    formatStyle(c('WAT_TOX_EXC','WAT_TOX_STAT'), 'WAT_TOX_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
+    formatStyle(c('SED_MET_EXC','SED_MET_STAT'), 'SED_MET_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%   
+    formatStyle(c('SED_TOX_EXC','SED_TOX_STAT'), 'SED_TOX_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
+    formatStyle(c('FISH_MET_EXC','FISH_MET_STAT'), 'FISH_MET_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%   
+    formatStyle(c('FISH_TOX_EXC','FISH_TOX_STAT'), 'FISH_TOX_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
+    formatStyle(c('BENTHIC_STAT'), 'BENTHIC_STAT', backgroundColor = styleEqual(c('Review'), c('yellow'))) %>%
+    formatStyle(c('NUT_TP_EXC','NUT_TP_SAMP'), 'NUT_TP_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>% 
+    formatStyle(c('NUT_CHLA_EXC','NUT_CHLA_SAMP'), 'NUT_CHLA_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red')))  
+
+
+## Water Intake proximity flag for station
+if(unique(stationData$FDT_STA_ID) %in% intakeSites$FDT_STA_ID){
+    print('This station is within 100 meters of a drinking water intake. Please review whether the station 
+                should be assessed for secondary human health criteria.' ) } 
+
+## PWS table output marked up
+if(is.na(unique(stationData$PWS))){
+  PWSconcat <- tibble(STATION_ID = unique(stationData$FDT_STA_ID),
+                        PWS= 'PWS Standards Do Not Apply To Station')
+    DT::datatable(PWSconcat, escape=F, rownames = F, options= list(scrollX = TRUE, pageLength = nrow(PWSconcat), dom='t'),
+                  selection = 'none')
+    
+  } else {
+    PWSconcat <- waterToxics %>% 
+      dplyr::select(PWSinfo) %>% 
+      unnest(cols = c(PWSinfo)) %>% 
+      dplyr::select(-ends_with('exceedanceRate')) 
+    
+    DT::datatable(PWSconcat, escape=F, rownames = F, options= list(scrollX = TRUE, pageLength = nrow(PWSconcat), dom='t'),
+                  selection = 'none') %>% 
+      formatStyle(c("PWS_Nitrate_EXC","PWS_Nitrate_SAMP","PWS_Nitrate_STAT"), "PWS_Nitrate_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) %>%
+      formatStyle(c("PWS_Chloride_EXC","PWS_Chloride_SAMP","PWS_Chloride_STAT"), "PWS_Chloride_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) %>%
+      formatStyle(c("PWS_Total_Sulfate_EXC","PWS_Total_Sulfate_SAMP","PWS_Total_Sulfate_STAT"), "PWS_Total_Sulfate_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) } 
+
+
+
+#### Data Sub Tab ####---------------------------------------------------------------------------------------------------
+
+
+# Display Data 
+DT::datatable(AUData, extensions = 'Buttons', escape=F, rownames = F, 
+              options= list(scrollX = TRUE, pageLength = nrow(AUData), scrollY = "300px", 
+                            dom='Btf', buttons=list('copy',
+                                                    list(extend='csv',filename=paste('AUData_',paste(stationSelection, collapse = "_"),Sys.Date(),sep='')),
+                                                    list(extend='excel',filename=paste('AUData_',paste(stationSelection, collapse = "_"),Sys.Date(),sep='')))),
+              selection = 'none')
+# Summarize data
+paste(nrow(AUData), 'records were retrieved for',as.character(inputAUselection),sep=' ')
+plyr::count(AUData, vars = c("FDT_STA_ID")) %>% dplyr::rename('Number of Records'='freq')
+withinAssessmentPeriod(AUData)

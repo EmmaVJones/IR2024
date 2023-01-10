@@ -510,9 +510,14 @@ shinyServer(function(input, output, session) {
                                                      annualRollingExceedanceSummary(
                                                        annualRollingExceedanceAnalysis(ammoniaAnalysisStation(), yearsToRoll = 3, aquaticLifeUse = FALSE)), parameterAbbreviation = "AMMONIA"),
                                                    
-                                                   # Roger's water column metals analysis, transcribed
-                                                   metalsData(filter(WCmetals, Station_Id %in% stationData()$FDT_STA_ID), 'WAT_MET'),
+                                                   # Water Column Metals
+                                                   filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID) %>% 
+                                                     metalsAnalysis(stationData, WER= 1) %>% 
+                                                     metalsAssessmentFunction(), 
+                                                   
+                                                   # Water Toxics combo fields
                                                    waterToxics(),
+                                                   
                                                    # Roger's sediment metals analysis, transcribed
                                                    metalsData(filter(Smetals, Station_Id %in% stationData()$FDT_STA_ID), 'SED_MET'),
                                                    # Mark's sediment PCB results, flagged
@@ -535,8 +540,7 @@ shinyServer(function(input, output, session) {
   })
   
   # Display marked up station table row for each site
-  output$stationTableDataSummary <- DT::renderDataTable({
-    req(stationData()$FDT_STA_ID == input$stationSelection, siteData$stationTableOutput)
+  output$stationTableDataSummary <- DT::renderDataTable({    req(stationData()$FDT_STA_ID == input$stationSelection, siteData$stationTableOutput)
     datatable(siteData$stationTableOutput, extensions = 'Buttons', escape=F, rownames = F, editable = TRUE,
               options= list(scrollX = TRUE, pageLength = nrow(siteData$stationTableOutput),
                             # adjust COMMENTS column width

@@ -936,7 +936,15 @@ freshwaterNH3limit <- function(stationData, # dataframe with station data
 #ammoniaAnalysisStation <- freshwaterNH3limit(stationData, trout = TRUE, mussels = TRUE, earlyLife = TRUE)
 
 
-## Metals Functions Updates from Joe
+# old function that needs to be deleted
+## Identify if metals data exists
+metalsData <- function(stationData, metalType){
+  if(nrow(stationData) > 0){
+    dataOut <- tibble(`_EXC` = NA, `_STAT` = 'Review')
+  } else {
+    dataOut <- tibble(`_EXC` = NA, `_STAT` = NA)}
+  names(dataOut) <- paste0(metalType, names(dataOut))
+  return(dataOut)}
 
 # Metals criteria analysis
 metalsCriteriaFunction <- function(ID, Hardness, WER){
