@@ -186,7 +186,7 @@ shinyServer(function(input, output, session) {
   # Pull AU data from server
   regionalAUs <- reactive({ req(input$pullAUs)
     withProgress(message = 'Reading in Large Spatial File',
-                 st_zm(st_as_sf(pin_get('AUreservoir_EVJ', board = 'rsconnect')) ) %>%
+                 st_zm(st_as_sf(pin_get('AUreservoir', board = 'rsconnect')) ) %>%
                    lakeNameStandardization()) })  
   
   
@@ -570,17 +570,17 @@ shinyServer(function(input, output, session) {
   ## Temperature Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(temperaturePlotlySingleStation,'temperature', AUData, stationSelected)
 
-  # ## Dissolved Oxygen Sub Tab ##------------------------------------------------------------------------------------------------------
-  # callModule(DOPlotlySingleStation,'DO', AUData, stationSelected)
-  # 
-  # ## pH Sub Tab ##------------------------------------------------------------------------------------------------------
-  # callModule(pHPlotlySingleStation,'pH', AUData, stationSelected)
-  # 
-  # ## E. coli Sub Tab ##------------------------------------------------------------------------------------------------------
-  # # single station tab
-  # callModule(EcoliPlotlySingleStation,'Ecoli', AUData, stationSelected, ecoli)
-  # # AU tab
-  # callModule(EcoliPlotlyAU,'EcoliAU', AUData, AUmedians, AUmediansForAnalysis, ecoliAU)
-  
+  ## Dissolved Oxygen Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(DOPlotlySingleStation,'DO', AUData, stationSelected)
+
+  ## pH Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(pHPlotlySingleStation,'pH', AUData, stationSelected)
+
+  ## E. coli Sub Tab ##------------------------------------------------------------------------------------------------------
+  # single station tab
+  callModule(EcoliPlotlySingleStation,'Ecoli', AUData, stationSelected, ecoli)
+  # AU tab
+  callModule(EcoliPlotlyAU,'EcoliAU', AUData, AUmedians, AUmediansForAnalysis, ecoliAU)
+
   
 })

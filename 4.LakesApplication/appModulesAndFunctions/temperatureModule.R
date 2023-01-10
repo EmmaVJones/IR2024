@@ -119,6 +119,7 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
     z <- tempExceedances(oneStation()) %>%
       rename("FDT_TEMP" = 'parameter', 'Criteria' = 'limit', 'Parameter Rounded to WQS Format' = 'parameterRound') %>%
       filter(exceeds == TRUE) %>%
+      arrange(FDT_DATE_TIME, FDT_DEPTH) %>% 
       dplyr::select(-exceeds)
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "150px", dom='t'),
               selection = 'none') %>% 
@@ -138,6 +139,7 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
     z <- tempExceedances( filter(AUdata(), !is.na(FDT_TEMP_CELCIUS)) ) %>%
       rename("FDT_TEMP" = 'parameter', 'Criteria' = 'limit', 'Parameter Rounded to WQS Format' = 'parameterRound') %>%
       filter(exceeds == TRUE) %>%
+      arrange(FDT_DATE_TIME, FDT_DEPTH) %>% 
       dplyr::select(-exceeds)
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "150px", dom='t'),
               selection = 'none') %>% 

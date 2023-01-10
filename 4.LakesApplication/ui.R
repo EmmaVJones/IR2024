@@ -190,23 +190,23 @@ shinyUI(fluidPage(theme="yeti.css",
                                                                 helpText('Review each site using the single site visualization section. The results from this analysis are reflected
                                                                          in the TEMP_EXC, TEMP_SAMP, and TEMP_STAT columns in the station table.',
                                                                          span('Users may view AU level assessment results below.', style="color:red")),
-                                                                temperaturePlotlySingleStationUI('temperature'))#,
-                                 #                       tabPanel('Dissolved Oxygen',
-                                 #                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
-                                 #                                         in the DO_EXC, DO_SAMP, and DO_STAT columns in the station table.',
-                                 #                                         span('Users may view AU level assessment results below.', style="color:red")),
-                                 #                                DOPlotlySingleStationUI('DO')),
-                                 #                       tabPanel('pH',
-                                 #                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
-                                 #                                         in the PH_EXC, PH_SAMP, and PH_STAT columns in the station table.',
-                                 #                                         span('Users may view AU level assessment results below.', style="color:red")),
-                                 #                                pHPlotlySingleStationUI('pH')),
-                                 #                       tabPanel('E. coli',
-                                 #                                tabsetPanel(
-                                 #                                  tabPanel('Single Station Analysis',
-                                 #                                           EcoliPlotlySingleStationUI('Ecoli')),
-                                 #                                  tabPanel('Assessment Unit Analysis',
-                                 #                                           EcoliPlotlyAUUI('EcoliAU')))),
+                                                                temperaturePlotlySingleStationUI('temperature')),
+                                                       tabPanel('Dissolved Oxygen',
+                                                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
+                                                                         in the DO_EXC, DO_SAMP, and DO_STAT columns in the station table.',
+                                                                         span('Users may view AU level assessment results below.', style="color:red")),
+                                                                DOPlotlySingleStationUI('DO')),
+                                                       tabPanel('pH',
+                                                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
+                                                                         in the PH_EXC, PH_SAMP, and PH_STAT columns in the station table.',
+                                                                         span('Users may view AU level assessment results below.', style="color:red")),
+                                                                pHPlotlySingleStationUI('pH')),
+                                                       tabPanel('E. coli',
+                                                                tabsetPanel(
+                                                                  tabPanel('Single Station Analysis',
+                                                                           EcoliPlotlySingleStationUI('Ecoli')),
+                                                                  tabPanel('Assessment Unit Analysis',
+                                                                           EcoliPlotlyAUUI('EcoliAU'))))#,
                                  #                       tabPanel('Chlorophyll a',
                                  #                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
                                  #                                         in the NUT_CHLA_EXC, NUT_CHLA_SAMP, and NUT_CHLA_STAT columns in the station table.',
