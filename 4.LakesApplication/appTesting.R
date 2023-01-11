@@ -379,7 +379,7 @@ ecoli <- bacteriaAssessmentDecision(stationData, 'ECOLI', 'LEVEL_ECOLI', 10, 410
 # save individual ecoli results for later
 AUmedians <- AUData %>%
     filter(ID305B_1 %in% inputAUselection) %>%# run ecoli by only 1 AU at a time
-    group_by(SampleDate) %>%
+    group_by(SampleDate, FDT_DEPTH) %>%
     filter(!is.na(ECOLI)) %>%
     mutate(EcoliDailyMedian = median(ECOLI, na.rm = TRUE)) %>%
     dplyr::select(ID305B_1, FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, SampleDate, EcoliDailyMedian, ECOLI, RMK_ECOLI, LEVEL_ECOLI) %>%
@@ -389,13 +389,14 @@ AUmedians <- AUData %>%
 AUmediansForAnalysis <- AUmedians %>% 
     filter(! LEVEL_ECOLI %in% c('Level I', 'Level II')) %>%
     mutate(ECOLI_Station = ECOLI,
+           StationName = FDT_STA_ID,
            ECOLI = EcoliDailyMedian,
            FDT_STA_ID = unique(ID305B_1),
            FDT_DATE_TIME = SampleDate) %>%
-    dplyr::select(FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, SampleDate, ECOLI, ECOLI_Station, RMK_ECOLI, LEVEL_ECOLI) %>%
-    distinct(SampleDate, .keep_all = T) 
+    dplyr::select(FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH, SampleDate, ECOLI, StationName, ECOLI_Station, RMK_ECOLI, LEVEL_ECOLI) # dont run distinct here so extra station data can go to ecoli module
 
-ecoliAU <-  bacteriaAssessmentDecision(AUmediansForAnalysis, 'ECOLI', 'LEVEL_ECOLI', 10, 410, 126)
+ecoliAU <-  bacteriaAssessmentDecision(AUmediansForAnalysis %>%
+                                         distinct(SampleDate, .keep_all = T) , 'ECOLI', 'LEVEL_ECOLI', 10, 410, 126)
 
 
 z <- filter(ammoniaAnalysis, StationID %in% unique(stationData$FDT_STA_ID)) %>%
