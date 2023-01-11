@@ -48,7 +48,6 @@ AmmoniaPlotlySingleStationUI <- function(id){
       
       br(),hr(),br(),
       
-      
       h4(strong('Ammonia Criteria In Depth Analysis')),
       helpText('Review the data windows (identified by each sample date) for each criteria analysis.
                To view the dataset within any window, click the row in the table below to plot data within the window selected.'),
@@ -110,13 +109,13 @@ AmmoniaPlotlySingleStation <- function(input,output,session, AUdata, stationSele
                comment fields is highlighed in yellow (non agency/citizen monitoring Level II), and data NOT CONSIDERED in app is noted in
                orange (non agency/citizen monitoring Level I).'),
       DT::dataTableOutput(ns('parameterData')),
-      size = 'l', easyClose = TRUE))  })
+      easyClose = TRUE))  })
   
   # modal parameter data
   output$parameterData <- DT::renderDataTable({
     req(oneStation())
-    parameterFilter <- dplyr::select(oneStation(),  FDT_STA_ID, GROUP_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_COMMENT,
-                                     AMMONIA_mg_L, RMK_AMMONIA, LEVEL_AMMONIA, `7Q10 Flag Gage`, `7Q10 Flag`)
+    parameterFilter <- dplyr::select(oneStation(), FDT_STA_ID, GROUP_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_COMMENT,
+                                     AMMONIA_mg_L, RMK_AMMONIA, LEVEL_AMMONIA, ThermoclineDepth, LakeStratification, `7Q10 Flag Gage`, `7Q10 Flag`)
     
     DT::datatable(parameterFilter, rownames = FALSE, extensions = c('Buttons',  'FixedColumns'),
                   options= list(dom= 'Bt', pageLength = nrow(parameterFilter), scrollX = TRUE, scrollY = "400px", 
@@ -127,7 +126,8 @@ AmmoniaPlotlySingleStation <- function(input,output,session, AUdata, stationSele
   })
   
   
-  output$plotly <- renderPlotly({    req(oneStation())
+  
+  output$plotly <- renderPlotly({    req(oneStationAnalysis())
     if(nrow(oneStation()) > 0){
       dat <- oneStation()
       dat$SampleDate <- as.POSIXct(dat$FDT_DATE_TIME, format="%m/%d/%y")
@@ -245,4 +245,6 @@ AmmoniaPlotlySingleStation <- function(input,output,session, AUdata, stationSele
   
   output$test <- renderPrint({ oneStationAnalysis()[input$criteriaData_rows_selected, ]})
   
+  
 }
+

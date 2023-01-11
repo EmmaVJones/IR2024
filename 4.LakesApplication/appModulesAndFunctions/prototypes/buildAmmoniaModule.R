@@ -1,3 +1,5 @@
+# work through appTesting.R through the creation of stationData object
+
 AmmoniaPlotlySingleStationUI <- function(id){
   ns <- NS(id)
   tagList(
@@ -47,7 +49,6 @@ AmmoniaPlotlySingleStationUI <- function(id){
       dataTableOutput(ns("stationExceedanceRate")),
       
       br(),hr(),br(),
-      
       
       h4(strong('Ammonia Criteria In Depth Analysis')),
       helpText('Review the data windows (identified by each sample date) for each criteria analysis.
@@ -110,13 +111,13 @@ AmmoniaPlotlySingleStation <- function(input,output,session, AUdata, stationSele
                comment fields is highlighed in yellow (non agency/citizen monitoring Level II), and data NOT CONSIDERED in app is noted in
                orange (non agency/citizen monitoring Level I).'),
       DT::dataTableOutput(ns('parameterData')),
-      size = 'l', easyClose = TRUE))  })
+      easyClose = TRUE))  })
   
   # modal parameter data
   output$parameterData <- DT::renderDataTable({
     req(oneStation())
-    parameterFilter <- dplyr::select(oneStation(),  FDT_STA_ID, GROUP_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_COMMENT,
-                                     AMMONIA_mg_L, RMK_AMMONIA, LEVEL_AMMONIA, `7Q10 Flag Gage`, `7Q10 Flag`)
+    parameterFilter <- dplyr::select(oneStation(), FDT_STA_ID, GROUP_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_COMMENT,
+                                     AMMONIA_mg_L, RMK_AMMONIA, LEVEL_AMMONIA, ThermoclineDepth, LakeStratification, `7Q10 Flag Gage`, `7Q10 Flag`)
     
     DT::datatable(parameterFilter, rownames = FALSE, extensions = c('Buttons',  'FixedColumns'),
                   options= list(dom= 'Bt', pageLength = nrow(parameterFilter), scrollX = TRUE, scrollY = "400px", 
@@ -127,7 +128,8 @@ AmmoniaPlotlySingleStation <- function(input,output,session, AUdata, stationSele
   })
   
   
-  output$plotly <- renderPlotly({    req(oneStation())
+  
+  output$plotly <- renderPlotly({    req(oneStationAnalysis())
     if(nrow(oneStation()) > 0){
       dat <- oneStation()
       dat$SampleDate <- as.POSIXct(dat$FDT_DATE_TIME, format="%m/%d/%y")
@@ -245,4 +247,56 @@ AmmoniaPlotlySingleStation <- function(input,output,session, AUdata, stationSele
   
   output$test <- renderPrint({ oneStationAnalysis()[input$criteriaData_rows_selected, ]})
   
+  
 }
+
+
+
+
+
+ui <- fluidPage(
+  useShinyjs(),
+  helpText('Review each site using the single site visualization section. There are no WQS for Specific Conductivity.'),
+  AmmoniaPlotlySingleStationUI('Ammonia'))
+
+server <- function(input,output,session){
+  
+  stationData <- eventReactive( input$stationSelection, {
+    filter(AUData, FDT_STA_ID %in% input$stationSelection) })
+  stationSelected <- reactive({input$stationSelection})
+  
+  
+  AUData <- reactive({filter_at(conventionalsLake, vars(starts_with("ID305B")), any_vars(. %in% inputAUselection) ) })
+  # for testing 30 day
+  #filter(conventionals, FDT_STA_ID == '2-XDD000.40') %>%
+  #  left_join(dplyr::select(stationTable, STATION_ID:VAHU6,
+  #                          WQS_ID:EPA_ECO_US_L3NAME),
+  #            #WQS_ID:`Max Temperature (C)`), 
+  #            by = c('FDT_STA_ID' = 'STATION_ID')) %>%
+  #  filter(!is.na(ID305B_1)) %>%
+  #  pHSpecialStandardsCorrection() })
+  
+  # for testing 4 day
+  #stationData <- filter(conventionals, FDT_STA_ID %in% '4ABSA000.62') %>% # good example with lots of data, lake station so depth is important and hourly averages
+  #  left_join(dplyr::select(stationTable, STATION_ID:VAHU6,
+  #                          WQS_ID:EPA_ECO_US_L3NAME),
+  #            #WQS_ID:`Max Temperature (C)`), 
+  #            by = c('FDT_STA_ID' = 'STATION_ID')) %>%
+  #  #filter(!is.na(ID305B_1)) %>% # 4ABSA000.62 doesn't have an AU?????
+  #  pHSpecialStandardsCorrection()
+  #stationData <- filter(stationData, !is.na(AMMONIA))
+  #stationData$FDT_DATE_TIME[c(2, 4, 6, 8)] <- as.POSIXct(c("2015-04-28 11:50:00 EDT", "2015-05-12 11:30:00 EDT", "2015-06-11 11:10:00 EDT", "2015-07-22 11:00:00 EDT"))
+  #stationData <- stationData[1:9,]
+  #return(stationData) })
+  
+  
+  
+  
+  
+  callModule(AmmoniaPlotlySingleStation,'Ammonia', AUData, stationSelected, ammoniaAnalysis)
+  
+}
+
+shinyApp(ui,server)
+
+
