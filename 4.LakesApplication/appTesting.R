@@ -176,7 +176,7 @@ lakeSelection_ <- regionalAUs %>%
   distinct(Lake_Name) %>% 
   arrange(Lake_Name) %>% 
   pull()
-lakeSelection <- "Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
+lakeSelection <-  "Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
 
 AUs <- filter(regionalAUs, Lake_Name %in% lakeSelection & ASSESS_REG %in% DEQregionSelection)
 lake_filter <- filter_at(stationTable, vars(starts_with('ID305B')), any_vars(. %in% AUs$ID305B)) 

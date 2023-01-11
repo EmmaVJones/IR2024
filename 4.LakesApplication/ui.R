@@ -216,25 +216,25 @@ shinyUI(fluidPage(theme="yeti.css",
                                                                 helpText('Review each site using the single site visualization section. The results from this analysis are reflected
                                                                          in the NUT_TP_EXC, NUT_TP_SAMP, and NUT_TP_STAT columns in the station table.',
                                                                          span('Users may view AU level assessment results below.', style="color:red")),
-                                                                TPPlotlySingleStationUI('TP'))#,
-                                 #                       tabPanel('Trophic State Index',
-                                 #                                helpText('Review each site using the single site visualization section. The results from this analysis are not reflected
-                                 #                                         in the station table as they are only applicable to Section 187 lakes.',
-                                 #                                         span('Users may view AU level assessment results below.', style="color:red")),
-                                 #                                TSIPlotlySingleStationUI('TSI') ),
-                                 #                       tabPanel('Ammonia',
-                                 #                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
-                                 #                                         in the AMMONIA_EXC and AMMONIA_STAT columns in the station table.'),
-                                 #                                AmmoniaPlotlySingleStationUI('Ammonia')),
-                                 #                       tabPanel('Nitrate',
-                                 #                                helpText('Review each site using the single site visualization section. Nitrate criteria only apply to stations with PWS designation.'),
-                                 #                                NitratePlotlySingleStationUI('Nitrate')),
-                                 #                       tabPanel('Chloride',
-                                 #                                helpText('Review each site using the single site visualization section. Chloride PWS criteria only apply at intakes.'),
-                                 #                                ClPlotlySingleStationUI('Cl')),
-                                 #                       tabPanel('Sulfate',
-                                 #                                helpText('Review each site using the single site visualization section. Sulfate PWS criteria only apply at intakes.'),
-                                 #                                DSulfatePlotlySingleStationUI('DSulfate')))),
+                                                                TPPlotlySingleStationUI('TP')),
+                                                       tabPanel('Trophic State Index',
+                                                                helpText('Review each site using the single site visualization section. The results from this analysis are not reflected
+                                                                         in the station table as they are only applicable to Section 187 lakes.',
+                                                                         span('Users may view AU level assessment results below.', style="color:red")),
+                                                                TSIPlotlySingleStationUI('TSI') ),
+                                                       tabPanel('Ammonia',
+                                                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
+                                                                         in the AMMONIA_EXC and AMMONIA_STAT columns in the station table.'),
+                                                                AmmoniaPlotlySingleStationUI('Ammonia')),
+                                                       tabPanel('Nitrate',
+                                                                helpText('Review each site using the single site visualization section. Nitrate criteria only apply to stations with PWS designation.'),
+                                                                NitratePlotlySingleStationUI('Nitrate')),
+                                                       tabPanel('Chloride',
+                                                                helpText('Review each site using the single site visualization section. Chloride PWS criteria only apply at intakes.'),
+                                                                ClPlotlySingleStationUI('Cl')),
+                                                       tabPanel('Sulfate',
+                                                                helpText('Review each site using the single site visualization section. Sulfate PWS criteria only apply at intakes.'),
+                                                                DSulfatePlotlySingleStationUI('DSulfate'))))#,
                                  #            tabPanel('Metals Data',
                                  #                     helpText('Review each site using the single site visualization section. All analyses were performed outside of the
                                  #                                          automated assessment scripts, so please direct questions to Roger Stewart (roger.stewart@deq.virginia.gov).'),
@@ -242,9 +242,5 @@ shinyUI(fluidPage(theme="yeti.css",
                                  #            tabPanel('Toxics Data', 
                                  #                     toxicsSingleStationUI('PBC')))#,
                                  #          
-                                 # )
                                  
-                                                     ))))
-                      )))))
-                                 
-                                 
+                                          )))))))

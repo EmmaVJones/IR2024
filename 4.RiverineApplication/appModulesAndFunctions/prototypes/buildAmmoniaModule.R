@@ -24,7 +24,7 @@ AmmoniaPlotlySingleStationUI <- function(id){
                30Q10 (see 9VAC25-260-140 B footnote 6) unless statistically valid methods are employed which demonstrate 
                compliance with the duration and return frequency of the water quality criteria.'),
       helpText(strong('This assessment application does not currently support the autocalculation of flow statistics. Regional
-                      assessors are responsible for validating suggested assessment results against flow statistics.')),
+                      assessors are responsible for validating suggested assessment results against suggested flow statistics.')),
       plotlyOutput(ns('plotly')),
       br(),hr(),br(),
       h4(strong("Combined Ammonia Criteria Analysis Results")),

@@ -1,5 +1,3 @@
-# work through appTesting.R through the creation of stationData object
-
 
 
 NitratePlotlySingleStationUI <- function(id){
@@ -153,29 +151,5 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
                 selection = 'none') }}) 
   
 }
-
-
-
-
-
-ui <- fluidPage(
-  helpText('Review each site using the single site visualization section. There are no WQS for Specific Conductivity.'),
-  NitratePlotlySingleStationUI('Nitrate')
-)
-
-server <- function(input,output,session){
-  stationData <- eventReactive( input$stationSelection, {
-    filter(AUData, FDT_STA_ID %in% input$stationSelection) })
-  stationSelected <- reactive({input$stationSelection})
-  
-  
-  AUData <- reactive({filter_at(conventionalsLake, vars(starts_with("ID305B")), any_vars(. %in% inputAUselection) ) })
-  
-  
-  callModule(NitratePlotlySingleStation,'Nitrate', AUData, stationSelected)
-  
-}
-
-shinyApp(ui,server)
 
 
