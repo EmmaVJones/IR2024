@@ -583,11 +583,11 @@ TP_Assessment <- function(x){
 
 
 ### TSI equations
-TSIcalculation <- function(x){
-  if(unique(x$lakeStation) == TRUE){
-    if(is.na(unique(x$Lakes_187B))){
+TSIcalculation <- function(stationData){
+  if(unique(stationData$lakeStation) == TRUE){
+    if(is.na(unique(stationData$Lakes_187B))){
       # first fill down secchi depth in case it isn't stored exactly at 0.3 meter
-      secchiFix <- x %>%
+      secchiFix <- stationData %>%
         group_by(FDT_STA_ID, FDT_DATE_TIME) %>% 
         fill(SECCHI_DEPTH_M, .direction = "downup") %>%
         filter(FDT_DEPTH <= 0.3) %>%
@@ -637,11 +637,11 @@ TSIcalculation <- function(x){
       
       return(TSI)
       
-    } else {return(tibble(FDT_STA_ID = NA, meanSD = NA, TSI_SD = NA, meanchla = NA, TSI_chla = NA, meanTP = NA, TSI_TP = NA, associatedData = list(NA)))}
-  } else {return(tibble(FDT_STA_ID = NA, meanSD = NA, TSI_SD = NA, meanchla = NA, TSI_chla = NA, meanTP = NA, TSI_TP = NA, associatedData = list(NA)))} 
+    } else {return(NULL)} #tibble(FDT_STA_ID = NA, meanSD = NA, TSI_SD = NA, meanchla = NA, TSI_chla = NA, meanTP = NA, TSI_TP = NA, associatedData = list(NA)))}
+  } else {return(NULL)} #return(tibble(FDT_STA_ID = NA, meanSD = NA, TSI_SD = NA, meanchla = NA, TSI_chla = NA, meanTP = NA, TSI_TP = NA, associatedData = list(NA)))} 
 }
 
-#TSIcalculation(stationData1)
+#TSIcalculation(stationData)
 
 #x <- stationData1 %>%
 #  bind_rows(mutate(stationData1, FDT_STA_ID = 'FAKE'))

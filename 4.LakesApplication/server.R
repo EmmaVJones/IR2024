@@ -582,5 +582,40 @@ shinyServer(function(input, output, session) {
   # AU tab
   callModule(EcoliPlotlyAU,'EcoliAU', AUData, AUmedians, AUmediansForAnalysis, ecoliAU)
 
+  ## For Nutrients
+  AUselection <- reactive({as.character(input$AUselection)})
+  
+  ## Chlorophyll a Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(chlAPlotlySingleStation,'chlA', AUData, stationSelected, AUselection)
+  
+  ## Total Phosphorus Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(TPPlotlySingleStation,'TP', AUData, stationSelected, AUselection)
+  
+  ## Trophic State Index Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(TSIPlotlySingleStation,'TSI', AUData, stationSelected, AUselection)  
+  
+  ## Ammonia Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(AmmoniaPlotlySingleStation,'Ammonia', AUData, stationSelected, ammoniaAnalysis)
+  
+  ## Nitrate Sub Tab ##-----------------------------------------------------------------------------------------------------
+  callModule(NitratePlotlySingleStation,'Nitrate', AUData, stationSelected)
+  
+  ## Chloride Sub Tab ##-----------------------------------------------------------------------------------------------------
+  callModule(ClPlotlySingleStation,'Cl', AUData, stationSelected)
+  
+  ## Sulfate Sub Tab ##-----------------------------------------------------------------------------------------------------
+  callModule(DSulfatePlotlySingleStation,'DSulfate', AUData, stationSelected)
+  
+  
+  # 
+  # 
+  # #### Metals Sub Tab ####---------------------------------------------------------------------------------------------------
+  # callModule(metalsTableSingleStation,'metals', AUData, WCmetals, WCmetalsForAnalysis, IR2020WCmetals ,Smetals, IR2020Smetals,
+  #            fishMetals, fishMetalsScreeningValues, stationSelected, staticLimit)
+  # # callModule(metalsTableSingleStation,'metals', AUData, WCmetals, IR2020WCmetals, Smetals, IR2020Smetals, fishMetals, 
+  # #            fishMetalsScreeningValues, stationSelected)
+  # # 
+  # #### Toxics Sub Tab ####---------------------------------------------------------------------------------------------------
+  # callModule(toxicsSingleStation,'PBC', AUData, markPCB, fishPCB, stationSelected)
   
 })

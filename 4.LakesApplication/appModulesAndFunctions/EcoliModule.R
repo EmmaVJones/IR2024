@@ -11,20 +11,23 @@ EcoliPlotlySingleStationUI <- function(id){
                assessment period.'),
       plotlyOutput(ns('plotly')),
       br(),hr(),br(),
+      h4(strong('New Standard (STV= 410 CFU / 100 mL, geomean = 126 CFU / 100 mL with additional sampling requirements)')), 
+      h5('All E. coli records that are ',span(strong('above the criteria')),' for the ',
+         span(strong('selected site collected during the two most recent calendar years of the assessment period')),' are highlighted below.',
+         span(strong('If no data are reflected in below tables then no data are available for analysis in the most recent two years
+                       of the assessment period.'))),
       fluidRow(
-        h4(strong('New Standard (STV= 410 CFU / 100 mL, geomean = 126 CFU / 100 mL with additional sampling requirements)')), 
-        column(6, h5('All E. coli records that are ',span(strong('above the criteria')),' for the ',
-                     span(strong('selected site')),' are highlighted below.',
-                     span(strong('If no data are reflected in below tables then no data exceeded the respective criteria.'))),
-               helpText('The below table highlights all analyzed windows that have either STV violations OR geomean violations. Note
+        column(6, helpText('The below table highlights all analyzed windows ',
+                           span(strong('within the two most recent calendar years of the assessment period')),
+                           ' that have either STV violations OR geomean violations. Note
                         the number of samples in the window, STV Assessment, and Geomean Assessment columns for context. These violations
                         are important to understand the dataset, but the verbose assessment decision in the table to the right is where one should look
                         for assistance choosing which of the potential violations are driving the decision. Explore the dataset in 
                         90 day windows in the interactive graph below and the full dataset with assessment decisions paired with each window
-                        in the bottom-most table.'),
+                        in the table below.'),
                DT::dataTableOutput(ns('exceedancesNEWStdTableSingleSite')),
                br()),
-        column(6, br(), br(),br(), br(),br(), br(),br(), br(),
+        column(6, #br(), br(),br(), br(),br(), br(),br(), br(),
                h5('Individual E. coli exceedance statistics for the ',span(strong('selected site')),' are highlighted below.'),
                h5("Note: This analysis is based only on data collected during the ",span(strong('two most recent calendar years of the six-year assessment window')),". For the ",
                   assessmentCycle, " IR cycle this would mean only bacteria data collected between January 1, ",
@@ -42,7 +45,8 @@ EcoliPlotlySingleStationUI <- function(id){
         #verbatimTextOutput(ns('test')),
         column(4, helpText('Below is the raw data associated with the ',span('selected site'),'. Click on a row to reveal the
                            data included in the selected 90 day window in the plot to the right and to highlight the specific 
-                           assessment logic in the table below the plot. Data valid for recreational use assessment are colored in gray.'), 
+                           assessment logic in the table below the plot. ',
+                           span(strong('Data valid for recreational use assessment are colored in gray.'))), 
                h5(strong('Raw Data')),DT::dataTableOutput(ns('rawData'))),
         column(8, helpText('Click a row on the table to left to reveal a detailed interactive plot of the data
                            included in the selected 90 day window. The orange line corresponds to the window geomean; wide black dashed line
@@ -172,7 +176,8 @@ EcoliPlotlySingleStation <- function(input,output,session, AUdata, stationSelect
     z <- dplyr::select(oneStation(), FDT_STA_ID, FDT_DATE_TIME, ECOLI, RMK_ECOLI, LEVEL_ECOLI)  %>% 
       mutate(FDT_DATE_TIME = as.Date(FDT_DATE_TIME, format = '%Y-%m-%D %H:%M:S'),
              RecValid = ifelse(FDT_DATE_TIME >= assessmentPeriod[1] + years(4), 1, NA))
-    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "400px", dom='ti'),
+    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "400px", dom='ti',
+                                                     columnDefs = list(list(targets = 5, visible = FALSE))), # hide RecValid field
                   selection = 'single')  %>% 
       formatStyle('RecValid',  target = 'row', backgroundColor = styleEqual(c(1), c('lightgray')))})
   
@@ -262,5 +267,3 @@ EcoliPlotlySingleStation <- function(input,output,session, AUdata, stationSelect
   
   
 }
-
-

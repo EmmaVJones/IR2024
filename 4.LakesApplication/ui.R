@@ -206,17 +206,17 @@ shinyUI(fluidPage(theme="yeti.css",
                                                                   tabPanel('Single Station Analysis',
                                                                            EcoliPlotlySingleStationUI('Ecoli')),
                                                                   tabPanel('Assessment Unit Analysis',
-                                                                           EcoliPlotlyAUUI('EcoliAU'))))#,
-                                 #                       tabPanel('Chlorophyll a',
-                                 #                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
-                                 #                                         in the NUT_CHLA_EXC, NUT_CHLA_SAMP, and NUT_CHLA_STAT columns in the station table.',
-                                 #                                         span('Users may view AU level assessment results below.', style="color:red")),
-                                 #                                chlAPlotlySingleStationUI('chlA')),
-                                 #                       tabPanel('Total Phosphorus',
-                                 #                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
-                                 #                                         in the NUT_TP_EXC, NUT_TP_SAMP, and NUT_TP_STAT columns in the station table.',
-                                 #                                         span('Users may view AU level assessment results below.', style="color:red")),
-                                 #                                TPPlotlySingleStationUI('TP')),
+                                                                           EcoliPlotlyAUUI('EcoliAU')))),
+                                                       tabPanel('Chlorophyll a',
+                                                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
+                                                                         in the NUT_CHLA_EXC, NUT_CHLA_SAMP, and NUT_CHLA_STAT columns in the station table.',
+                                                                         span('Users may view AU level assessment results below.', style="color:red")),
+                                                                chlAPlotlySingleStationUI('chlA')),
+                                                       tabPanel('Total Phosphorus',
+                                                                helpText('Review each site using the single site visualization section. The results from this analysis are reflected
+                                                                         in the NUT_TP_EXC, NUT_TP_SAMP, and NUT_TP_STAT columns in the station table.',
+                                                                         span('Users may view AU level assessment results below.', style="color:red")),
+                                                                TPPlotlySingleStationUI('TP'))#,
                                  #                       tabPanel('Trophic State Index',
                                  #                                helpText('Review each site using the single site visualization section. The results from this analysis are not reflected
                                  #                                         in the station table as they are only applicable to Section 187 lakes.',
