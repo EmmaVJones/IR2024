@@ -418,19 +418,19 @@ assessPWSsummary <- function(assessPWSresults,
 # Nutrients pseudo-assessment functions (for Riverine applications)
 
 # Count samples
-countNutrients <- function(x, fieldName, commentName, nutrientLimit){
+countNutrients <- function(stationData, fieldName, commentName, nutrientLimit){
   fieldName_ <- enquo(fieldName)
   commentName_ <- enquo(commentName)
   
-  dplyr::select(x,FDT_STA_ID,FDT_DATE_TIME, !! fieldName_, !! commentName_)%>% # Just get relevant columns
+  dplyr::select(stationData,FDT_STA_ID,FDT_DATE_TIME, !! fieldName_, !! commentName_)%>% # Just get relevant columns
     filter(!( !! commentName_ %in% c('Level II', 'Level I'))) %>% # get lower levels out
     filter(!is.na(!!fieldName_ )) %>% #get rid of NA's
     rename(parameter = !!names(.[3])) %>% # rename columns to make functions easier to apply
     mutate(limit = nutrientLimit, 
            exceeds = ifelse(parameter > limit, T, F)) # Identify where above WQS limit
 }
-#countNutrients(x, PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, 0.2) %>% quickStats('NUT_TP') # but no longer use 0.2 riverine flag after 12/21/2020 email with Tish/Amanda
-#countNutrients(x, CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA)  %>% quickStats('NUT_CHLA')
+#countNutrients(stationData, PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, 0.2) %>% quickStats('NUT_TP') # but no longer use 0.2 riverine flag after 12/21/2020 email with Tish/Amanda
+#countNutrients(stationData, CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA)  %>% quickStats('NUT_CHLA')
 
 
 

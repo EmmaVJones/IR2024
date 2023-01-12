@@ -47,7 +47,11 @@ WQSvalues <- tibble(CLASS_BASIN = c('I',"II","II_7","III","IV","V","VI","VII"),
 
 # Lake name standardization
 lakeNameStandardization <- function(x){
+  # flexibility to handle new and old naming conventions
   x %>% 
+    {if("WaterName" %in% names(x))
+      rename(x, WATER_NAME = WaterName)
+      else .} %>% 
     mutate(Lake_Name = case_when(WATER_NAME %in% c('Abel Lake Reservoir (Long Branch)') ~ 'Abel Lake',
                                  WATER_NAME %in% c('Big Cherry Reservior') ~ 'Big Cherry Lake',
                                  WATER_NAME %in% c('Dan River','Buffalo Creek','Bluestone Creek') ~ 'Kerr Reservoir',
@@ -94,8 +98,7 @@ lakeNameStandardization <- function(x){
                                  WATER_NAME %in% c('Unsegmented lakes in G03') ~ 'West Run',
                                  TRUE ~ as.character(WATER_NAME))) 
 }
-#test <- regionalAUs %>%
-#  lakeNameStandardization()
+# regionalAUs %>% lakeNameStandardization()
 
 
 quickStats <- function(parameterDataset, # dataset from one station that has been run through a parameter exceedance analysis function 
@@ -415,19 +418,19 @@ assessPWSsummary <- function(assessPWSresults,
 # Nutrients pseudo-assessment functions (for Riverine applications)
 
 # Count samples
-countNutrients <- function(x, fieldName, commentName, nutrientLimit){
+countNutrients <- function(stationData, fieldName, commentName, nutrientLimit){
   fieldName_ <- enquo(fieldName)
   commentName_ <- enquo(commentName)
   
-  dplyr::select(x,FDT_STA_ID,FDT_DATE_TIME, !! fieldName_, !! commentName_)%>% # Just get relevant columns
+  dplyr::select(stationData,FDT_STA_ID,FDT_DATE_TIME, !! fieldName_, !! commentName_)%>% # Just get relevant columns
     filter(!( !! commentName_ %in% c('Level II', 'Level I'))) %>% # get lower levels out
     filter(!is.na(!!fieldName_ )) %>% #get rid of NA's
     rename(parameter = !!names(.[3])) %>% # rename columns to make functions easier to apply
     mutate(limit = nutrientLimit, 
            exceeds = ifelse(parameter > limit, T, F)) # Identify where above WQS limit
 }
-#countNutrients(x, PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, 0.2) %>% quickStats('NUT_TP') # but no longer use 0.2 riverine flag after 12/21/2020 email with Tish/Amanda
-#countNutrients(x, CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA)  %>% quickStats('NUT_CHLA')
+#countNutrients(stationData, PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, 0.2) %>% quickStats('NUT_TP') # but no longer use 0.2 riverine flag after 12/21/2020 email with Tish/Amanda
+#countNutrients(stationData, CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA)  %>% quickStats('NUT_CHLA')
 
 
 
@@ -580,11 +583,11 @@ TP_Assessment <- function(x){
 
 
 ### TSI equations
-TSIcalculation <- function(x){
-  if(unique(x$lakeStation) == TRUE){
-    if(is.na(unique(x$Lakes_187B))){
+TSIcalculation <- function(stationData){
+  if(unique(stationData$lakeStation) == TRUE){
+    if(is.na(unique(stationData$Lakes_187B))){
       # first fill down secchi depth in case it isn't stored exactly at 0.3 meter
-      secchiFix <- x %>%
+      secchiFix <- stationData %>%
         group_by(FDT_STA_ID, FDT_DATE_TIME) %>% 
         fill(SECCHI_DEPTH_M, .direction = "downup") %>%
         filter(FDT_DEPTH <= 0.3) %>%
@@ -634,11 +637,11 @@ TSIcalculation <- function(x){
       
       return(TSI)
       
-    } else {return(tibble(FDT_STA_ID = NA, meanSD = NA, TSI_SD = NA, meanchla = NA, TSI_chla = NA, meanTP = NA, TSI_TP = NA, associatedData = list(NA)))}
-  } else {return(tibble(FDT_STA_ID = NA, meanSD = NA, TSI_SD = NA, meanchla = NA, TSI_chla = NA, meanTP = NA, TSI_TP = NA, associatedData = list(NA)))} 
+    } else {return(NULL)} #tibble(FDT_STA_ID = NA, meanSD = NA, TSI_SD = NA, meanchla = NA, TSI_chla = NA, meanTP = NA, TSI_TP = NA, associatedData = list(NA)))}
+  } else {return(NULL)} #return(tibble(FDT_STA_ID = NA, meanSD = NA, TSI_SD = NA, meanchla = NA, TSI_chla = NA, meanTP = NA, TSI_TP = NA, associatedData = list(NA)))} 
 }
 
-#TSIcalculation(stationData1)
+#TSIcalculation(stationData)
 
 #x <- stationData1 %>%
 #  bind_rows(mutate(stationData1, FDT_STA_ID = 'FAKE'))
@@ -933,7 +936,15 @@ freshwaterNH3limit <- function(stationData, # dataframe with station data
 #ammoniaAnalysisStation <- freshwaterNH3limit(stationData, trout = TRUE, mussels = TRUE, earlyLife = TRUE)
 
 
-## Metals Functions Updates from Joe
+# old function that needs to be deleted
+## Identify if metals data exists
+metalsData <- function(stationData, metalType){
+  if(nrow(stationData) > 0){
+    dataOut <- tibble(`_EXC` = NA, `_STAT` = 'Review')
+  } else {
+    dataOut <- tibble(`_EXC` = NA, `_STAT` = NA)}
+  names(dataOut) <- paste0(metalType, names(dataOut))
+  return(dataOut)}
 
 # Metals criteria analysis
 metalsCriteriaFunction <- function(ID, Hardness, WER){
