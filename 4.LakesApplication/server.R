@@ -181,7 +181,7 @@ shinyServer(function(input, output, session) {
   
   ################################ Lake Selection Tab ########################################
   
-  output$DEQregionSelectionUI <- renderUI({selectInput("DEQregionSelection", "Select DEQ Assessment Region", choices = c('BRRO', 'PRO', 'TRO', 'SWRO', 'NRO', 'VRO'))})
+  output$DEQregionSelectionUI <- renderUI({selectInput("DEQregionSelection", "Select DEQ Assessment Region", choices = c('BRRO', 'NRO','PRO', 'SWRO', 'TRO', 'VRO'))})
   
   # Pull AU data from server
   regionalAUs <- reactive({ req(input$pullAUs)

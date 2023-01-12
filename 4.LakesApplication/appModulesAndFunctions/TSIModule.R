@@ -4,8 +4,11 @@ TSIPlotlySingleStationUI <- function(id){
     wellPanel(
       h4(strong('Single Station Data Visualization')),
       fluidRow(column(3,uiOutput(ns('oneStationSelectionUI'))),
-               column(3, selectInput(ns('TSIparameter'),'TSI Parameter To Plot', choices = c('Secchi Depth', 'Chlorophyll a', 'Total Phosphorus'))),
-               column(3, helpText('Users may change the parameter plotted below with the TSI Parameter To Plot utility.')),
+               column(3,br(), uiOutput(ns('lake187UI')),
+                      helpText('TSI assessments are appropriate for non-187 lakes only. You may investigate TSI analyses for individual stations in Section 187 lakes
+                               by manually overriding the lake status using the checkbox above.')),
+               column(3, selectInput(ns('TSIparameter'),'TSI Parameter To Plot', choices = c('Secchi Depth', 'Chlorophyll a', 'Total Phosphorus')),
+                      helpText('Users may change the parameter plotted below with the TSI Parameter To Plot utility.')),
                column(3,actionButton(ns('reviewData'),"Review Raw Parameter Data",class='btn-block', width = '250px'))),
       helpText('All data presented in the interactive plot is raw data. Rounding rules are appropriately applied to the 
                assessment functions utilized by the application.'),
@@ -25,6 +28,9 @@ TSIPlotlySingleStationUI <- function(id){
                  lake/reservoir assessment unit, the individual TSI equations should be calculated at each station 
                  and then averaged (using a median or arithmetic mean) to determine the values for the waterbody.'"),
         helpText('This application uses mean as the central tendency statistic for TSI.'),
+        helpText("Manual adjustment of the `Section 187 Lake` designation checkbox above does not affect this
+                 calculation. To change the designation of a lake's 187 designation for AU calculation purposes, please
+                 contact Emma Jones and Tish Robertson as this is a WQS metadata related issue."),
         fluidRow(
           column(7, h5('Trophic State Index calculations for the ',span(strong('Assessment Unit')),' are highlighted below.'),
                  dataTableOutput(ns('rangeTableAU'))),
@@ -40,14 +46,26 @@ TSIPlotlySingleStation <- function(input,output,session, AUdata, stationSelected
   ns <- session$ns
   
   # Select One station for individual review
-  output$oneStationSelectionUI <- renderUI({
-    req(AUdata)
+  output$oneStationSelectionUI <- renderUI({    req(AUdata)
     selectInput(ns('oneStationSelection'),strong('Select Station to Review'),
                 choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))), # Change this based on stationSelectedAbove
                 width='200px', selected = stationSelectedAbove())})
   
   oneStation <- reactive({    req(ns(input$oneStationSelection))
     filter(AUdata(),FDT_STA_ID %in% input$oneStationSelection) })
+  
+  # Option to change WQS used for modal
+  output$lake187UI <- renderUI({    req(oneStation())
+    if(nrow(oneStation()) > 0){
+      default187 <- unique(oneStation()$Lakes_187B) %in% c("y")
+    } else { default187 <- FALSE}
+    checkboxInput(ns('lake187'),'Section 187 Lake (Automatically selected if the lake is designated as a Section 187 lake in the attached WQS metadata)', value = default187) })
+  
+  TSIoneStation <- reactive({req(oneStation())
+    if(input$lake187 == FALSE){
+      return( TSIcalculation(oneStation() %>% mutate(Lakes_187B = NA)) ) # must override function default behavior 
+    } else {return( NULL )}    })
+  
   
   # Button to visualize modal table of available parameter data
   observeEvent(input$reviewData,{
@@ -77,10 +95,8 @@ TSIPlotlySingleStation <- function(input,output,session, AUdata, stationSelected
       formatStyle(c('PHOSPHORUS_mg_L','RMK_PHOSPHORUS', 'LEVEL_PHOSPHORUS'), 'LEVEL_PHOSPHORUS', backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray'))  })
   
   
-  TSIoneStation <- reactive({req(oneStation())
-    TSIcalculation(oneStation())  })
   
-  output$plotly <- renderPlotly({req(TSIoneStation(), input$TSIparameter)
+  output$plotly <- renderPlotly({req(!is.null(TSIoneStation()), !is.na(input$TSIparameter), input$lake187 == FALSE)
     datOG <- TSIoneStation()
     dat <- TSIoneStation() %>%
       dplyr::select( associatedData) %>%
@@ -88,10 +104,9 @@ TSIPlotlySingleStation <- function(input,output,session, AUdata, stationSelected
       mutate(`Overall TSI SD` = datOG$TSI_SD,
              `Overall TSI Chl a` = datOG$TSI_chla,
              `Overall TSI TP` = datOG$TSI_TP)
-    
-    TSIplotly(dat, input$TSIparameter)  })
+    if(nrow(dat) > 0){TSIplotly(dat, input$TSIparameter) }     })
   
-  output$rangeTableSingleSite <- renderDataTable({    req(TSIoneStation())
+  output$rangeTableSingleSite <- renderDataTable({    req(!is.null(TSIoneStation()))
     z <- TSIoneStation() %>% dplyr::select(-associatedData) %>%
       rename('Mean Secchi Depth' = 'meanSD',
              'TSI Secchi Depth' = 'TSI_SD',
@@ -103,12 +118,6 @@ TSIPlotlySingleStation <- function(input,output,session, AUdata, stationSelected
               selection = 'none') %>%
       formatRound(columns=c('Mean Secchi Depth', 'TSI Secchi Depth','Mean Chlorophyll a','TSI Chlorophyll a','Mean Total Phosphorus','TSI Total Phosphrus'), digits=3)})
   
-  
-  # output$stationExceedanceRate <- renderDataTable({    req(ns(input$oneStationSelection), oneStation())
-  #   z <- TSIassessment(oneStation())
-  #   datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "60px", dom='t'),
-  #             selection = 'none') })
-  # 
   
   output$rangeTableAU <- renderDataTable({    req(TSIoneStation())
     z <- TSIcalculation(filter(AUdata(), ID305B_1 %in% AUselectionFromOutsideModal())) %>% dplyr::select(-associatedData)%>%
@@ -124,7 +133,7 @@ TSIPlotlySingleStation <- function(input,output,session, AUdata, stationSelected
   
   
   output$AUExceedanceRate <- renderDataTable({    req(TSIoneStation())
-    z <- TSIassessment(filter(AUdata(), ID305B_1 %in% AUselectionFromOutsideModal())) 
+    z <- TSIassessment(filter(AUdata(), ID305B_1 %in% AUselectionFromOutsideModal()))
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "70px", dom='t'),
               selection = 'none') })
 }

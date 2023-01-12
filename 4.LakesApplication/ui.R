@@ -219,7 +219,7 @@ shinyUI(fluidPage(theme="yeti.css",
                                                                 TPPlotlySingleStationUI('TP')),
                                                        tabPanel('Trophic State Index',
                                                                 helpText('Review each site using the single site visualization section. The results from this analysis are not reflected
-                                                                         in the station table as they are only applicable to Section 187 lakes.',
+                                                                         in the station table as they are only applicable to non Section 187 lakes.',
                                                                          span('Users may view AU level assessment results below.', style="color:red")),
                                                                 TSIPlotlySingleStationUI('TSI') ),
                                                        tabPanel('Ammonia',
