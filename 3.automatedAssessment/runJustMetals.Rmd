@@ -415,4 +415,6 @@ if(nrow(stationData)>0){
   
 }
 
+stationTableResults <- dplyr::select(stationTableResults, STATION_ID, ID305B_1, ID305B_2, WATER_TYPE, REGION, VAHU6, WAT_MET_EXC, WAT_MET_STAT, WAT_MET_COMMENT)
+saveRDS(stationTableResults, 'data/metals.RDS')
 ```

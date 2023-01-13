@@ -1440,7 +1440,7 @@ annualRollingExceedanceAnalysis <- function(dataToAnalyze,
   windowRange <- (min(windowOptions):(max(windowOptions)- (yearsToRoll- 1)))#[(min(windowOptions):(max(windowOptions)- (yearsToRoll- 1))) %in% windowOptions]
   # windowRange check to remove unnecessary windows that occur before the first windowRange year 
   # e.g. if only one year of data is available, window range will return: year, year - 1, and year -2 which isn't necessary, so stop that behavior
-  if(windowRange[2] < windowRange[1]){    windowRange <- windowRange[1]  }
+  if(length(windowRange) > 1 & windowRange[2] < windowRange[1]){    windowRange <- windowRange[1]  }
 
   for(i in windowRange){ #i =  windowRange[1] #min(min(windowRange):(max(windowRange)- (yearsToRoll- 1))[1])
     dataWindow <- filter(dataToAnalyze, Year %in% i:(i + yearsToRoll- 1) ) # minus 1 year for math to work
