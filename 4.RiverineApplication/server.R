@@ -496,28 +496,28 @@ shinyServer(function(input, output, session) {
     siteData$stationTableOutput <- bind_rows(stationsTemplate,
                                              cbind(StationTableStartingData(stationData()),
                                                    tempExceedances(stationData()) %>% quickStats('TEMP'),
-                                                   DOExceedances_Min(stationData()) %>% quickStats('DO'), 
+                                                   DOExceedances_Min(stationData()) %>% quickStats('DO'),
                                                    pHExceedances(stationData()) %>% quickStats('PH'),
-                                                   
-                                                   # this runs the bacteria assessment again (unfortunately), but it suppresses 
+
+                                                   # this runs the bacteria assessment again (unfortunately), but it suppresses
                                                    # any unnecessary bacteria fields for the stations table to avoid unnecessary flags
                                                    # and it only runs the 2 year analysis per IR2024 rules
                                                    bacteriaAssessmentDecisionClass( # NEW for IR2024, bacteria only assessed in two most recent years of assessment period
                                                      filter(stationData(), between(FDT_DATE_TIME, assessmentPeriod[1] + years(4), assessmentPeriod[2])),
                                                      uniqueStationName = unique(stationData()$FDT_STA_ID)),
-                                                     
+
                                                    rollingWindowSummary(
                                                      annualRollingExceedanceSummary(
                                                        annualRollingExceedanceAnalysis(ammoniaAnalysisStation(), yearsToRoll = 3, aquaticLifeUse = FALSE)), parameterAbbreviation = "AMMONIA"),
-                                                   
+
                                                    # Water Column Metals
-                                                   filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID) %>% 
-                                                     metalsAnalysis(stationData, WER= 1) %>% 
-                                                     metalsAssessmentFunction(), 
-                                                   
+                                                   filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID) %>%
+                                                     metalsAnalysis(stationData(), WER= 1) %>%
+                                                     metalsAssessmentFunction(),
+
                                                    # Water Toxics combo fields
                                                    waterToxics(),
-                                                   
+
                                                    # Roger's sediment metals analysis, transcribed
                                                    metalsData(filter(Smetals, Station_Id %in% stationData()$FDT_STA_ID), 'SED_MET'),
                                                    # Mark's sediment PCB results, flagged
@@ -528,17 +528,17 @@ shinyServer(function(input, output, session) {
                                                    # Gabe's fish PCB results, flagged
                                                    PCBmetalsDataExists(filter(fishPCB, `DEQ rivermile` %in%  stationData()$FDT_STA_ID), 'FISH_TOX'),
                                                    benthicAssessment(stationData(), VSCIresults),
-                                                   countNutrients(stationData(), PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, NA) %>% quickStats('NUT_TP') %>% 
+                                                   countNutrients(stationData(), PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, NA) %>% quickStats('NUT_TP') %>%
                                                      mutate(NUT_TP_STAT = ifelse(NUT_TP_STAT != "S", "Review", NA)), # flag OE but don't show a real assessment decision
                                                    countNutrients(stationData(), CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA) %>% quickStats('NUT_CHLA') %>%
                                                      mutate(NUT_CHLA_STAT = NA)) %>% # don't show a real assessment decision) %>%
                                                left_join(dplyr::select(stationTable(), STATION_ID, COMMENTS),
-                                                         by = 'STATION_ID') %>% 
+                                                         by = 'STATION_ID') %>%
                                                dplyr::select(-ends_with(c('exceedanceRate','Assessment Decision', 'VERBOSE', 'StationID', "PWSinfo",
-                                                                          'BACTERIADECISION', 'BACTERIASTATS')))) %>% 
-      filter(!is.na(STATION_ID)) 
+                                                                          'BACTERIADECISION', 'BACTERIASTATS')))) %>%
+      filter(!is.na(STATION_ID))
   })
-  
+
   # Display marked up station table row for each site
   output$stationTableDataSummary <- DT::renderDataTable({    req(stationData()$FDT_STA_ID == input$stationSelection, siteData$stationTableOutput)
     datatable(siteData$stationTableOutput, extensions = 'Buttons', escape=F, rownames = F, editable = TRUE,
@@ -548,7 +548,7 @@ shinyServer(function(input, output, session) {
                             dom='Bt', buttons=list('copy',
                                                    list(extend='csv',filename=paste('AssessmentResults_',paste(assessmentCycle,input$stationSelection, collapse = "_"),Sys.Date(),sep='')),
                                                    list(extend='excel',filename=paste('AssessmentResults_',paste(assessmentCycle,input$stationSelection, collapse = "_"),Sys.Date(),sep='')))),
-              selection = 'none') %>% 
+              selection = 'none') %>%
       formatStyle(c('TEMP_EXC','TEMP_SAMP','TEMP_STAT'), 'TEMP_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
       formatStyle(c('DO_EXC','DO_SAMP','DO_STAT'), 'DO_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
       formatStyle(c('PH_EXC','PH_SAMP','PH_STAT'), 'PH_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
@@ -557,22 +557,22 @@ shinyServer(function(input, output, session) {
       formatStyle(c('AMMONIA_EXC','AMMONIA_STAT'), 'AMMONIA_STAT', backgroundColor = styleEqual(c('Review', 'IM'), c('yellow','red'))) %>%
       formatStyle(c('WAT_MET_EXC','WAT_MET_STAT'), 'WAT_MET_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
       formatStyle(c('WAT_TOX_EXC','WAT_TOX_STAT'), 'WAT_TOX_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
-      formatStyle(c('SED_MET_EXC','SED_MET_STAT'), 'SED_MET_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%   
+      formatStyle(c('SED_MET_EXC','SED_MET_STAT'), 'SED_MET_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
       formatStyle(c('SED_TOX_EXC','SED_TOX_STAT'), 'SED_TOX_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
-      formatStyle(c('FISH_MET_EXC','FISH_MET_STAT'), 'FISH_MET_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%   
+      formatStyle(c('FISH_MET_EXC','FISH_MET_STAT'), 'FISH_MET_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
       formatStyle(c('FISH_TOX_EXC','FISH_TOX_STAT'), 'FISH_TOX_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) %>%
       formatStyle(c('BENTHIC_STAT'), 'BENTHIC_STAT', backgroundColor = styleEqual(c('Review'), c('yellow'))) %>%
-      formatStyle(c('NUT_TP_EXC','NUT_TP_SAMP'), 'NUT_TP_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red'))) 
-    
-    
+      formatStyle(c('NUT_TP_EXC','NUT_TP_SAMP'), 'NUT_TP_STAT', backgroundColor = styleEqual(c('Review', '10.5% Exceedance'), c('yellow','red')))
+
+
   })
-  
+
   ## Water Intake proximity flag for station
   output$intakeProximityFlag <- renderUI({req(stationData())
     if(unique(stationData()$FDT_STA_ID) %in% intakeSites$FDT_STA_ID){
-      wellPanel(h5(strong('This station is within 100 meters of a drinking water intake. Please review whether the station 
+      wellPanel(h5(strong('This station is within 100 meters of a drinking water intake. Please review whether the station
                 should be assessed for secondary human health criteria.', style = "color:red")) ) }    })
-  
+
   ## PWS table output marked up
   output$PWStable <- DT::renderDataTable({  req(stationData(), waterToxics())
     if(is.na(unique(stationData()$PWS))){
@@ -580,26 +580,26 @@ shinyServer(function(input, output, session) {
                           PWS= 'PWS Standards Do Not Apply To Station')
       DT::datatable(PWSconcat, escape=F, rownames = F, options= list(scrollX = TRUE, pageLength = nrow(PWSconcat), dom='t'),
                     selection = 'none')
-      
+
     } else {
-      PWSconcat <- waterToxics() %>% 
-        dplyr::select(PWSinfo) %>% 
-        unnest(cols = c(PWSinfo)) %>% 
-        dplyr::select(-ends_with('exceedanceRate')) 
-      
+      PWSconcat <- waterToxics() %>%
+        dplyr::select(PWSinfo) %>%
+        unnest(cols = c(PWSinfo)) %>%
+        dplyr::select(-ends_with('exceedanceRate'))
+
       DT::datatable(PWSconcat, escape=F, rownames = F, options= list(scrollX = TRUE, pageLength = nrow(PWSconcat), dom='t'),
-                    selection = 'none') %>% 
+                    selection = 'none') %>%
         formatStyle(c("PWS_Nitrate_EXC","PWS_Nitrate_SAMP","PWS_Nitrate_STAT"), "PWS_Nitrate_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) %>%
         formatStyle(c("PWS_Chloride_EXC","PWS_Chloride_SAMP","PWS_Chloride_STAT"), "PWS_Chloride_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) %>%
         formatStyle(c("PWS_Total_Sulfate_EXC","PWS_Total_Sulfate_SAMP","PWS_Total_Sulfate_STAT"), "PWS_Total_Sulfate_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) } })
-  
-  
+
+
   #### Data Sub Tab ####---------------------------------------------------------------------------------------------------
-  
-  # Display Data 
+
+  # Display Data
   output$AURawData <- DT::renderDataTable({ req(AUData())
-    DT::datatable(AUData(), extensions = 'Buttons', escape=F, rownames = F, 
-                  options= list(scrollX = TRUE, pageLength = nrow(AUData()), scrollY = "300px", 
+    DT::datatable(AUData(), extensions = 'Buttons', escape=F, rownames = F,
+                  options= list(scrollX = TRUE, pageLength = nrow(AUData()), scrollY = "300px",
                                 dom='Btf', buttons=list('copy',
                                                         list(extend='csv',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')),
                                                         list(extend='excel',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')))),
@@ -608,35 +608,35 @@ shinyServer(function(input, output, session) {
   output$stationDataTableRecords <- renderText({req(AUData())
     paste(nrow(AUData()), 'records were retrieved for',as.character(input$AUselection),sep=' ')})
   output$uniqueStationDataTableRecords <- renderTable({req(AUData())
-    AUData() %>% 
-      group_by(FDT_STA_ID) %>% 
+    AUData() %>%
+      group_by(FDT_STA_ID) %>%
       count() %>% dplyr::rename('Number of Records'='n') })
   output$stationDataTableAssessmentWindow <- renderText({req(AUData())
     withinAssessmentPeriod(AUData())})
-  
-  
-  # Need this as a reactive to regenerate below modules when user changes station 
+
+
+  # Need this as a reactive to regenerate below modules when user changes station
   stationSelected <- reactive({input$stationSelection})
 
-  
+
   ## Temperature Sub Tab ##------------------------------------------------------------------------------------------------------
-  callModule(temperaturePlotlySingleStation, 'temperature', AUData, stationSelected, reactive(assessmentWindowLowFlows)) 
-  
+  callModule(temperaturePlotlySingleStation, 'temperature', AUData, stationSelected, reactive(assessmentWindowLowFlows))
+
   ## pH Sub Tab ##------------------------------------------------------------------------------------------------------
-  callModule(pHPlotlySingleStation,'pH', AUData, stationSelected, reactive(assessmentWindowLowFlows)) 
-  
+  callModule(pHPlotlySingleStation,'pH', AUData, stationSelected, reactive(assessmentWindowLowFlows))
+
   ## DO Sub Tab ##------------------------------------------------------------------------------------------------------
-  callModule(DOPlotlySingleStation,'DO', AUData, stationSelected, reactive(assessmentWindowLowFlows)) 
-  
+  callModule(DOPlotlySingleStation,'DO', AUData, stationSelected, reactive(assessmentWindowLowFlows))
+
   ## Specific Conductivity Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(SpCondPlotlySingleStation,'SpCond', AUData, stationSelected)
-  
+
   ## Salinity Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(salinityPlotlySingleStation,'salinity', AUData, stationSelected)
-  
+
   ## Total Nitrogen Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(TNPlotlySingleStation,'TN', AUData, stationSelected)
-  
+
   ## Ammonia Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(AmmoniaPlotlySingleStation,'Ammonia', AUData, stationSelected, ammoniaAnalysis)
 
@@ -654,10 +654,10 @@ shinyServer(function(input, output, session) {
 
   ## Chlorophyll a Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(chlAPlotlySingleStation,'chlA', AUData, stationSelected)
-  
+
   ## Suspended Sediments Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(SSCPlotlySingleStation,'SSC', AUData, stationSelected)
-  
+
   ## Nitrate Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(NitratePlotlySingleStation,'Nitrate', AUData, stationSelected)
 
@@ -667,26 +667,26 @@ shinyServer(function(input, output, session) {
   ## Sulfate Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(DSulfatePlotlySingleStation,'DSulfate', AUData, stationSelected)
 
-  
+
   # Other Data Sources
-  
+
   #### Benthics Sub Tab ####---------------------------------------------------------------------------------------------------
   callModule(BenthicsPlotlySingleStation,'Benthics', AUData, stationSelected, VSCIresults, VCPMI63results, VCPMI65results)
-  
+
   # Bioassessment Tab- This is included at this level because couldn't figure the download piece out inside a module
   # empty reactive objects list
-  reactive_objects = reactiveValues() 
-  
+  reactive_objects = reactiveValues()
+
   assessmentDecision_UserSelection <- reactive({req(pinnedDecisions)
-    filter(pinnedDecisions, StationID %in% input$stationSelection) %>% 
+    filter(pinnedDecisions, StationID %in% input$stationSelection) %>%
       filter(IRYear == assessmentCycle) })  # only show information from current cycle here
-  
+
   # Bioassesment information from current cycle
   output$bioassessmentInfo <- DT::renderDataTable({req(nrow(assessmentDecision_UserSelection())> 0)
     DT::datatable(assessmentDecision_UserSelection(),  escape=F, rownames = F,
                   options= list(dom= 't' , pageLength = nrow(assessmentDecision_UserSelection()),scrollX = TRUE, scrollY = "250px"),
                   selection = 'none')})
-  
+
   observe({req(nrow(assessmentDecision_UserSelection())> 0)
     reactive_objects$SCI_UserSelection <- filter(VSCIresults, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VSCI')$StationID) %>%
       bind_rows(
@@ -696,7 +696,7 @@ shinyServer(function(input, output, session) {
       # only Current IR data
       filter(between(`Collection Date`,assessmentPeriod[1], assessmentPeriod[2])) %>% # limit data to assessment window
       # only use family level rarified data
-      filter(`Target Count` == 110) %>% 
+      filter(`Target Count` == 110) %>%
       filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
       filter(Gradient != "Boatable") %>%  # don't assess where no SCI not validated
       # add back in description information
@@ -704,53 +704,53 @@ shinyServer(function(input, output, session) {
                   dplyr::select(StationID, Sta_Desc, BenSampID,US_L3CODE, US_L3NAME, HUC_12, VAHU6, Basin, Basin_Code),
                 by = c('StationID', 'BenSampID')) %>%
       dplyr::select(StationID, Sta_Desc, BenSampID, `Collection Date`, RepNum, everything())
-  
+
     reactive_objects$benSampsFilter <- filter(benSamps, BenSampID %in% reactive_objects$SCI_UserSelection$BenSampID)
 
     reactive_objects$habitatUserSelection <- habitatConsolidation( input$stationSelection, habSamps, habValues)  })
-  
-  
+
+
   # have to make separate reactive object in order to send appropriate station name to the download title
   fileNameForReport <- reactive({paste("IR",assessmentCycle," ", as.character(unique(input$stationSelection))," Benthic Assessment Fact Sheet.html", sep = "")})
-  
-  
+
+
   output$downloadReport_ <- renderUI({req(nrow(assessmentDecision_UserSelection())> 0)
     list(helpText('If you would like to download a copy of the Bioassessment Fact Sheet for the selected station,
                   click the Generate Report button below.'),
          downloadButton('downloadReport', 'Generate Report'))})
-  
+
   output$downloadReport <- downloadHandler(
     filename = fileNameForReport,
     content= function(file){
       tempReport <- normalizePath('bioassessmentFactSheet.Rmd')
       imageToSend1 <- normalizePath('images/riskCategories.PNG') #NEW
       imageToSend2 <- normalizePath('images/HabitatColor.jpg') #NEW
-      
+
       owd <- setwd(tempdir())
       on.exit(setwd(owd))
-      
+
       file.copy(tempReport, 'bioassessmentFactSheet.Rmd')
       file.copy(imageToSend1, 'images/riskCategories.PNG') #NEW
       file.copy(imageToSend2, 'images/HabitatColor.jpg') #NEW
-      
+
       params <- list(assessmentDecision =  assessmentDecision_UserSelection(),
                      SCI = reactive_objects$SCI_UserSelection,
                      benSampsFilter = reactive_objects$benSampsFilter,
                      habitat = reactive_objects$habitatUserSelection,
                      assessmentCycle = assessmentCycle)
-      
+
       rmarkdown::render(tempReport,output_file = file,
                         params=params,envir=new.env(parent = globalenv()))})
-  
 
-  
+
+
   # Bioassesment information from previous cycles
   output$historicalBioassessmentInfo <- DT::renderDataTable({req(pinnedDecisions)
     z <- filter(pinnedDecisions, StationID %in% input$stationSelection)   %>%  # only show information from not current cycle here
-      filter(IRYear != assessmentCycle) %>% 
+      filter(IRYear != assessmentCycle) %>%
       arrange(IRYear)
     DT::datatable(z,  escape=F, rownames = F,
                   options= list(dom= 't' , pageLength = nrow(assessmentDecision_UserSelection()),scrollX = TRUE, scrollY = "250px"),
                   selection = 'none')})
-  
+
 })

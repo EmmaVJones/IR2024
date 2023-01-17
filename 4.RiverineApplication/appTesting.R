@@ -582,8 +582,8 @@ if(unique(stationData$FDT_STA_ID) %in% intakeSites$FDT_STA_ID){
 DT::datatable(AUData, extensions = 'Buttons', escape=F, rownames = F, 
                 options= list(scrollX = TRUE, pageLength = nrow(AUData), scrollY = "300px", 
                               dom='Btf', buttons=list('copy',
-                                                      list(extend='csv',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')),
-                                                      list(extend='excel',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')))),
+                                                      list(extend='csv',filename=paste('AUData_',paste(stationSelection, collapse = "_"),Sys.Date(),sep='')),
+                                                      list(extend='excel',filename=paste('AUData_',paste(stationSelection, collapse = "_"),Sys.Date(),sep='')))),
                 selection = 'none')
 # Summarize data
 paste(nrow(AUData), 'records were retrieved for',as.character(AUselection),sep=' ')
