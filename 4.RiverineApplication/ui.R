@@ -131,8 +131,8 @@ shinyUI(fluidPage(theme="yeti.css",
                                             DT::dataTableOutput('stationSummary'),
                                             br(),
                                             h5(strong("Stations in Selected VAHU6 that have no data in the current window but were carried 
-                                                      over from last cycle due to an IM designation in one of the 2020IR status fields or
-                                                      the 2020 stations table reports the station was carried over from a previous cycle.")),
+                                                      over from last cycle due to an IM designation in one of the previous IR status fields or
+                                                      the previous IR stations table reports the station was carried over from a more previous cycle.")),
                                             helpText('These stations can be viewed in the application and stations table, but none of the 
                                                      parameter modules will display data as no data is available in the current window.'),
                                             DT::dataTableOutput('carryoverStationSummary'),
@@ -165,7 +165,7 @@ shinyUI(fluidPage(theme="yeti.css",
                                           h4('Stations Table Results'),
                                           helpText('Parameters are highlighted
                                                   in different colors to indicate further review may be necessary. Parameters highlighted in yellow have at least one 
-                                                  violation of a standard. When BENTHIC_STAT is highlighed, it indicates there is benthic data present for that site
+                                                  violation of a standard. When BENTHIC_STAT is highlighted, it indicates there is benthic data present for that site
                                                   and the assessor should review that information with the Regional Biologist. Parameters highlighted in red exceed the 10.5% exceedance rate. Both scenarios warrant further
                                                   investigation and may require comments in the Station Table and CEDS WQA.'),
                                           h5(strong('If no station table appears, then there is no data within the assessment window for the selected station.'), 

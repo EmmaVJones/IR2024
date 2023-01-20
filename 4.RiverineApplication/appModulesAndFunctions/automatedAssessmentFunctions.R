@@ -1301,10 +1301,9 @@ metalsAssessmentFunction <- function(metalsAnalysisResults){
     
     #  Organize results to include Staion_Id, Criteria, and the # of Exceedances
     metalsExceedances <- metalsAnalysisResults %>%
-      group_by(FDT_STA_ID, `Criteria Type` ) %>%
-      summarise(Exceedances = sum(`n Windows Exceeding`, na.rm = T)) %>%
+      rename("Exceedances" = `n Windows Exceeding`)%>%
       arrange(`Criteria Type`) %>%  # arrange on just Criteria to make column order make more sense
-      filter(Exceedances > 0)
+      filter(Exceedances > 0 & `Suggested Result` != "Supporting")
     
     # If there are any exceedances, create a string that includes the metal name(s) and the number of exceedances in parentheses
     if(nrow(metalsExceedances)>0){
@@ -1321,6 +1320,7 @@ metalsAssessmentFunction <- function(metalsAnalysisResults){
     }    
   return(metalsResults)
 }
+
 
 
 # Single station chloride assessment
