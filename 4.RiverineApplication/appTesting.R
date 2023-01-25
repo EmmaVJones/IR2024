@@ -167,8 +167,8 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
 ## Watershed selection Tab
 # side panel arguments
 DEQregionSelection <- "BRRO"#"NRO"#"NRO"#"VRO"#"PRO"#"NRO"#'BRRO'#"PRO"#'BRRO'
-basinSelection <- "James-Middle"#"James-Upper"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
-HUC6Selection <- "JM01"#"JU11"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+basinSelection <- "James-Upper"#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
+HUC6Selection <- "JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
 
 # pull together data based on user input on side panel
 # Pull AU data from server
@@ -230,7 +230,7 @@ if(nrow(carryoverStations) > 0){
     stationSelection_  <- c(stationSelection_ , carryoverStationsInAU)  } }
 
 # user selection
-stationSelection <- stationSelection_[1]
+stationSelection <- stationSelection_[2]
 
 
 # Pull conventionals data for just selected AU
@@ -444,10 +444,10 @@ ammoniaAnalysisStation <- z$AmmoniaAnalysis
       PWSconcat <- tibble(#STATION_ID = unique(stationData$FDT_STA_ID),
         PWS= NA)
     } else {
-      PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData$FDT_STA_ID)),
-        assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10, 'PWS_Nitrate'),
-        assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250, 'PWS_Chloride'),
-        assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250, 'PWS_Total_Sulfate')) %>%
+      PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData()$FDT_STA_ID)),
+        assessPWSsummary(assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10), 'PWS_Nitrate'),
+        assessPWSsummary(assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250), 'PWS_Chloride'),
+        assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate')) %>%
         dplyr::select(-ends_with('exceedanceRate')) }
     
     # chloride assessment if data exists
@@ -497,7 +497,11 @@ stationTableOutput <- bind_rows(stationsTemplate,
                                       
                                       # Water Column Metals
                                       filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID) %>% 
-                                        metalsAnalysis(stationData, WER= 1) %>% 
+                                        metalsAnalysis( stationData, WER = 1) %>% 
+                                        rename(FDT_STA_ID = Station_Id) %>% 
+                                        mutate(`Criteria Type` = Criteria) %>% 
+                                        annualRollingExceedanceAnalysis(yearsToRoll = 3, aquaticLifeUse = TRUE) %>% 
+                                        annualRollingExceedanceSummary() %>% 
                                         metalsAssessmentFunction(), 
                                       
                                       # Water Toxics combo fields

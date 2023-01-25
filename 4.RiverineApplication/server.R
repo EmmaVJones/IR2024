@@ -511,9 +511,16 @@ shinyServer(function(input, output, session) {
                                                        annualRollingExceedanceAnalysis(ammoniaAnalysisStation(), yearsToRoll = 3, aquaticLifeUse = FALSE)), parameterAbbreviation = "AMMONIA"),
 
                                                    # Water Column Metals
-                                                   filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID) %>%
-                                                     metalsAnalysis(stationData(), WER= 1) %>%
-                                                     metalsAssessmentFunction(),
+                                                   #metalsAssessmentFunction(filter(metalsAnalysisResults, stationID %in% stationData()$FDT_STA_ID)), 
+                                                  
+                                                    # takes too long to run this in app form, sourced from pinned data to expedite rendering time
+                                                   # filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID) %>% 
+                                                   #   metalsAnalysis( stationData(), WER = 1) %>% 
+                                                   #   rename(FDT_STA_ID = Station_Id) %>% 
+                                                   #   mutate(`Criteria Type` = Criteria) %>% 
+                                                   #   annualRollingExceedanceAnalysis(yearsToRoll = 3, aquaticLifeUse = TRUE) %>% 
+                                                   #   annualRollingExceedanceSummary() %>% 
+                                                   #   metalsAssessmentFunction(),
 
                                                    # Water Toxics combo fields
                                                    waterToxics(),

@@ -25,8 +25,7 @@ ClPlotlySingleStationUI <- function(id){
       br(),hr(),br(),
       h4('Freshwater Chloride Criteria'),
       helpText('Below are the results of the chloride freshwater acute and chronic criteria analysis. These results apply to all stations with
-               CLASS II (Tidal Fresh Zone only) and III - VII. The acute and chronic criteria for each data window are presented on the plot below. 
-               Turn the layers on/off to visualize the raw data averaged across each window.'),
+               CLASS II (Tidal Fresh Zone only) and III - VII. The acute and chronic criteria for each data window are presented on the table below.'),
       h4(strong("Combined Chloride Criteria Analysis Results")),
       h5('All chloride records that are ',span(strong('above the acute or chronic criteria')),' for the ',span(strong('selected site')),' are highlighted below.'),
       # helpText('For chronic criteria to apply, there must be > 1 sample to evaluate in each window. The `Valid Window` field identifies whether these criteria 

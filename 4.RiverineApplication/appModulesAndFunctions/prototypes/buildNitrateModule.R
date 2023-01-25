@@ -13,7 +13,8 @@ NitratePlotlySingleStationUI <- function(id){
                column(1),
                column(2,br(),actionButton(ns('reviewData'),"Review Raw Parameter Data",class='btn-block', width = '250px'))),
       helpText('All data presented in the interactive plot is raw data. Rounding rules are appropriately applied to the 
-               assessment functions utilized by the application.'),
+               assessment functions utilized by the application. .The orange dashed line is nitrate averaged across the assessment window 
+               (visible if the `Apply Public Water Supply Water Quality Standards` checkbox is selected).'),
       plotlyOutput(ns('plotly')),
       fluidRow(
         column(8, h5('All nitrate records that are above the PWS criteria (where applicable) for the ',span(strong('selected site')),' are highlighted below.'),
@@ -215,7 +216,7 @@ server <- function(input,output,session){
   
   
   #AUData <- reactive({filter_at(conventionals_HUC, vars(starts_with("ID305B")), any_vars(. %in% AUselection) ) })
-  AUData <- reactive({filter(conventionals, Huc6_Vahu6 %in% c('JM01','JM02', 'JM03', 'JM04', 'JM05', 'JM06')) %>%
+  AUData <- reactive({filter(conventionals, Huc6_Vahu6 %in% c("JU11")) %>% #'JM01','JM02', 'JM03', 'JM04', 'JM05', 'JM06')) %>%
       left_join(dplyr::select(stationTable, STATION_ID:VAHU6,
                               WQS_ID:CLASS_DESCRIPTION),
                 #WQS_ID:`Max Temperature (C)`), 
