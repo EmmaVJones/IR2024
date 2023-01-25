@@ -409,6 +409,7 @@ ammoniaAnalysisStation <- z$AmmoniaAnalysis
 WCmetalsStationAnalysisStation <- filter(WCmetalsForAnalysis, StationID %in% unique(stationData$FDT_STA_ID)) %>%
     map(1)  
 
+WCmetalsStationAnalysisStation$WCmetalsExceedanceSummary
 
   # PWS stuff
   if(nrow(stationData) > 0){

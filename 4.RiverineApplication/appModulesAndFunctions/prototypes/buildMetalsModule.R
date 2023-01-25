@@ -22,6 +22,7 @@ metalsTableSingleStationUI <- function(id){
                                      h5(strong("These analyses are still undergoing rigorous review. Please verify all assessment decisions 
                                             based off these results until further notice.")) ) ),
                             DT::dataTableOutput(ns('WCmetalsSingleSiteSummary')),
+                            verbatimTextOutput(ns('testtest')),
                             hr(), 
                             fluidRow(
                               column(7, helpText('Below are the calculated results associated with the ',span('selected site'),". You can view all the
@@ -98,182 +99,142 @@ metalsTableSingleStation <- function(input,output,session, AUdata, stationData, 
       WCmetals_oneStationForAnalysis()$WCmetalsExceedanceSummary
     } else {
       WCmetals_oneStation() %>% 
-        metalsAnalysis( stationData(), WER = 1) %>% 
-        rename(FDT_STA_ID = Station_Id) %>% 
-        mutate(`Criteria Type` = Criteria)      } })
+        metalsAnalysis( stationData(), WER = input$WER) #%>% 
+        #rename(FDT_STA_ID = Station_Id) %>% 
+        #mutate(`Criteria Type` = Criteria)    
+      } })
    # metalsAnalysis(WCmetals_oneStationForAnalysis(), AUdata(), WER= input$WER)    })
+  
+  output$testtest <- renderPrint({nrow(stationData())}) #WCmetals_oneStationAnalysis()})
   
   WCmetals_oneStationAssessment <- reactive({req(WCmetals_oneStationForAnalysis(), input$WER)
     if(input$WER == 1){
       WCmetals_oneStationForAnalysis()$WCmetalsExceedanceSummary
     } else {
       annualRollingExceedanceAnalysis(WCmetals_oneStationAnalysis(), yearsToRoll = 3, aquaticLifeUse = TRUE) %>% 
-        annualRollingExceedanceSummary(WCmetalsExceedanceAnalysis)     } })
+        annualRollingExceedanceSummary()     } })
     #metalsAssessmentFunction(WCmetals_oneStationAnalysis())})
   
   output$WCmetalsSingleSiteSummary <- DT::renderDataTable({req(WCmetals_oneStationAssessment())
     DT::datatable(WCmetals_oneStationAssessment(), rownames = FALSE,extensions = 'Buttons',
-                  options= list(scrollX = TRUE, pageLength = nrow(WCmetals_oneStationAssessment()), scrollY = "80px", dom='Bt',
+                  options= list(scrollX = TRUE, pageLength = nrow(WCmetals_oneStationAssessment()), scrollY = "400px", dom='Bt',
                                 buttons=list('copy',
                                              list(extend='csv',filename=paste('WCmetalsSummary_',paste(assessmentCycle,input$WCmetals_oneStationSelection, collapse = "_"),Sys.Date(),sep='')),
                                              list(extend='excel',filename=paste('WCmetalsSummary_',paste(assessmentCycle,input$WCmetals_oneStationSelection, collapse = "_"),Sys.Date(),sep='')))),
                   selection = 'none')     })
   
-  # Zoomed plot section
-  output$criteriaChoice_ <- renderUI({req(WCmetals_oneStationAnalysis())
-    selectizeInput(ns("criteriaChoice"), "Choose Criteria to visualize", choices = c('All', unique(WCmetals_oneStationAnalysis()$Criteria)), width = '40%')})
-  
-  output$analyzedData <- DT::renderDataTable({req(WCmetals_oneStationAnalysis(), input$criteriaChoice)
-    z <- WCmetals_oneStationAnalysis() %>% 
-      {if(input$criteriaChoice != 'All')
-        filter(., Criteria %in% input$criteriaChoice)
-        else . }
-    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "300px", dom='Bti', buttons=list('copy')),
-                  selection = 'none') })
-  #output$test <- renderPrint({input$criteriaChoice    })
-  
-  output$plotlyZoom <- renderPlotly({ req(WCmetals_oneStationAnalysis(), input$criteriaChoice !='All' )#input$analyzedData_rows_selected, 
-    criteriaSelection <- input$criteriaChoice #WCmetals_oneStationAnalysis()[input$analyzedData_rows_selected, ]$Criteria
-    dat <- filter(WCmetals_oneStationAnalysis(), Criteria %in%  criteriaSelection) %>%
-      filter(Value != 'NaN') # drop any unmeasured values
-    print(dat)
-    dat$SampleDate <- as.POSIXct(dat$WindowDateTimeStart, format="%m/%d/%y")
-    
-    plot_ly(data=dat) %>%
-      {if(criteriaSelection %in% staticLimit)
-        add_markers(., x= ~SampleDate, y= ~Value,mode = 'scatter', name=~Metal, marker = list(color= '#535559'),
-                    hoverinfo="text",text=~paste(sep="<br>",
-                                                 paste("StationID: ",Station_Id),
-                                                 paste("Date: ",SampleDate),
-                                                 paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste(Metal,":",Value, "ug/L"),
-                                                 paste('Static Criteria:', CriteriaValue, "ug/L"))) %>%
-          add_lines(data=dat, x=~SampleDate,y=~CriteriaValue, mode='line', line = list(color = '#484a4c',dash = 'dot'),
-                    hoverinfo = "text", text= ~paste(criteriaSelection, "Criteria:",  CriteriaValue, "ug/L"), name="Static Criteria")
-        else add_markers(., data=dat, x= ~SampleDate, y= ~Value, mode = 'scatter', name=~Metal, marker = list(color= ~Exceedance), colors = c('#535559', 'red'), #color= ~Exceedance, #colors = c('#535559', 'red'),#marker = list(color= '#535559'),
-                         symbol =  ~Exceedance, symbols = c(16,15),
-                         hoverinfo="text",text=~paste(sep="<br>",
-                                                      paste("StationID: ",Station_Id),
-                                                      paste("Date: ",SampleDate),
-                                                      paste("Depth: ",FDT_DEPTH, "m"),
-                                                      paste(Metal,":",Value, "ug/L"),
-                                                      paste('Hardness Based Criteria:', CriteriaValue, "ug/L")))       } %>%
-      layout(showlegend=FALSE,
-             yaxis=list(title=paste(stringr::word(criteriaSelection, 1), "ug/L")),
-             xaxis=list(title="Sample Date",tickfont = list(size = 10))) })
-  
-  
-  
+  # # Zoomed plot section
+  # output$criteriaChoice_ <- renderUI({req(WCmetals_oneStationAnalysis())
+  #   selectizeInput(ns("criteriaChoice"), "Choose Criteria to visualize", choices = c('All', unique(WCmetals_oneStationAnalysis()$Criteria)), width = '40%')})
+  # 
+  # output$analyzedData <- DT::renderDataTable({req(WCmetals_oneStationAnalysis(), input$criteriaChoice)
+  #   z <- WCmetals_oneStationAnalysis() %>% 
+  #     {if(input$criteriaChoice != 'All')
+  #       filter(., Criteria %in% input$criteriaChoice)
+  #       else . }
+  #   DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "300px", dom='Bti', buttons=list('copy')),
+  #                 selection = 'none') })
+  # #output$test <- renderPrint({input$criteriaChoice    })
+  # 
+  # output$plotlyZoom <- renderPlotly({ req(WCmetals_oneStationAnalysis(), input$criteriaChoice !='All' )#input$analyzedData_rows_selected, 
+  #   criteriaSelection <- input$criteriaChoice #WCmetals_oneStationAnalysis()[input$analyzedData_rows_selected, ]$Criteria
+  #   dat <- filter(WCmetals_oneStationAnalysis(), Criteria %in%  criteriaSelection) %>%
+  #     filter(Value != 'NaN') # drop any unmeasured values
+  #   print(dat)
+  #   dat$SampleDate <- as.POSIXct(dat$WindowDateTimeStart, format="%m/%d/%y")
+  #   
+  #   plot_ly(data=dat) %>%
+  #     {if(criteriaSelection %in% staticLimit)
+  #       add_markers(., x= ~SampleDate, y= ~Value,mode = 'scatter', name=~Metal, marker = list(color= '#535559'),
+  #                   hoverinfo="text",text=~paste(sep="<br>",
+  #                                                paste("StationID: ",Station_Id),
+  #                                                paste("Date: ",SampleDate),
+  #                                                paste("Depth: ",FDT_DEPTH, "m"),
+  #                                                paste(Metal,":",Value, "ug/L"),
+  #                                                paste('Static Criteria:', CriteriaValue, "ug/L"))) %>%
+  #         add_lines(data=dat, x=~SampleDate,y=~CriteriaValue, mode='line', line = list(color = '#484a4c',dash = 'dot'),
+  #                   hoverinfo = "text", text= ~paste(criteriaSelection, "Criteria:",  CriteriaValue, "ug/L"), name="Static Criteria")
+  #       else add_markers(., data=dat, x= ~SampleDate, y= ~Value, mode = 'scatter', name=~Metal, marker = list(color= ~Exceedance), colors = c('#535559', 'red'), #color= ~Exceedance, #colors = c('#535559', 'red'),#marker = list(color= '#535559'),
+  #                        symbol =  ~Exceedance, symbols = c(16,15),
+  #                        hoverinfo="text",text=~paste(sep="<br>",
+  #                                                     paste("StationID: ",Station_Id),
+  #                                                     paste("Date: ",SampleDate),
+  #                                                     paste("Depth: ",FDT_DEPTH, "m"),
+  #                                                     paste(Metal,":",Value, "ug/L"),
+  #                                                     paste('Hardness Based Criteria:', CriteriaValue, "ug/L")))       } %>%
+  #     layout(showlegend=FALSE,
+  #            yaxis=list(title=paste(stringr::word(criteriaSelection, 1), "ug/L")),
+  #            xaxis=list(title="Sample Date",tickfont = list(size = 10))) })
+  # 
+  # 
+  # 
   # Raw data
   output$WCmetalsRangeTableSingleSite <- DT::renderDataTable({req(WCmetals_oneStation())
     z <- WCmetals_oneStation()
-    z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
+    #z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
     DT::datatable(z, rownames = FALSE,extensions = 'Buttons',
                   options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='Bt',
                                 buttons=list('copy',
                                              list(extend='csv',filename=paste('WCmetalsRaw_',paste(assessmentCycle,input$WCmetals_oneStationSelection, collapse = "_"),Sys.Date(),sep='')),
                                              list(extend='excel',filename=paste('WCmetalsRaw_',paste(assessmentCycle,input$WCmetals_oneStationSelection, collapse = "_"),Sys.Date(),sep='')))),
                   selection = 'none')     })
-  
-  
-  
-  
-  output$IR2020WCmetalsRangeTableSingleSite <- DT::renderDataTable({req(input$WCmetals_oneStationSelection)
-    z <- filter(IR2020WCmetals, FDT_STA_ID %in% input$WCmetals_oneStationSelection) %>%
-      dplyr::select( FDT_STA_ID:HARDNESS)
-    z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
-    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'),
-                  selection = 'none')     })
-  
-  output$IR2020WCstationmetalsExceedanceRate <- DT::renderDataTable({ req(input$WCmetals_oneStationSelection)
-    z <-  filter(IR2020WCmetals, FDT_STA_ID %in% input$WCmetals_oneStationSelection) %>%
-      dplyr::select(FDT_STA_ID, `FDT_DATE_TIME`,`ANTIMONY HUMAN HEALTH PWS`:`ZINC ALL OTHER SURFACE WATERS`)
-    z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
-    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'),
-                  selection = 'none') %>%
-      formatStyle(names(z), backgroundColor = styleEqual(c('NSP'), c('red'))) # highlight cells red if not supporting
-  })
-  
-  
-  
-  ## Sediment Metals
-  
-  # Select One station for individual review
-  output$Smetals_oneStationSelectionUI <- renderUI({
-    req(stationSelectedAbove)
-    selectInput(ns('Smetals_oneStationSelection'),strong('Select Station to Review'),choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))),#unique(AUdata())$FDT_STA_ID,
-                width='300px', selected = stationSelectedAbove())})# "2-JMS279.41" )})
-  
-  Smetals_oneStation <- reactive({
-    req(ns(input$Smetals_oneStationSelection))
-    filter(Smetals, Station_Id %in% input$Smetals_oneStationSelection)})
-  
-  output$SmetalsRangeTableSingleSite <- DT::renderDataTable({req(Smetals_oneStation())
-    z <- Smetals_oneStation()
-    z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
-    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'),
-                  selection = 'none')     })
-  
-  
-  
-  
-  output$IR2020SmetalsRangeTableSingleSite <- DT::renderDataTable({req(input$Smetals_oneStationSelection)
-    z <- filter(IR2020Smetals, FDT_STA_ID %in% input$Smetals_oneStationSelection) %>%
-      dplyr::select(FDT_STA_ID, FDT_DATE_TIME:ENDRINT)
-    z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
-    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'),
-                  selection = 'none')     })
-  
-  
-  output$IR2020SmetalsRangeTableSingleSite <- DT::renderDataTable({req(input$Smetals_oneStationSelection)
-    z <- filter(IR2020Smetals, FDT_STA_ID %in% input$Smetals_oneStationSelection) %>%
-      dplyr::select( FDT_STA_ID, FDT_DATE_TIME:ENDRINT)
-    z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
-    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'),
-                  selection = 'none')     })
-  
-  output$IR2020SstationmetalsExceedanceRate <- DT::renderDataTable({
-    req(input$Smetals_oneStationSelection, Smetals_oneStation())
-    z <- filter(IR2020Smetals, FDT_STA_ID %in% input$Smetals_oneStationSelection) %>%
-      dplyr::select(FDT_STA_ID, `FDT_DATE_TIME`,ARSENIC:COMMENT)
-    z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
-    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'),
-                  selection = 'none') %>%
-      formatStyle(names(z), backgroundColor = styleEqual(c('OE'), c('red'))) # highlight cells red if not supporting
-  })
-  
-  ## Fish Tissue Metals
-  
-  output$Fmetals_oneStationSelectionUI <- renderUI({
-    req(stationSelectedAbove)
-    selectInput(ns('Fmetals_oneStationSelection'),strong('Select Station to Review'),choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))),#unique(AUdata())$FDT_STA_ID,
-                width='300px', selected = stationSelectedAbove())})# "2-JMS279.41" )})
-  
-  
-  Fmetals_oneStation <- reactive({req(ns(input$Fmetals_oneStationSelection))
-    filter(Fmetals, Station_ID %in% input$Fmetals_oneStationSelection)})
-  
-  output$Fmetals_exceedance <- DT::renderDataTable({req(Fmetals_oneStation())
-    FmetalsSV <- dplyr::select(Fmetals_oneStation(), Station_ID, Collection_Date_Time, Sample_ID,  `# of Fish`, Species_Name, length, weight, Beryllium:Lead) %>%
-      dplyr::select(-contains('RMK_')) %>%
-      group_by( Station_ID, Collection_Date_Time, Sample_ID, `# of Fish`, Species_Name, length, weight) %>%
-      pivot_longer(cols= Beryllium:Lead, names_to = "Metal", values_to = 'Measure') %>%
-      left_join(metalsSV, by = 'Metal') %>%
-      filter(Measure > `Screening Value`) %>%
-      arrange(Metal)
-    DT::datatable(FmetalsSV, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(FmetalsSV),
-                                                             scrollY = "250px", dom='Bti', buttons=list('copy')), selection = 'none') })
-  
-  
-  output$FmetalsRangeTableSingleSite <- DT::renderDataTable({ req(input$Fmetals_oneStationSelection, Fmetals_oneStation())
-    # z <- dplyr::select(Smetals_oneStation(), FDT_STA_ID, `FDT_DATE_TIME`,ARSENIC:COMMENT)
-    # z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
-    DT::datatable(Fmetals_oneStation(), rownames = FALSE,
-                  options= list(scrollX = TRUE, pageLength = nrow(Fmetals_oneStation()), scrollY = "250px", dom='Bti', buttons=list('copy')),
-                  selection = 'none') #%>%
-    #formatStyle(names(z), backgroundColor = styleEqual(c('OE'), c('red'))) # highlight cells red if not supporting
-  })
-  
+
+
+  # 
+  # 
+ 
+  # 
+  # ## Sediment Metals
+  # 
+  # # Select One station for individual review
+  # output$Smetals_oneStationSelectionUI <- renderUI({
+  #   req(stationSelectedAbove)
+  #   selectInput(ns('Smetals_oneStationSelection'),strong('Select Station to Review'),choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))),#unique(AUdata())$FDT_STA_ID,
+  #               width='300px', selected = stationSelectedAbove())})# "2-JMS279.41" )})
+  # 
+  # Smetals_oneStation <- reactive({
+  #   req(ns(input$Smetals_oneStationSelection))
+  #   filter(Smetals, Station_Id %in% input$Smetals_oneStationSelection)})
+  # 
+  # output$SmetalsRangeTableSingleSite <- DT::renderDataTable({req(Smetals_oneStation())
+  #   z <- Smetals_oneStation()
+  #   z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
+  #   DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'),
+  #                 selection = 'none')     })
+  # 
+  #  
+  # ## Fish Tissue Metals
+  # 
+  # output$Fmetals_oneStationSelectionUI <- renderUI({
+  #   req(stationSelectedAbove)
+  #   selectInput(ns('Fmetals_oneStationSelection'),strong('Select Station to Review'),choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))),#unique(AUdata())$FDT_STA_ID,
+  #               width='300px', selected = stationSelectedAbove())})# "2-JMS279.41" )})
+  # 
+  # 
+  # Fmetals_oneStation <- reactive({req(ns(input$Fmetals_oneStationSelection))
+  #   filter(Fmetals, Station_ID %in% input$Fmetals_oneStationSelection)})
+  # 
+  # output$Fmetals_exceedance <- DT::renderDataTable({req(Fmetals_oneStation())
+  #   FmetalsSV <- dplyr::select(Fmetals_oneStation(), Station_ID, Collection_Date_Time, Sample_ID,  `# of Fish`, Species_Name, length, weight, Beryllium:Lead) %>%
+  #     dplyr::select(-contains('RMK_')) %>%
+  #     group_by( Station_ID, Collection_Date_Time, Sample_ID, `# of Fish`, Species_Name, length, weight) %>%
+  #     pivot_longer(cols= Beryllium:Lead, names_to = "Metal", values_to = 'Measure') %>%
+  #     left_join(metalsSV, by = 'Metal') %>%
+  #     filter(Measure > `Screening Value`) %>%
+  #     arrange(Metal)
+  #   DT::datatable(FmetalsSV, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(FmetalsSV),
+  #                                                            scrollY = "250px", dom='Bti', buttons=list('copy')), selection = 'none') })
+  # 
+  # 
+  # output$FmetalsRangeTableSingleSite <- DT::renderDataTable({ req(input$Fmetals_oneStationSelection, Fmetals_oneStation())
+  #   # z <- dplyr::select(Smetals_oneStation(), FDT_STA_ID, `FDT_DATE_TIME`,ARSENIC:COMMENT)
+  #   # z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
+  #   DT::datatable(Fmetals_oneStation(), rownames = FALSE,
+  #                 options= list(scrollX = TRUE, pageLength = nrow(Fmetals_oneStation()), scrollY = "250px", dom='Bti', buttons=list('copy')),
+  #                 selection = 'none') #%>%
+  #   #formatStyle(names(z), backgroundColor = styleEqual(c('OE'), c('red'))) # highlight cells red if not supporting
+  # })
+  # 
   
 }
 
@@ -283,11 +244,12 @@ metalsTableSingleStation <- function(input,output,session, AUdata, stationData, 
 
 ui <- fluidPage(
   helpText('Review each site using the single site visualization section. There are no WQS for Specific Conductivity.'),
-  metalsTableSingleStationUI('metals')
+  metalsTableSingleStationUI('metals'),
+  verbatimTextOutput('test')
 )
 
 server <- function(input,output,session){
-  stationData <- eventReactive( input$stationSelection, {
+  stationData1 <- eventReactive( input$stationSelection, {
     filter(AUData(), FDT_STA_ID %in% input$stationSelection) })
   stationSelected <- reactive({input$stationSelection})
   
@@ -302,9 +264,10 @@ server <- function(input,output,session){
       pHSpecialStandardsCorrection() %>%
       filter(!is.na(CHLORIDE_mg_L))})
   
+  output$test <-renderPrint({stationData1()})   # this is the problem
   
   #### Metals Sub Tab ####---------------------------------------------------------------------------------------------------
-  callModule(metalsTableSingleStation,'metals', AUData, stationData, WCmetals, WCmetalsForAnalysis, Smetals, 
+  callModule(metalsTableSingleStation,'metals', AUData, reactive(stationData1), WCmetals, WCmetalsForAnalysis, Smetals, 
              fishMetals, fishMetalsScreeningValues, stationSelected, staticLimit)
   
   
