@@ -513,7 +513,7 @@ shinyServer(function(input, output, session) {
                                                    # Water Column Metals
                                                    #metalsAssessmentFunction(filter(metalsAnalysisResults, stationID %in% stationData()$FDT_STA_ID)), 
                                                   
-                                                    # takes too long to run this in app form, sourced from pinned data to expedite rendering time
+                                                   # takes too long to run this in app form, sourced from pinned data to expedite rendering time
                                                    # filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID) %>% 
                                                    #   metalsAnalysis( stationData(), WER = 1) %>% 
                                                    #   rename(FDT_STA_ID = Station_Id) %>% 
