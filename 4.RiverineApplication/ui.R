@@ -318,7 +318,13 @@ shinyUI(fluidPage(theme="yeti.css",
                                                                              helpText("Information is available here if regional biological staff have completed the 
                                                                                       bioassessment process in previous assessment cycles."),
                                                                              DT::dataTableOutput('historicalBioassessmentInfo')))
-                                                                  ))))#, 
+                                                                  )))),
+                                            tabPanel('Metals Data',
+                                                     HTML("<p>For detailed explanations on how individual parameters are calculated using the automated assessment process, 
+                                                                     please see the <a href='https://rconnect.deq.virginia.gov/WQAautomatedAssessmentUserManual/individual-parameter-analyses.html#individual-parameter-analyses' target='_blank'>Automated Assessment User Guide</a></p>"),
+                                                     metalsTableSingleStationUI('metals'))#,
+                                            # tabPanel('Toxics Data', 
+                                            #          toxicsSingleStationUI('PBC'))
                                                      )
                                  )
                                  

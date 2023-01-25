@@ -1296,28 +1296,35 @@ metalsAnalysis <- function(stationMetalsData, stationData, WER){
 
 # Metals Assessment function that makes sense of output from metalsAnalysis()
 metalsAssessmentFunction <- function(metalsAnalysisResults){
+
   #Check to make sure that metals data exist
-  if(nrow(metalsAnalysisResults) > 0){
-    
-    #  Organize results to include Staion_Id, Criteria, and the # of Exceedances
-    metalsExceedances <- metalsAnalysisResults %>%
-      rename("Exceedances" = `n Windows Exceeding`)%>%
-      arrange(`Criteria Type`) %>%  # arrange on just Criteria to make column order make more sense
-      filter(Exceedances > 0 & `Suggested Result` != "Supporting")
-    
-    # If there are any exceedances, create a string that includes the metal name(s) and the number of exceedances in parentheses
-    if(nrow(metalsExceedances)>0){
-      WAT_MET_STATstring<-sapply(seq_len(nrow(metalsExceedances)), function(i) paste0(metalsExceedances$`Criteria Type`[i]," (", metalsExceedances$Exceedances[i], ")")) %>%
-        toString()
-      # Create tibble in the format of the stations table that takes the sum of all exceedances for the WAT_MET_EXC field and returns the string created above for the WAT_MET_STAT field
-      metalsResults <- tibble("WAT_MET_EXC" = sum(metalsExceedances$Exceedances), "WAT_MET_STAT" = "Review", "WAT_MET_COMMENT" = WAT_MET_STATstring)
-    }else{
-      # If metals data do exist, but there are no exceedances, return 0 and "S" for supporting
-      metalsResults <- tibble("WAT_MET_EXC" = 0, "WAT_MET_STAT" = "S", "WAT_MET_COMMENT" = NA)
-    }}else{
-      # If no metals data exist, return a tibble with NA for both fields
-      metalsResults <- tibble("WAT_MET_EXC" = NA, "WAT_MET_STAT" = NA, "WAT_MET_COMMENT" = NA)
-    }    
+  if(!is.null(metalsAnalysisResults)){
+    if(nrow(metalsAnalysisResults) > 0){
+      
+      #  Organize results to include Staion_Id, Criteria, and the # of Exceedances
+      metalsExceedances <- metalsAnalysisResults %>%
+        rename("Exceedances" = `n Windows Exceeding`)%>%
+        arrange(`Criteria Type`) %>%  # arrange on just Criteria to make column order make more sense
+        filter(Exceedances > 0 & `Suggested Result` != "Supporting")
+      
+      # If there are any exceedances, create a string that includes the metal name(s) and the number of exceedances in parentheses
+      if(nrow(metalsExceedances)>0){
+        WAT_MET_STATstring<-sapply(seq_len(nrow(metalsExceedances)), function(i) paste0(metalsExceedances$`Criteria Type`[i]," (", metalsExceedances$Exceedances[i], ")")) %>%
+          toString()
+        # Create tibble in the format of the stations table that takes the sum of all exceedances for the WAT_MET_EXC field and returns the string created above for the WAT_MET_STAT field
+        metalsResults <- tibble("WAT_MET_EXC" = sum(metalsExceedances$Exceedances), "WAT_MET_STAT" = "Review", "WAT_MET_COMMENT" = WAT_MET_STATstring)
+      }else{
+        # If metals data do exist, but there are no exceedances, return 0 and "S" for supporting
+        metalsResults <- tibble("WAT_MET_EXC" = 0, "WAT_MET_STAT" = "S", "WAT_MET_COMMENT" = NA)
+      }}else{
+        # If no metals data exist, return a tibble with NA for both fields
+        metalsResults <- tibble("WAT_MET_EXC" = NA, "WAT_MET_STAT" = NA, "WAT_MET_COMMENT" = NA)
+      } 
+  } else {
+    # If no metals data exist, return a tibble with NA for both fields
+    metalsResults <- tibble("WAT_MET_EXC" = NA, "WAT_MET_STAT" = NA, "WAT_MET_COMMENT" = NA)
+  }
+     
   return(metalsResults)
 }
 
@@ -1418,6 +1425,7 @@ annualRollingExceedanceAnalysis <- function(dataToAnalyze,
                                             ){
   
   if(is.null(dataToAnalyze)){return(NULL)}
+  if(nrow(dataToAnalyze) == 0 ){return(NULL)}
   
   # place to store results
   dataWindowResults <- tibble(FDT_STA_ID = as.character(NA), `Window Begin` = as.numeric(NA),

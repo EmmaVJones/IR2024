@@ -356,7 +356,11 @@ WCmetalsForAnalysis <- WCmetals %>%
   rename_with(~str_remove(., 'METAL_')) # drop METAL_ prefix for easier analyses
 ```
 
+Best to pin water column metals data to the R server to expedite app rendering.
 
+```{r pin wcmetals reformatted}
+# pin(WCmetalsForAnalysis, name = 'WCmetalsForAnalysis', description = "Draft water column metals data for IR2024. This is used for the shiny app versions of the automated assessment protocol to save rendering time", board = 'rsconnect')
+```
 
 
 # Automated Assessment Steps
@@ -368,7 +372,7 @@ Finally, we are ready to analyze some data! Go through stationTable one station 
 stationTableResults <- stationsTemplate 
 # save ammonia results (based on default assessment information) for use in app to speed rendering
 ammoniaAnalysis <- tibble()
-
+waterColumnMetalsAnalysis <- tibble()
 
 # time it:
 startTime <- Sys.time()
@@ -450,6 +454,15 @@ for(i in 1:nrow(stationTable)){
   } else {
     WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA)
   }
+  
+  
+  # Water Column Metals analysis using Aquatic Life Toxics rolling window method
+  WCmetalsStationAnalysis <- filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID) %>% 
+        metalsAnalysis( stationData, WER = 1) %>% 
+        rename(FDT_STA_ID = Station_Id) %>% 
+        mutate(`Criteria Type` = Criteria) 
+  WCmetalsExceedanceAnalysis <- annualRollingExceedanceAnalysis(WCmetalsStationAnalysis, yearsToRoll = 3, aquaticLifeUse = TRUE)
+  WCmetalsExceedanceSummary <- annualRollingExceedanceSummary(WCmetalsExceedanceAnalysis)  
    
   # If data exists for station, run it, otherwise just output what last cycle said and comment
   if(nrow(stationData) > 0){
@@ -490,17 +503,8 @@ for(i in 1:nrow(stationTable)){
           annualRollingExceedanceAnalysis(ammoniaAnalysisStation, yearsToRoll = 3, aquaticLifeUse = FALSE)), 
         parameterAbbreviation = "AMMONIA"),
     
-      # Water Column Metals analysis using Aquatic Life Toxics rolling window method
-      filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID) %>% 
-        metalsAnalysis( stationData, WER = 1) %>% 
-        rename(FDT_STA_ID = Station_Id) %>% 
-        mutate(`Criteria Type` = Criteria) %>% 
-        annualRollingExceedanceAnalysis(yearsToRoll = 3, aquaticLifeUse = TRUE) %>% 
-        annualRollingExceedanceSummary() %>% 
-        metalsAssessmentFunction() ,
-      # filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID) %>% 
-      #   metalsAnalysis(stationData, WER= 1) %>% 
-      #   metalsAssessmentFunction(), 
+      # Summarize analyzed water column metals information for station table
+      metalsAssessmentFunction(WCmetalsExceedanceSummary),
       
       # # Flag for whether or not metals data exists
       # metalsData(filter(WCmetals, Station_Id %in% stationData$FDT_STA_ID), 'WAT_MET'),
@@ -556,6 +560,12 @@ for(i in 1:nrow(stationTable)){
   ammoniaAnalysis <- bind_rows(ammoniaAnalysis, 
                                tibble(StationID = unique(stationData$FDT_STA_ID), 
                                       AmmoniaAnalysis = list(ammoniaAnalysisStation)))
+  waterColumnMetalsAnalysis <- bind_rows(waterColumnMetalsAnalysis,
+                                         tibble(StationID = unique(stationData$FDT_STA_ID),
+                                                WCmetalsStationAnalysis =  list(WCmetalsStationAnalysis),
+                                                WCmetalsExceedanceAnalysis = list(WCmetalsExceedanceAnalysis),
+                                                WCmetalsExceedanceSummary = list(WCmetalsExceedanceSummary)))  
+  
 }
 
 
@@ -621,6 +631,7 @@ write_csv(stationTableResults, 'processedStationData/stationTableResults.csv',
 #           na = "") # dont write out a character NA in csv
 
 saveRDS(ammoniaAnalysis, 'processedStationData/ammoniaAnalysis.RDS')
+saveRDS(waterColumnMetalsAnalysis, 'processedStationData/WCmetalsForApp.RDS')
 ```
 
 

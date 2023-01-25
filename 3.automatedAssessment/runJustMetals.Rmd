@@ -366,18 +366,21 @@ Finally, we are ready to analyze some data! Go through stationTable one station 
 
 Only run for metals with data
 ```{r}
-stationTable <- filter(stationTable, STATION_ID %in% WCmetalsForAnalysis$Station_Id)
+#stationTable <- filter(stationTable, STATION_ID %in% WCmetalsForAnalysis$Station_Id)
 ```
 
 
 ```{r Automated Assessment}
 # make placeholder objects to store data results
 stationTableResults <- stationsTemplate 
+waterColumnMetalsAnalysis <- tibble()
 
 
 
 # loop over all sites, not super efficient but get the job done in easy to follow format
 for(i in 1:nrow(stationTable)){
+  print(paste(i, "of", nrow(stationTable)))
+  
 stationData <- filter(conventionals, FDT_STA_ID %in% stationTable$STATION_ID[i]) %>%
     #stationData <- filter(conventionals, FDT_STA_ID == '1ABIR000.76') %>% #'1AACO014.57') %>% #"4ACRV006.19") %>% #"1ABIR000.76") %>%# test a specific station
     left_join(stationTable, by = c('FDT_STA_ID' = 'STATION_ID')) %>%
@@ -393,28 +396,35 @@ stationData <- filter(conventionals, FDT_STA_ID %in% stationTable$STATION_ID[i])
     #   else mutate(., lakeStation = FALSE) }
   
 if(nrow(stationData)>0){
-  results <- cbind(
-    StationTableStartingData(stationData),
-    filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID) %>% 
-      metalsAnalysis( stationData, WER = 1) %>% 
-      rename(FDT_STA_ID = Station_Id) %>% 
-      mutate(`Criteria Type` = Criteria) %>% 
-      annualRollingExceedanceAnalysis(yearsToRoll = 3, aquaticLifeUse = TRUE) %>% 
-      annualRollingExceedanceSummary() %>% 
-      metalsAssessmentFunction() )
- # mutate(COMMENTS = WAT_MET_COMMENT)  #paste0(DO_Daily_Avg_STAT,  WAT_MET_COMMENT) )   
+  
+   # Water Column Metals analysis using Aquatic Life Toxics rolling window method
+  WCmetalsStationAnalysis <- filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID) %>% 
+        metalsAnalysis( stationData, WER = 1) %>% 
+        rename(FDT_STA_ID = Station_Id) %>% 
+        mutate(`Criteria Type` = Criteria) 
+  WCmetalsExceedanceAnalysis <- annualRollingExceedanceAnalysis(WCmetalsStationAnalysis, yearsToRoll = 3, aquaticLifeUse = TRUE)
+  WCmetalsExceedanceSummary <- annualRollingExceedanceSummary(WCmetalsExceedanceAnalysis)  
+
+  
+  waterColumnMetalsAnalysis <- bind_rows(waterColumnMetalsAnalysis,
+                                         tibble(StationID = unique(stationData$FDT_STA_ID),
+                                                WCmetalsStationAnalysis =  list(WCmetalsStationAnalysis),
+                                                WCmetalsExceedanceAnalysis = list(WCmetalsExceedanceAnalysis),
+                                                WCmetalsExceedanceSummary = list(WCmetalsExceedanceSummary)))    
   
 } else{
-  results <- filter(stationTable, STATION_ID == stationTable$STATION_ID[i]) %>%
-      dplyr::select(STATION_ID:VAHU6, COMMENTS) %>%
-      mutate(COMMENTS = 'This station has no data in current window but was carried over due to IM in one of the previous IR status fields or the previous IR stations table reports the station was carried over from a previous cycle.')# %>%
-      #left_join(comments, by = 'STATION_ID')# %>% 
-      #mutate(`Date Last Sampled` = dateLastSampled)
-}
-  stationTableResults <- bind_rows(stationTableResults,results)
+  waterColumnMetalsAnalysis <- bind_rows(waterColumnMetalsAnalysis,
+                                         tibble(StationID = unique(stationTable$STATION_ID[i]),
+                                                WCmetalsStationAnalysis =  list(NULL),
+                                                WCmetalsExceedanceAnalysis = list(NULL),
+                                                WCmetalsExceedanceSummary = list(NULL))) 
   
+ 
 }
 
-stationTableResults <- dplyr::select(stationTableResults, STATION_ID, ID305B_1, ID305B_2, WATER_TYPE, REGION, VAHU6, WAT_MET_EXC, WAT_MET_STAT, WAT_MET_COMMENT)
-saveRDS(stationTableResults, 'data/metals.RDS')
+}
+```
+
+```{r}
+saveRDS(waterColumnMetalsAnalysis, 'processedStationData/WCmetalsForApp.RDS')
 ```
