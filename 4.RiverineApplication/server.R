@@ -26,7 +26,7 @@ intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
 
 
 WCmetals <- pin_get("ejones/WCmetalsForAnalysis",  board = "rsconnect") #pin_get("WCmetals-2022IRfinal",  board = "rsconnect")
-WCmetalsForAnalysis <- readRDS('data/WCmetalsForApp.RDS')
+WCmetalsForAnalysis <- readRDS('userDataToUpload/WCmetalsForApp.RDS')
 Smetals <- pin_get("Smetals-2022IRfinal",  board = "rsconnect")
 # IR2020WCmetals <- pin_get("WCmetals-2020IRfinal",  board = "rsconnect")
 # IR2020Smetals <- pin_get("Smetals-2020IRfinal",  board = "rsconnect")

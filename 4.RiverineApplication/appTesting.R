@@ -30,7 +30,7 @@ intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
 
 WCmetals <- pin_get("ejones/WCmetalsForAnalysis",  board = "rsconnect")
 # Separate object for analysis, tack on METALS and RMK designation to make the filtering of certain lab comment codes easier
-WCmetalsForAnalysis <- readRDS('data/WCmetalsForApp.RDS')
+WCmetalsForAnalysis <- readRDS('userDataToUpload/WCmetalsForApp.RDS')
 Smetals <- pin_get("Smetals-2022IRfinal",  board = "rsconnect")
 # IR2020WCmetals <- pin_get("WCmetals-2020IRfinal",  board = "rsconnect")
 # IR2020Smetals <- pin_get("Smetals-2020IRfinal",  board = "rsconnect")
