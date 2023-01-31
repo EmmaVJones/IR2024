@@ -100,7 +100,7 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                                      FDT_FIELD_PH, RMK_FDT_FIELD_PH, LEVEL_FDT_FIELD_PH,
                                      ThermoclineDepth, LakeStratification)
     
-    DDT::datatable(parameterFilter, rownames = FALSE, extensions = c('Buttons',  'FixedColumns'),
+    DT::datatable(parameterFilter, rownames = FALSE, extensions = c('Buttons',  'FixedColumns'),
                    options= list(dom= 'Bt', pageLength = nrow(parameterFilter), scrollX = TRUE, scrollY = "400px",
                                  fixedColumns = list(leftColumns = 3), buttons=list('copy')),
                    selection = 'none') %>%

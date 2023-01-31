@@ -118,13 +118,13 @@ shinyUI(fluidPage(theme="yeti.css",
                                                      application because they are not in the input stations table."),
                                             DT::dataTableOutput('stationSummary'),
                                             br(),
-                                            h5(strong("Stations in Selected VAHU6 that have no data in the current window but were carried 
+                                            h5(strong("Stations in Selected VAHU6 that have no data in the current window but were carried
                                                       over from last cycle due to an IM designation in one of the 2020IR status fields or
                                                       the 2020 stations table reports the station was carried over from a previous cycle.")),
-                                            helpText('These stations can be viewed in the application and stations table, but none of the 
+                                            helpText('These stations can be viewed in the application and stations table, but none of the
                                                      parameter modules will display data as no data is available in the current window.'),
                                             DT::dataTableOutput('carryoverStationSummary'),
-                                            
+
                                             br(), br(), br() # a bit of breathing room
                                           )),
                                  tabPanel('Assessment Unit Review',
@@ -138,7 +138,7 @@ shinyUI(fluidPage(theme="yeti.css",
                                                    column(4, leafletOutput('stationMap', height = 300, width = 300),
                                                           helpText("The AUs displayed on the map above represent all AUs associated with the selected
                                                                   station (listed in a station's ID305B_1:ID305B_10 fields) for context. ")),
-                                                   column(4, 
+                                                   column(4,
                                                           tabsetPanel(
                                                             tabPanel(paste0(as.numeric(assessmentCycle) - 2,' Station Table'),
                                                                      DT::dataTableOutput('stationHistoricalInfo1')),
@@ -150,16 +150,16 @@ shinyUI(fluidPage(theme="yeti.css",
                                                   where exceedances are present and should be reviewed in the individual parameter visualization tabs below.'),
                                           h4('Stations Table Results'),
                                           helpText('Parameters are highlighted
-                                                  in different colors to indicate further review may be necessary. Parameters highlighted in yellow have at least one 
+                                                  in different colors to indicate further review may be necessary. Parameters highlighted in yellow have at least one
                                                   violation of a standard. Parameters highlighted in red exceed the 10.5% exceedance rate. Both scenarios warrant further
                                                   investigation and may requre comments in the Station Table and CEDS WQA.'),
-                                          h5(strong('If no station table appears, then there is no data within the assessment window for the selected station.'), 
+                                          h5(strong('If no station table appears, then there is no data within the assessment window for the selected station.'),
                                              'Please investigate the Historical Station Information table above for information as to why this station is
                                              included in the application.'),
                                           DT::dataTableOutput('stationTableDataSummary'), br(),
                                           h4('PWS Criteria'),
-                                          helpText(span("PWS assessments should noted in a station's COMMENT field of the Stations Table. The table below organizes 
-                                                  PWS information to expedite the comment process.", 
+                                          helpText(span("PWS assessments should noted in a station's COMMENT field of the Stations Table. The table below organizes
+                                                  PWS information to expedite the comment process.",
                                                   strong('Note: Chloride, Sulfate, Total Dissolved Solids, Iron, and Foaming Agents are secondary criteria and are
                                                          only applicable to data collected at the drinking water intake.'))),
                                           uiOutput('intakeProximityFlag'),
@@ -179,13 +179,13 @@ shinyUI(fluidPage(theme="yeti.css",
                                                                 h5('Assessment Window:'),
                                                                 fluidRow(column(1),column(10,textOutput('stationDataTableAssessmentWindow'))), br(),br()),
                                                        tabPanel('Thermocline',
-                                                                HTML("<p>For detailed explanations on how individual parameters are calculated using the automated assessment process, 
+                                                                HTML("<p>For detailed explanations on how individual parameters are calculated using the automated assessment process,
                                                                      please see the <a href='https://rconnect.deq.virginia.gov/WQAautomatedAssessmentUserManual/individual-parameter-analyses.html#individual-parameter-analyses' target='_blank'>Automated Assessment User Guide</a></p>"),
                                                                 helpText('Review each site using the single site visualization section. The results from this analysis are carried
                                                                          over to temperature and pH assessment decisions.'),
                                                                 thermoclinePlotlySingleStationUI('thermocline')),
                                                        tabPanel('Temperature',
-                                                                HTML("<p>For detailed explanations on how individual parameters are calculated using the automated assessment process, 
+                                                                HTML("<p>For detailed explanations on how individual parameters are calculated using the automated assessment process,
                                                                      please see the <a href='https://rconnect.deq.virginia.gov/WQAautomatedAssessmentUserManual/individual-parameter-analyses.html#individual-parameter-analyses' target='_blank'>Automated Assessment User Guide</a></p>"),
                                                                 helpText('Review each site using the single site visualization section. The results from this analysis are reflected
                                                                          in the TEMP_EXC, TEMP_SAMP, and TEMP_STAT columns in the station table.',
@@ -236,11 +236,11 @@ shinyUI(fluidPage(theme="yeti.css",
                                                                 helpText('Review each site using the single site visualization section. Sulfate PWS criteria only apply at intakes.'),
                                                                 DSulfatePlotlySingleStationUI('DSulfate')))),
                                             tabPanel('Metals Data',
-                                                     HTML("<p>For detailed explanations on how individual parameters are calculated using the automated assessment process, 
+                                                     HTML("<p>For detailed explanations on how individual parameters are calculated using the automated assessment process,
                                                                      please see the <a href='https://rconnect.deq.virginia.gov/WQAautomatedAssessmentUserManual/individual-parameter-analyses.html#individual-parameter-analyses' target='_blank'>Automated Assessment User Guide</a></p>"),
                                                      metalsTableSingleStationUI('metals'))#,
-                                 #            tabPanel('Toxics Data', 
+                                 #            tabPanel('Toxics Data',
                                  #                     toxicsSingleStationUI('PBC')))#,
-                                 #          
-                                 
+                                 #
+
                                           )))))))
