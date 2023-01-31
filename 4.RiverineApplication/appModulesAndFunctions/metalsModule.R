@@ -1,7 +1,4 @@
 
-# work through appTesting.R through the creation of stationData object
-
-
 metalsTableSingleStationUI <- function(id){
   ns <- NS(id)
   tagList(
@@ -22,7 +19,7 @@ metalsTableSingleStationUI <- function(id){
                                      h5(strong("These analyses are still undergoing rigorous review. Please verify all assessment decisions 
                                             based off these results until further notice.")) ) ),
                             DT::dataTableOutput(ns('WCmetalsSingleSiteSummary')),
-                           # verbatimTextOutput(ns('testtest')),
+                            # verbatimTextOutput(ns('testtest')),
                             hr(), 
                             h5('All 3 year rolled window water column metals results for the for the ',span(strong('selected site')),' are highlighted below. 
                                Click on a row to show all the data contained within the chosen window in the table to the right.'),
@@ -33,8 +30,8 @@ metalsTableSingleStationUI <- function(id){
                             fluidRow(column(6, h5("Three year window summaries"),
                                             dataTableOutput(ns('stationRolledExceedanceRate'))),
                                      column(6, h5("All data within chosen three year window. Select a row to your left to reveal data analyzed within the chosen window/criteria combination."),
-                         dataTableOutput(ns('detailedStationRolledExceedanceRate')))),
-                         br()),
+                                            dataTableOutput(ns('detailedStationRolledExceedanceRate')))),
+                            br()),
                    tabPanel('Raw Data',
                             h5('All water column metals data available for the ',span(strong('selected site')),' are available below. 
                                If no data is presented, then the station does not have any water column metals data available.'),
@@ -94,18 +91,18 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
         rename(FDT_STA_ID = Station_Id) %>% 
         mutate(`Criteria Type` = Criteria) %>% 
         annualRollingExceedanceAnalysis(yearsToRoll = 3, aquaticLifeUse = TRUE)
-      } })
+    } })
   
- # output$testtest <- renderPrint({WCmetals_oneStationAnalysis()})
+  # output$testtest <- renderPrint({WCmetals_oneStationAnalysis()})
   
-
+  
   
   WCmetals_oneStationAssessment <- reactive({req(WCmetals_oneStationForAnalysis(), input$WER)
     if(input$WER == 1){
       WCmetals_oneStationForAnalysis()$WCmetalsExceedanceSummary
     } else {
       annualRollingExceedanceSummary(WCmetals_oneStationAnalysis())     } })
-
+  
   output$WCmetalsSingleSiteSummary <- DT::renderDataTable({req(WCmetals_oneStationAssessment())
     DT::datatable(WCmetals_oneStationAssessment() %>% dplyr::select(-FDT_DEPTH),
                   rownames = FALSE,extensions = 'Buttons',
@@ -131,7 +128,7 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
     z <- z$associatedData %>%
       #dplyr::select(-c(associatedData)) %>%
       rename(#"Chloride Average Value"  = "Value",
-             'Parameter Rounded to WQS Format' = parameterRound) %>%
+        'Parameter Rounded to WQS Format' = parameterRound) %>%
       dplyr::select(-`Valid Window`)
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
               selection = 'none') %>%
@@ -150,11 +147,11 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
                                              list(extend='csv',filename=paste('WCmetalsRaw_',paste(assessmentCycle,input$WCmetals_oneStationSelection, collapse = "_"),Sys.Date(),sep='')),
                                              list(extend='excel',filename=paste('WCmetalsRaw_',paste(assessmentCycle,input$WCmetals_oneStationSelection, collapse = "_"),Sys.Date(),sep='')))),
                   selection = 'none')     })
-
-
+  
+  
   # 
   # 
- 
+  
   # 
   # ## Sediment Metals
   # 
@@ -209,44 +206,3 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
   # 
   
 }
-
-
-
-
-
-ui <- fluidPage(
-  verbatimTextOutput('testStationData'),
-  
-  helpText('Review each site using the single site visualization section. There are no WQS for Specific Conductivity.'),
-  metalsTableSingleStationUI('metals')
-)
-
-server <- function(input,output,session){
-  stationData1 <- eventReactive( input$stationSelection, {
-    filter(AUData(), FDT_STA_ID %in% input$stationSelection) })
-  stationSelected <- reactive({input$stationSelection})
-  
-  
-  #AUData <- reactive({filter_at(conventionals_HUC, vars(starts_with("ID305B")), any_vars(. %in% AUselection) ) })
-  AUData <- reactive({filter(conventionals, Huc6_Vahu6 %in% c("PL30", 'JM01','JM02', 'JM03', 'JM04', 'JM05', 'JM06', "JU11")) %>%
-      left_join(dplyr::select(stationTable, STATION_ID:VAHU6,
-                              WQS_ID:CLASS_DESCRIPTION),
-                #WQS_ID:`Max Temperature (C)`), 
-                by = c('FDT_STA_ID' = 'STATION_ID')) %>%
-      filter(!is.na(ID305B_1)) %>%
-      pHSpecialStandardsCorrection() %>%
-      filter(!is.na(CHLORIDE_mg_L))})
-  
-  output$testStationData <- renderPrint({input$stationSelection })#stationSelected() })#stationData1()})   # this is the problem
-  
-  #### Metals Sub Tab ####---------------------------------------------------------------------------------------------------
-  callModule(metalsTableSingleStation,'metals', AUData,  WCmetals, WCmetalsForAnalysis, Smetals, 
-             fishMetals, fishMetalsScreeningValues, stationSelected, staticLimit)
-  
-  
-}
-
-shinyApp(ui,server)
-
-
-

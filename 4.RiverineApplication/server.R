@@ -741,7 +741,7 @@ shinyServer(function(input, output, session) {
   
   
   #### Metals Sub Tab ####---------------------------------------------------------------------------------------------------
-  callModule(metalsTableSingleStation,'metals', AUData, WCmetals, WCmetalsForAnalysis, IR2020WCmetals ,Smetals, IR2020Smetals,
+  callModule(metalsTableSingleStation,'metals', AUData,  WCmetals, WCmetalsForAnalysis, Smetals, 
              fishMetals, fishMetalsScreeningValues, stationSelected, staticLimit)
   
 
