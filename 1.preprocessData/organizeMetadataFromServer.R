@@ -26,7 +26,8 @@ snapCheck <- function(successDataFrame){
 }
 
 # WQS Bring in data from server
-WQStableExisting <- read_csv('WQSlookupTable/blank_WQSlookup.csv') #20210401_0001_WQSlookup.csv') #read_csv('data/WQSlookupTable/20201207_092616_WQSlookup.csv') 
+
+WQStableExisting <- pin_get('ejones/WQSlookup', board = 'rsconnect')#read_csv('WQSlookupTable/blank_WQSlookup.csv') #20210401_0001_WQSlookup.csv') #read_csv('data/WQSlookupTable/20201207_092616_WQSlookup.csv') 
 WQStableNew <- loadData("WQSlookupTable") %>% 
   # this is only necessary if you are allow assessors to continue to work with application after a cleanup phase
   filter(!StationID %in% WQStableExisting$StationID)
