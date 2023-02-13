@@ -6,7 +6,7 @@ shinyUI(fluidPage(theme="yeti.css",
                                                generates fact sheets for data collected within a chosen IR data window. This tool was developed to be used after a 
                                                regional biologist assesses stations using the '),
                                         span(tagList(a("Bioassessment Dashboard.",
-                                                       href="http://deq-rstudio-prod.cov.virginia.gov/rsconnect/IR2024BioassessmentDashboard/",
+                                                       href="https://rconnect.deq.virginia.gov/IR2024bioassessmentDashboard/",
                                                        target = 'blank'))), ' Assessment decisions saved on the server feed the Riverine Assessment
                                                application. The General Purpose Biological Fact Sheet tab generates a generic fact sheet with benthic macroinvertebrate
                                         and habitat information. The format of this report follows the same structure of the Assessment Fact Sheet report, but it allows

@@ -1,0 +1,148 @@
+---
+title: "Bio"
+author: "Emma Jones"
+output: html_document
+---
+
+looking for bug data collected but not entered into CEDS yet:
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(pool)
+library(pins)
+library(dbplyr)
+
+## For testing: connect to ODS production
+pool <- dbPool(
+  drv = odbc::odbc(),
+  Driver = "ODBC Driver 11 for SQL Server",#"SQL Server Native Client 11.0",
+  Server= "DEQ-SQLODS-PROD,50000",
+  dbname = "ODS",
+  trusted_connection = "yes"
+)
+
+# get configuration settings
+conn <- config::get(file = 'config.yml',
+                      "connectionSettings")
+
+# use API key to register board
+board_register_rsconnect(key = conn$CONNECT_API_KEY, 
+                          server = conn$CONNECT_SERVER)
+
+```
+
+
+
+### 2022 
+
+All bio sites sampled in 2022
+
+```{r}
+dateRange <- c(as.Date('2022-01-01'), as.Date('2022-12-31'))# as.Date(Sys.Date())) #as.Date('1985-01-01'))#
+
+bioExpectations <- pool %>% tbl(in_schema("wqm", "Wqm_Field_Data_View")) %>%
+  filter(Fdt_Spg_Code %in% c('RB' , 'FP', 'TM', 'PT', 'IP') & 
+           between(as.Date(Fdt_Date_Time), !! dateRange[1], !! dateRange[2]) ) %>% # & # x >= left & x <= right
+  as_tibble() 
+
+stations <- pin_get('ejones/WQM-Stations-Spatial', board = 'rsconnect')
+VSCI <- pin_get('ejones/VSCIresults', board = 'rsconnect') # this is run for every bio site, doesn't matter if not right SCI, just tells us there is full bio data entered
+  
+  
+bioExpectations <- left_join(bioExpectations, 
+                             dplyr::select(stations, StationID, ASSESS_REG), 
+                             by = c('Fdt_Sta_Id' = 'StationID'))
+
+```
+
+How many stations do we expect we collected bio?
+
+```{r}
+bioExpectations %>% 
+  distinct(Fdt_Sta_Id, .keep_all = T) %>% 
+  group_by(ASSESS_REG) %>% 
+  count()
+```
+
+
+What ProbMon or Bio sites (FP or RB) do not have benthic data entered yet?
+
+```{r}
+filter(bioExpectations, ! Fdt_Sta_Id %in% VSCI$StationID)
+```
+
+So apparently we used RB instead of RL for a BRRO sites this year. Taking lake sites out, these are the stations that we expect bugs but don't have them in CEDS yet:
+
+```{r}
+filter(bioExpectations, ! Fdt_Sta_Id %in% VSCI$StationID) %>% 
+  filter(! Fdt_Sta_Id %in% c('2-JKS046.40'))
+```
+Break this down by region:
+
+```{r}
+filter(bioExpectations, ! Fdt_Sta_Id %in% VSCI$StationID) %>% 
+  filter(! Fdt_Sta_Id %in% c('2-JKS046.40')) %>% 
+  distinct(Fdt_Sta_Id, .keep_all = T) %>% 
+  group_by(ASSESS_REG) %>% 
+  count()
+```
+
+### 2021
+
+
+Same question for 2021 bugs:
+
+
+```{r}
+dateRange <- c(as.Date('2021-01-01'), as.Date('2021-12-31'))# as.Date(Sys.Date())) #as.Date('1985-01-01'))#
+
+bioExpectations <- pool %>% tbl(in_schema("wqm", "Wqm_Field_Data_View")) %>%
+  filter(Fdt_Spg_Code %in% c('RB' , 'FP') & 
+           between(as.Date(Fdt_Date_Time), !! dateRange[1], !! dateRange[2]) ) %>% # & # x >= left & x <= right
+  as_tibble() 
+
+stations <- pin_get('ejones/WQM-Stations-Spatial', board = 'rsconnect')
+VSCI <- pin_get('ejones/VSCIresults', board = 'rsconnect') # this is run for every bio site, doesn't matter if not right SCI, just tells us there is full bio data entered
+  
+  
+bioExpectations <- left_join(bioExpectations, 
+                             dplyr::select(stations, StationID, ASSESS_REG), 
+                             by = c('Fdt_Sta_Id' = 'StationID'))
+
+```
+
+
+How many stations do we expect we collected bio?
+
+```{r}
+bioExpectations %>% 
+  distinct(Fdt_Sta_Id, .keep_all = T) %>% 
+  group_by(ASSESS_REG) %>% 
+  count()
+```
+
+What ProbMon or Bio sites (FP or RB) do not have benthic data entered yet?
+
+```{r}
+filter(bioExpectations, ! Fdt_Sta_Id %in% VSCI$StationID)
+```
+
+So apparently we used RB instead of RL for a BRRO sites this year. Taking lake sites out, these are the stations that we expect bugs but don't have them in CEDS yet:
+
+```{r}
+filter(bioExpectations, ! Fdt_Sta_Id %in% VSCI$StationID) %>% 
+  filter(! Fdt_Sta_Id %in% c('2-JKS046.40'))
+```
+
+
+
+Break this down by region:
+
+```{r}
+filter(bioExpectations, ! Fdt_Sta_Id %in% VSCI$StationID) %>% 
+  filter(! Fdt_Sta_Id %in% c('2-JKS046.40')) %>% 
+  distinct(Fdt_Sta_Id, .keep_all = T) %>% 
+  group_by(ASSESS_REG) %>% 
+  count()
+```
