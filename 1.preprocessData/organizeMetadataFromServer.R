@@ -35,20 +35,33 @@ WQStableCombined <- bind_rows(WQStableExisting, WQStableNew) #%>%
   # make sure no duplicates
   #group_by(StationID) %>% #mutate(n())
 # write it out to do edits manually
-write.csv(WQStableCombined, 'WQSlookupTable/20221202_0000_WQSlookup.csv', row.names = F, na = "")
+write.csv(WQStableCombined, 'WQSlookupTable/20230213_0000_WQSlookup.csv', row.names = F, na = "")
 
 
 # AU Bring in data from server
-AUtableExisting <- read_csv('AUlookupTable/blank_AUlookup.csv') 
+# AUtableExisting <- read_csv('AUlookupTable/20221202_0000_AUlookup.csv') %>%  #'AUlookupTable/blank_AUlookup.csv') 
+#   mutate(CYCLE = 2024) %>% 
+#   dplyr::select(CYCLE, everything())
+AUtableExisting <- bind_rows(pin_get("ejones/AUlookup", board = "rsconnect"),
+                             read_csv('AUlookupTable/20221202_0000_AUlookup.csv') %>%  #'AUlookupTable/blank_AUlookup.csv') 
+                               mutate(CYCLE = 2024) %>% 
+                               dplyr::select(CYCLE, everything())) %>% 
+  filter(FDT_STA_ID != 'FakeStation') %>% 
+  dplyr::select(-n)
 AUtableNew <- loadData("AUlookupTable") %>% 
   # this is only necessary if you are allow assessors to continue to work with application after a cleanup phase
-  filter(!FDT_STA_ID %in% AUtableExisting$FDT_STA_ID)
-AUtableCombined <- bind_rows(AUtableExisting, AUtableNew) #%>% 
-# make sure no duplicates
-#group_by(StationID) %>% #mutate(n())
-# write it out to do edits manually
-write.csv(AUtableCombined, 'AUlookupTable/20221202_0000_AUlookup.csv', row.names = F, na = "")
+  filter(!FDT_STA_ID %in% AUtableExisting$FDT_STA_ID) %>% 
+  mutate(CYCLE = 2024) %>% 
+  dplyr::select(CYCLE, everything())
+AUtableCombined <- bind_rows(AUtableExisting, AUtableNew) %>% 
+  # make sure no duplicates
+  group_by(FDT_STA_ID, CYCLE) %>% mutate(n = n())
+doubled <- filter(AUtableCombined, `n` >1)
+View(filter(AUtableCombined, FDT_STA_ID %in% doubled$FDT_STA_ID))
 
+# write it out to do edits manually
+write.csv(AUtableCombined, 'AUlookupTable/20230213_0000_AUlookup.csv', row.names = F, na = "")
+# manually clean up the doubles
 
 
 

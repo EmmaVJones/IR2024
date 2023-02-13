@@ -471,3 +471,153 @@ pin(Smetals_2022IRfinal, description = "FINAL 2022IR sediment metals data from R
 ```
 
 
+
+
+
+
+
+### WQS addition
+
+Now we need to make sure we have WQS information for each station we need to assess so that assessors only need to upload station information to the assessment applications and not bother with WQS information.
+
+First, pull and organize any WQS information from the server. These steps are detailed in 1.preprocessData/HowToPreprocessDataFebruary2023.Rmd #### Aside, how to get WQS data from the server and then cleaned in organizeMetadataFromServer.R from that directory
+
+
+
+Then, take the most recent WQSlookup table and upload to server. This should be repeated once all WQS attribution is fully completed with full assessment cycle data.
+
+```{r wqs information}
+# most recent version taken from ..\1.preprocessData\WQSlookupTable
+WQSlookup <- read_csv('data/metadataAttribution/20230213_0000_WQSlookup.csv')
+# find number of WQS_ID linked to each station
+WQSlookup1 <- WQSlookup %>% 
+  group_by(StationID) %>%
+  summarise(distinctWQS = n_distinct(WQS_ID))
+
+
+# # these need to be sorted out 
+# moreThan1WQS <- filter(WQSlookup, StationID %in% filter(WQSlookup1, distinctWQS != 1)$StationID) %>%
+#   arrange(StationID)
+# write_csv(moreThan1WQS, 'multipleWQS.csv')
+# 
+# rm(moreThan1WQS); rm(WQSlookup1)
+# 
+
+
+pin(WQSlookup, description = "WQS lookup table from metadata attribution application", board = "rsconnect")
+```
+
+
+
+
+To speed up the applications and assessment calculations, we will first join the actual WQS information to the lookup table now in the preprocessing steps and pin that information as a starting point for apps.
+
+But to speed this process up, we will first pull down the data that exists on the server as to not run spatial joins more than necessary.
+
+```{r}
+WQSlookup_withStandards <- pin_get('WQSlookup-withStandards', board = "rsconnect")
+
+# cheater step, find sites I know have issues and remove from archived version
+WQStableKnownIssues <- readRDS('./data/WQStable12072020.RDS')
+WQSlookup_withStandards <- filter(WQSlookup_withStandards, ! StationID %in% WQStableKnownIssues$StationID)
+
+
+WQSlookupToDo <- filter(WQSlookup, ! StationID %in% WQSlookup_withStandards$StationID)
+
+```
+
+
+
+
+```{r WQS information joins, eval = FALSE}
+#bring in Riverine layers, valid for the assessment window
+riverine <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/riverine_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+WQSlookupFull <- left_join(WQSlookupToDo, riverine) %>%
+  filter(!is.na(CLASS))
+rm(riverine)
+
+lacustrine <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/lakes_reservoirs_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+WQSlookupFull <- left_join(WQSlookupToDo, lacustrine) %>%
+  filter(!is.na(CLASS)) %>%
+  bind_rows(WQSlookupFull)
+rm(lacustrine)
+
+estuarineLines <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/estuarinelines_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+WQSlookupFull <- left_join(WQSlookupToDo, estuarineLines) %>%
+  filter(!is.na(CLASS)) %>%
+  bind_rows(WQSlookupFull)
+rm(estuarineLines)
+
+estuarinePolys <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/estuarinepolygons_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+WQSlookupFull <- left_join(WQSlookupToDo, estuarinePolys) %>%
+  filter(!is.na(CLASS)) %>%
+  bind_rows(WQSlookupFull)
+rm(estuarinePolys)
+
+# # what stations are still missing info?
+# View(filter(WQSlookupToDo, !StationID %in% WQSlookupFull$StationID) )
+# WQMstations <- pin_get('ejones/WQM-Stations-Spatial', board = 'rsconnect')
+# filter(WQSlookupToDo, !StationID %in% WQSlookupFull$StationID) %>% 
+#   left_join(WQMstations, by = 'StationID') %>% 
+#     st_as_sf(coords = c("Longitude", "Latitude"), 
+#                remove = F, # don't remove these lat/lon cols from df
+#                crs = 4326) %>% # add projection, needs to be geographic for now bc entering lat/lng
+#   st_write('help.shp')
+
+
+WQSlookup_withStandards_pin <- bind_rows(WQSlookup_withStandards, WQSlookupFull) # for pin
+
+
+
+# Find duplicates 
+WQSlookup_withStandards_issues <- WQSlookup_withStandards_pin %>% 
+  group_by(StationID) %>% 
+  mutate(totCount = n()) %>% 
+  filter(totCount > 1)
+
+if(nrow(WQSlookup_withStandards_issues)>0){
+  # write out and fix
+  write_csv(WQSlookup_withStandards_issues %>% arrange(StationID), 'data/fixMe.csv')
+  fixed <- read_csv('data/fixMe.csv') %>%
+    mutate(GNIS_ID = as.factor(as.character(GNIS_ID)))
+
+  WQSlookup_withStandards <- filter(WQSlookup_withStandards_pin, ! StationID %in% fixed$StationID) %>%
+    bind_rows(fixed)
+
+# What stations still need WQS?
+z <- filter(WQSlookup, ! StationID %in% WQSlookup_withStandards_pin$StationID) 
+
+# fix user issues
+#test <- readRDS('C:/HardDriveBackup/R/GitHub/IR2022/1.preprocessData/data/WQStable.RDS')
+#y <- left_join(z, test, by = 'StationID') %>%
+#  rename("WQS_ID Saved on the server" = "WQS_ID.x",
+#         "WQS_ID Suggested To User" = "WQS_ID.y",
+#         "Buffer Distance" = "Buffer Distance.y") %>%
+#  dplyr::select(StationID, `Buffer Distance`, `WQS_ID Saved on the server`, `WQS_ID Suggested To User`, Comments)
+#write.csv(y,'missingWQSforReview.csv')
+  } else{WQSlookup_withStandards <- WQSlookup_withStandards_pin}
+```
+
+
+
+
+Once I get that information back from assessors I can fully move on.
+
+
+
+
+Now time to actually join standards to stations. This is going to be available on the server for users to access from the assessment scripts. The thinking right now is that it is better to store this information on the server right now and show users the data (when asked) instead of having it attached to the right of existing stationsTable (like 2020 cycle) since CEDS WQA only accepts a specific template. Also, if WQS info needs to be changed, the assessor is forced to update the WQS_ID. Maybe this isn't an awesome method but going with it for now.
+
+```{r pin WQS information}
+pin(WQSlookup_withStandards, description = "WQS lookup table with Standards from metadata attribution application", board = "rsconnect")
+```
+
+Lots of citizen, non agency sites without WQS info. Need to figure out a solution to these sites.

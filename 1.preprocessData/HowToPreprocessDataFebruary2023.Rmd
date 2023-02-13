@@ -1092,7 +1092,7 @@ write.csv(distinctSites_AU , 'data/preAnalyzedAUdata.csv', row.names = F)
 
 ### Intermediate app updates
 
-Throughout the metadata process, there will be times when you need to grab the attributed data from teh server, organize it, and push an app update. You first need to go to the server and grab all data attributed so far from the AUlookupTable and WQSlookupTable directories in the currently active application instance (see below for more info).
+Throughout the metadata process, there will be times when you need to grab the attributed data from the server, organize it, and push an app update. You first need to go to the server and grab all data attributed so far from the AUlookupTable and WQSlookupTable directories in the currently active application instance (see below for more info).
 
 **This is not for when the assessors have completed all attribution, just for intermediate updates!**
 
@@ -1103,4 +1103,6 @@ Then you need to move these to the current working directory (manually using Fil
 ```
 
 
+When you are ready to update the WQSlookup pinned data on the server, see 2.organizeMetadata/organizeStationMetadata.Rmd
+you will need to copy over your cleaned up WQS information (e.g. 20230213_0000_WQSlookup.csv) to that working directory under data/metadataAttribution and run through the steps in 2.organizeMetadata/organizeStationMetadata.Rmd #WQS addition
 
