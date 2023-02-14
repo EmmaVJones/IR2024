@@ -92,6 +92,9 @@ conventionalsRaw <- read_excel('data/draftData/CEDSWQM_2024_IR_20230209.XLSX', s
 conventionals <-  mutate(conventionalsRaw, #Source_Sta_Id = as.character(NA),
                          Data_Source = 'DEQ') %>%
   dplyr::select(FDT_STA_ID, STA_DESC, Data_Source, FDT_DATE_TIME, Latitude, Longitude)
+
+#source('preprocessingModules/updateConventionalsSchemaAndPinToServer.R')
+
 rm(conventionalsRaw)
 ```
 
@@ -277,7 +280,7 @@ distinctSites_sf <- bind_rows(distinctSites_sf %>% st_drop_geometry(),
   dplyr::select(FDT_STA_ID, GROUP_STA_ID, everything())
 
 # Save for use in metadata app
-saveRDS(distinctSites_sf, 'data/distinctSites_sf_withCitmon02132023.RDS')
+#saveRDS(distinctSites_sf, 'data/distinctSites_sf_withCitmon02132023.RDS')
 
 # Clean up workspace
 rm(list = c('ecoregion4Large','county', 'vahu6','subbasinConversion','unrestrictedAssessmentRegionVAHU6Subbasin',
@@ -348,7 +351,7 @@ lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3. Unless y
 
 ```{r assessment and subbasin join}
 #source('preprocessingModules/assessmentLayerSubbasinJoin.R') # lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3
-distinctSites_sf <- readRDS('./data/distinctSites_sf.RDS')
+distinctSites_sf <- readRDS('./data/distinctSites_sf02132023.RDS')
 distinctSitesToDo <- distinctSites_sf 
 # keep a copy of original distinct sites to check that no one was lost at the end
 ``` 
@@ -371,6 +374,8 @@ Now we will work with our distinctSites_sf object to spatially join WQS informat
 
 ```{r WQS info on server}
 WQStableExisting <- pin_get('ejones/WQSlookup', board = 'rsconnect')
+
+citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect")
 ```
 
 
@@ -405,7 +410,9 @@ These are pulled directly from WQSLookupTable directories and can contain issues
 Identify real number of sites that need spatial joining.
 
 ```{r find where spatial joins have already happened}
-distinctSitesToDoWQS <- filter(distinctSitesToDo, ! FDT_STA_ID  %in% WQStableExisting$StationID)
+distinctSitesToDoWQS <- filter(distinctSitesToDo, ! FDT_STA_ID  %in% WQStableExisting$StationID) %>% 
+  filter(! FDT_STA_ID  %in% citmonWQS$StationID)
+write.csv(distinctSitesToDoWQS, 'needsWQS.csv')
 ```
 
 
