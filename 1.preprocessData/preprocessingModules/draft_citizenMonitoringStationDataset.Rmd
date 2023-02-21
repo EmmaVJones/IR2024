@@ -1,0 +1,173 @@
+---
+title: "Citizen Monitoring station organization"
+author: "Emma Jones"
+date: "2/21/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+The method below was used to estimate citizen monitoring data for IR2024 before it became available. This script is just for record keeping in case future users want to build similar queries.
+
+
+
+
+
+Stations pulled from other sources with Lat/Lng info could be run through the WQS steps if uploaded and reorganized here.
+
+Bring in and organize citmonNonagency sites.
+
+```{r all citmonNonagency}
+# Tried to operationalize it but schema different between sheets so require manual work in excel
+# path <- "data/CitizenMonitoringNonAgencyFromRegions/ALL_BRRO_CitMon_Stn_IDs_FINAL.xlsx"
+# citmon <- path %>% 
+#   excel_sheets() %>% 
+#   set_names() %>% 
+#   map_df(read_excel, path = path)
+
+path <- "data/CitizenNonAgencyStations.xlsx"
+
+citmonNonAgency <- path %>% 
+  excel_sheets() %>%
+  set_names() %>%
+  map_df(read_excel, path = path)
+
+View(citmonNonAgency %>% group_by(`DEQ Station ID`) %>% mutate(n = n()) %>%  arrange(desc(n), `DEQ Station ID`))
+```
+
+Reduce to just the sites in the last assessment cycle as to not attribute unnecessary sites. 
+
+```{r limit citmonnonagency}
+# library(pool)
+# library(dbplyr)
+# 
+# pool <- dbPool(
+#   drv = odbc::odbc(),
+#   Driver = "ODBC Driver 11 for SQL Server", #"SQL Server", ##"SQL Server Native Client 11.0", 
+#   Server= "DEQ-SQLODS-PROD,50000",
+#   database = "ODS",
+#   trusted_connection = "yes"
+# )
+#
+# had to run below in R4.1.2 bc issue in driver or ODBC in 3.6.2?
+# stations <-  pool %>% 
+#   tbl(in_schema('wqa', 'WQA Station Details')) %>% 
+#   filter(`Assessment Cycle` == 2022) %>% 
+#   as_tibble()
+stations <- readRDS('data/2022stations.RDS')
+
+citmonNonAgency <- filter(citmonNonAgency, `DEQ Station ID` %in% stations$`Station Id`)
+
+
+rm(pool);rm(stations)
+```
+
+
+Organize data to match distinctSites_sf format
+
+```{r citmonNonagency spatial}
+citmonNonAgency_sf <- citmonNonAgency %>% 
+  dplyr::select(FDT_STA_ID = `DEQ Station ID`,
+                STA_DESC = `Station Description`, 
+                Data_Source = `Data Source`,
+                Latitude, Longitude) %>% 
+   st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = F, # don't remove these lat/lon cols from df
+           crs = 4326)
+```
+
+
+Need to add spatial metadata to make next steps work more efficiently.
+
+```{r citmonNonagency spatial metadata}
+#Bring in extra large ecoregion and assessment region files. By extra large we mean that they are continuous outside the state boundary such that stations that fall outside the state are not removed when spatially intersected
+ecoregion4Large <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VA_level4ecoregion_WGS84.shp')
+vahu6 <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VA_SUBWATERSHED_6TH_ORDER_STG.shp') # this version of vahu6 layer goes outside state boundary
+subbasinConversion <- read_csv('C:/HardDriveBackup/R/GitHub/pinData/data/subbasinToVAHU6conversion.csv')
+
+subbasinLayer <- st_read('../GIS/DEQ_VAHUSB_subbasins_EVJ.shp')  %>% 
+  st_drop_geometry() %>% 
+  rename('SUBBASIN' = 'SUBBASIN_1') %>% 
+  distinct(subbasin, .keep_all = T) %>%  # don't need this by Assessment Region right now so simplify dataset to make next join cleaner
+  dplyr::select(BASIN_NAME, BASIN_CODE, SUBBASIN, subbasin)
+
+unrestrictedAssessmentRegionVAHU6Subbasin <- left_join(vahu6, subbasinConversion, by = c('VAHU6', 'VAHU5')) %>% 
+  left_join(subbasinLayer, by = c('BASIN_CODE' = 'BASIN_CODE',
+                                  'VAHUSB' = 'subbasin'))
+#View(unrestrictedAssessmentRegionVAHU6Subbasin %>% st_drop_geometry())
+
+# need this if running just citmon
+#distinctSites_sf <- readRDS('./data/distinctSites_sf02132023.RDS')
+
+
+# Add Level 3 and 4 Ecoregion Info to citmon and any conventionals stations taht don't have info
+citmonNonAgency_sf1 <- rbind(citmonNonAgency_sf,
+                             filter(conventionals, FDT_STA_ID %in% missingCoordinates$FDT_STA_ID) %>% 
+                               st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+                                        remove = F, # don't remove these lat/lon cols from df
+                                        crs = 4326)) %>% 
+                             
+  st_intersection(unrestrictedAssessmentRegionVAHU6Subbasin) %>% 
+  st_intersection(dplyr::select(ecoregion4Large, US_L3CODE, US_L3NAME, US_L4CODE, US_L4NAME)) 
+
+# add back in sites that could have been lost in spatial joins
+citmonNonAgency_sf2 <- bind_rows(citmonNonAgency_sf1 %>% st_drop_geometry(), # drop geom so bind_rows will work instead of rbind
+                                 filter(citmonNonAgency_sf, ! FDT_STA_ID %in% citmonNonAgency_sf1$FDT_STA_ID) %>% 
+                                   st_drop_geometry()) %>% 
+  # add back in DEQ stations that might not have made the spatial join cut
+  bind_rows(filter(conventionals, FDT_STA_ID %in% missingCoordinates$FDT_STA_ID) %>% 
+              filter( ! FDT_STA_ID %in% citmonNonAgency_sf1$FDT_STA_ID)) %>% 
+  
+  # change back to spatial object
+   st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = F, # don't remove these lat/lon cols from df
+           crs = 4326)
+
+
+
+# QA step
+# filter(citmonNonAgency_sf, ! FDT_STA_ID %in% citmonNonAgency_sf2$FDT_STA_ID)
+# mapview::mapview(filter(citmonNonAgency_sf, ! FDT_STA_ID %in% citmonNonAgency_sf1$FDT_STA_ID))+
+#   mapview::mapview(ecoregion4Large)
+
+distinctSites_sf <- bind_rows(distinctSites_sf %>% st_drop_geometry(),
+                              citmonNonAgency_sf2 %>% st_drop_geometry() %>% 
+                                dplyr::select(any_of(names(distinctSites_sf)))) %>%
+  dplyr::select(names(distinctSites_sf %>% st_drop_geometry())) %>% # once you have the right column names, reorder to correct order
+  st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = F, # don't remove these lat/lon cols from df
+           crs = 4326) %>% 
+  distinct(FDT_STA_ID, .keep_all = T) %>% 
+  mutate(GROUP_STA_ID = NA_character_) %>% #will need this when it comes time to do real citmon stuff
+  dplyr::select(FDT_STA_ID, GROUP_STA_ID, everything())
+
+# Save for use in metadata app
+#saveRDS(distinctSites_sf, 'data/distinctSites_sf_withCitmon02132023.RDS')
+
+# Clean up workspace
+rm(list = c('ecoregion4Large','county', 'vahu6','subbasinConversion','unrestrictedAssessmentRegionVAHU6Subbasin',
+            'citmonNonAgency_sf1', 'citmonNonAgency_sf2', 'path', 'subbasinLayer'))
+```
+
+for next steps just running citmon
+
+```{r}
+# distinctSites_sf <- bind_rows(distinctSites_sf %>% st_drop_geometry(),
+#                               citmonNonAgency_sf %>% st_drop_geometry()) %>% 
+#    st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+#            remove = T, # don't remove these lat/lon cols from df
+#            crs = 4326)
+
+# for next steps just running 
+distinctSites_sf <- filter(distinctSites_sf, FDT_STA_ID %in% citmonNonAgency_sf$FDT_STA_ID)
+distinctSitesToDo <- distinctSites_sf 
+
+filter(citmonNonAgency_sf, ! FDT_STA_ID %in% distinctSites_sf$FDT_STA_ID)
+
+#View(distinctSites_sf %>% group_by(FDT_STA_ID) %>% mutate(n = n()) %>% dplyr::select(n, everything()) %>%  arrange(desc(n), FDT_STA_ID))
+```
+

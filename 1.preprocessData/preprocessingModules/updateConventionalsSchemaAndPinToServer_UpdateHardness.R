@@ -24,7 +24,12 @@ schemaFin <- read_csv('data/citmonnonagencydummydata_EVJ.csv') %>%# email 1/8/21
          LEVEL_NITROGEN_PARTICULATE_NITROGEN_PNWLF = as.factor(NA),
          TOTAL_SUSPENDED_SOLIDS_530XX = as.numeric(NA),
          RMK_530XX = as.character(NA),
-         LEVEL_530XX = as.factor(NA)
+         LEVEL_530XX = as.factor(NA),
+         HARDNESS_DISSOLVED = as.numeric(NA),
+         RMK_HARDNESS_DISSOLVED = as.character(NA),
+         LEVEL_HARDNESS_DISSOLVED = as.factor(NA)
+         
+         
          
          )  %>%
   rename(FDT_DO_PROBE = DISSOLVED_OXYGEN_00300_mg_L,

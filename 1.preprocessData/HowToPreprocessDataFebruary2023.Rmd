@@ -19,7 +19,7 @@ library(tidyverse)
 library(sf)
 library(readxl)
 library(lubridate)
-library(lwgeom) # used in assessmentLayerSubbasinJoin missingSites step
+#library(lwgeom) # used in assessmentLayerSubbasinJoin missingSites step
 ```
 
 ```{r connect to server}
@@ -86,27 +86,34 @@ The largest dataset needed for these analyses is the conventionals dataset that 
 
 This is the February draft data pull that will help expedite the process when the official Conventionals data pull is released in March 2023. 
 
-```{r conventionals}
-conventionalsRaw <- read_excel('data/draftData/CEDSWQM_2024_IR_20230209.XLSX', sheet = 'CONVENTIONALS') 
+```{r conventionals, echo=F, warning=F, error=FALSE}
+conventionalsRaw1 <- read_excel('data/draftData/CEDSWQM_2024_IR_20230209.XLSX', sheet = 'CONVENTIONALS') 
 
-conventionals <-  mutate(conventionalsRaw, #Source_Sta_Id = as.character(NA),
-                         Data_Source = 'DEQ') %>%
-  dplyr::select(FDT_STA_ID, STA_DESC, Data_Source, FDT_DATE_TIME, Latitude, Longitude)
+conventionalsRaw <- read_excel('data/draftData/CONVENTIONALS_20230216.xlsx', sheet = 'CONVENTIONALS') 
 
-#source('preprocessingModules/updateConventionalsSchemaAndPinToServer.R')
+# before removing data from your environment, here is how to clean Roger's data up to match with schema expected by automated tools
+#source('preprocessingModules/updateConventionalsSchema.R') # version working with old names, works for Feb 16 data pull
+#source('preprocessingModules/updateConventionalsSchemaAndPinToServer.R')  # version working with new storet names, works for Feb 9 data pull
+# pin final versions
+# pin(conventionals, name = 'ejones/conventionals2024draft',
+#     description = 'Working IR2024 conventionals dataset, EVJ reorganized from Roger 2/17/2023.',
+#     board = 'rsconnect')
 
-rm(conventionalsRaw)
+
+
+
+# An object named conventionals is now in your environment to following the cleanup step above
+
 ```
 
 Create a new object called distinctSites. This will be useful for keeping track of all anticipated sites for the new cycle. We will use this object to check which sites need WQS and which need AU. 
 
 ```{r conventionals missing WQS}
 conventionals <- conventionals %>% 
-  distinct(FDT_STA_ID, .keep_all = T) %>% 
-  dplyr::select(-FDT_DATE_TIME) 
+  dplyr::select(FDT_STA_ID, STA_DESC, Data_Source, Latitude, Longitude) %>% 
+  distinct(FDT_STA_ID, .keep_all = T)
 
 distinctSites <- dplyr::select(conventionals, -c(Latitude, Longitude)) # object to save unique sites for later, use standardized other lat/lng
-
 ```
 
 
@@ -144,16 +151,14 @@ distinctSites_sf <- distinctSites %>%
             remove = F, # don't remove these lat/lon cols from df
             crs = 4326)
 # save for later just in case
-#saveRDS(distinctSites_sf, './data/distinctSites_sf02132023.RDS')
+#saveRDS(distinctSites_sf, './data/distinctSites_sf02212023.RDS')
 ```
 
 
 
 ### Other data: Citizen Monitoring and Non Agency
 
-Stations pulled from other sources with Lat/Lng info could be run through the WQS steps if uploaded and reorganized here.
-
-Bring in and organize citmonNonagency sites.
+Bring in and organize citmonNonagency sites. Below is for 2019-2020 data from Reid
 
 ```{r all citmonNonagency}
 # Tried to operationalize it but schema different between sheets so require manual work in excel
@@ -337,7 +342,9 @@ now pin to server
 
 ```{r}
 # pin final versions
-# pin('ejones/conventionals2024draft', board = 'rsconnect')
+# pin(conventionals, name = 'ejones/conventionals2024draft',
+#     description = 'Working IR2024 conventionals dataset, EVJ reorganized from Roger 2/17/2023.',
+#     board = 'rsconnect')
 # pin('ejones/conventionals2024_distinctdraft', board = 'rsconnect')  # see below for fix coming this way at final stage
 
 ```
