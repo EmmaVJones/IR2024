@@ -418,8 +418,8 @@ So what stations do we have left? These are stations that are in the conventiona
 stationsToDo <- filter(conventionals_distinct, ! FDT_STA_ID %in% stationsTable2024begin$STATION_ID) %>% 
   # glean what we can to populate the data template
   dplyr::select(STATION_ID = FDT_STA_ID,
-                WATER_TYPE = STA_LV1_CODE,
-                TYPE_1 = STA_LV2_CODE,
+                WATER_TYPE = Sta_Lv1_Code,
+                TYPE_1 = Sta_Lv2_Code,
                 LATITUDE = Latitude,
                 LONGITUDE = Longitude) %>% 
   mutate(# throw in a flag for swamp but still need to force it to a waterbody type the assessment tools understand

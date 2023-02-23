@@ -70,7 +70,7 @@ basins <- st_as_sf(pin_get('ejones/DEQ_VAHUSB_subbasins_EVJ', board = 'rsconnect
 #                crs = 4326) %>% 
 #   st_intersection(dplyr::select(basins, BASIN_CODE)) 
 # saveRDS(conventionals_distinct, 'data/conventionals_distinctDRAFT.RDS')
-conventionals_distinct <- readRDS('data/conventionals_distinctDRAFT.RDS')
+#conventionals_distinct <- readRDS('data/conventionals_distinctDRAFT.RDS')
 ```
 
 Placeholders until data window sorted
@@ -151,8 +151,10 @@ Pull pinned WQS info saved on server. Then perform a series of data manipulation
 
 ```{r pull WQS info}
 WQSlookup <- pin_get("WQSlookup-withStandards",  board = "rsconnect")
-citmonWQS <- readRDS('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/data/citmonStationsWithWQS.RDS') %>% 
-  dplyr::select(StationID = `Station Id`, `WQS Section`, `WQS Class`, `WQS Special Standard`)
+citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect") %>% 
+  dplyr::select(StationID, `WQS Section` = SEC, `WQS Class`= CLASS,`WQS Special Standard` = SPSTDS)
+# citmonWQS <- readRDS('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/data/citmonStationsWithWQS.RDS') %>% 
+#   dplyr::select(StationID = `Station Id`, `WQS Section`, `WQS Class`, `WQS Special Standard`)
 
 stationTable <- stationTable %>% # (1)
   
@@ -292,7 +294,7 @@ assessmentWindowLowFlowsBasinLevelFlag <- dplyr::select(assessmentWindowLowFlows
 
 
 conventionals <- conventionals %>% 
-  left_join(dplyr::select(conventionals_distinct, FDT_STA_ID, BASIN_CODE) %>% st_drop_geometry(),
+  left_join(dplyr::select(conventionals_distinct, FDT_STA_ID, BASIN_CODE), #%>% st_drop_geometry(),
             by = 'FDT_STA_ID') %>% 
   mutate(SampleDate = as.Date(FDT_DATE_TIME)) %>% 
   #left_join(dplyr::select(stationTable, STATION_ID, VAHU6), by = c('FDT_STA_ID' = 'STATION_ID')) %>% # join in VAHU6 information from Assessors
@@ -314,7 +316,7 @@ conventionals <- conventionals %>%
 That dataset is money. We want to use that one in the shiny applications, so make sure you pin that to the server (and update it any time new conventionals data are processed).
 
 ```{r pin new conventionals}
-# pin(conventionals, name = "conventionals2024draft_with7Q10flag", 
+# pin(conventionals, name = "conventionals2024draft_with7Q10flag",
 #     description = "Draft Conventionals data for IR2024 with added 7Q10 flag joined at major river basin level. This is used for the shiny app versions of the automated assessment protocol to save rendering time", board = 'rsconnect')
 ```
 
