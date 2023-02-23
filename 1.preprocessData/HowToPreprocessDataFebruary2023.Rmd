@@ -87,19 +87,19 @@ The largest dataset needed for these analyses is the conventionals dataset that 
 This is the February draft data pull that will help expedite the process when the official Conventionals data pull is released in March 2023. 
 
 ```{r conventionals, echo=F, warning=F, error=FALSE}
-conventionalsRaw1 <- read_excel('data/draftData/CEDSWQM_2024_IR_20230209.XLSX', sheet = 'CONVENTIONALS') 
-
-conventionalsRaw <- read_excel('data/draftData/CONVENTIONALS_20230216.xlsx', sheet = 'CONVENTIONALS') 
+conventionalsRaw <- read_excel('data/draftData/CEDSWQM_2024_IR_20230216.xlsx', sheet = 'CONVENTIONALS')
+  #read_excel('data/draftData/CONVENTIONALS_20230216.xlsx', sheet = 'CONVENTIONALS') 
+  #read_excel('data/draftData/CEDSWQM_2024_IR_20230209.XLSX', sheet = 'CONVENTIONALS') 
 
 # before removing data from your environment, here is how to clean Roger's data up to match with schema expected by automated tools
 #source('preprocessingModules/updateConventionalsSchema.R') # version working with old names, works for Feb 16 data pull
 #source('preprocessingModules/updateConventionalsSchemaAndPinToServer.R')  # version working with new storet names, works for Feb 9 data pull
 # pin final versions
 # pin(conventionals, name = 'ejones/conventionals2024draft',
-#     description = 'Working IR2024 conventionals dataset, EVJ reorganized from Roger 2/17/2023.',
+#     description = 'Working IR2024 conventionals dataset, EVJ reorganized from Roger 2/23/2023.',
 #     board = 'rsconnect')
 
-
+conventionals <- pin_get('ejones/conventionals2024draft', board = 'rsconnect') 
 
 
 # An object named conventionals is now in your environment to following the cleanup step above
@@ -151,58 +151,21 @@ distinctSites_sf <- distinctSites %>%
             remove = F, # don't remove these lat/lon cols from df
             crs = 4326)
 # save for later just in case
-#saveRDS(distinctSites_sf, './data/distinctSites_sf02212023.RDS')
+#saveRDS(distinctSites_sf, './data/distinctSites_sf02232023.RDS')
 ```
 
 
 
 ### Other data: Citizen Monitoring and Non Agency
 
-Bring in and organize citmonNonagency sites. Below is for 2019-2020 data from Reid
+Bring in and organize citmonNonagency sites. Below is for 2019-2020 data from Reid.
 
-```{r all citmonNonagency}
-# Tried to operationalize it but schema different between sheets so require manual work in excel
-# path <- "data/CitizenMonitoringNonAgencyFromRegions/ALL_BRRO_CitMon_Stn_IDs_FINAL.xlsx"
-# citmon <- path %>% 
-#   excel_sheets() %>% 
-#   set_names() %>% 
-#   map_df(read_excel, path = path)
+```{r reid citmon data}
+citmonNonAgency <- read.csv('data/draftData/CMC_FOSR_19_20.csv')
 
-path <- "data/CitizenNonAgencyStations.xlsx"
+# force into conventionals format
+#source('preprocessingModules/citizenMonitoringDataToConventionals.R')
 
-citmonNonAgency <- path %>% 
-  excel_sheets() %>%
-  set_names() %>%
-  map_df(read_excel, path = path)
-
-View(citmonNonAgency %>% group_by(`DEQ Station ID`) %>% mutate(n = n()) %>%  arrange(desc(n), `DEQ Station ID`))
-```
-
-Reduce to just the sites in the last assessment cycle as to not attribute unnecessary sites. 
-
-```{r limit citmonnonagency}
-# library(pool)
-# library(dbplyr)
-# 
-# pool <- dbPool(
-#   drv = odbc::odbc(),
-#   Driver = "ODBC Driver 11 for SQL Server", #"SQL Server", ##"SQL Server Native Client 11.0", 
-#   Server= "DEQ-SQLODS-PROD,50000",
-#   database = "ODS",
-#   trusted_connection = "yes"
-# )
-#
-# had to run below in R4.1.2 bc issue in driver or ODBC in 3.6.2?
-# stations <-  pool %>% 
-#   tbl(in_schema('wqa', 'WQA Station Details')) %>% 
-#   filter(`Assessment Cycle` == 2022) %>% 
-#   as_tibble()
-stations <- readRDS('data/2022stations.RDS')
-
-citmonNonAgency <- filter(citmonNonAgency, `DEQ Station ID` %in% stations$`Station Id`)
-
-
-rm(pool);rm(stations)
 ```
 
 
@@ -210,10 +173,9 @@ Organize data to match distinctSites_sf format
 
 ```{r citmonNonagency spatial}
 citmonNonAgency_sf <- citmonNonAgency %>% 
-  dplyr::select(FDT_STA_ID = `DEQ Station ID`,
-                STA_DESC = `Station Description`, 
-                Data_Source = `Data Source`,
+  dplyr::select(FDT_STA_ID, STA_DESC, Data_Source,
                 Latitude, Longitude) %>% 
+  distinct(FDT_STA_ID, .keep_all = T) %>% 
    st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
            remove = F, # don't remove these lat/lon cols from df
            crs = 4326)
@@ -240,7 +202,7 @@ unrestrictedAssessmentRegionVAHU6Subbasin <- left_join(vahu6, subbasinConversion
 #View(unrestrictedAssessmentRegionVAHU6Subbasin %>% st_drop_geometry())
 
 # need this if running just citmon
-#distinctSites_sf <- readRDS('./data/distinctSites_sf02132023.RDS')
+#distinctSites_sf <- readRDS('./data/distinctSites_sf02232023.RDS')
 
 
 # Add Level 3 and 4 Ecoregion Info to citmon and any conventionals stations taht don't have info
@@ -266,6 +228,8 @@ citmonNonAgency_sf2 <- bind_rows(citmonNonAgency_sf1 %>% st_drop_geometry(), # d
            remove = F, # don't remove these lat/lon cols from df
            crs = 4326)
 
+# make sure no duplicates
+citmonNonAgency_sf2 %>% group_by(FDT_STA_ID) %>% mutate(n = n()) %>% filter(n > 1) %>% View()
 
 
 # QA step
@@ -284,8 +248,12 @@ distinctSites_sf <- bind_rows(distinctSites_sf %>% st_drop_geometry(),
   mutate(GROUP_STA_ID = NA_character_) %>% #will need this when it comes time to do real citmon stuff
   dplyr::select(FDT_STA_ID, GROUP_STA_ID, everything())
 
+# make sure no duplicates
+distinctSites_sf %>% group_by(FDT_STA_ID) %>% mutate(n = n()) %>% dplyr::select(n, everything()) %>%  filter(n > 1) %>%   View()
+# duplicates are all legit. These are colocated stations with citizen monitoring. KEEP THESE
+
 # Save for use in metadata app
-#saveRDS(distinctSites_sf, 'data/distinctSites_sf_withCitmon02132023.RDS')
+#saveRDS(distinctSites_sf, 'data/distinctSites_sf_withCitmon02232023.RDS')
 
 # Clean up workspace
 rm(list = c('ecoregion4Large','county', 'vahu6','subbasinConversion','unrestrictedAssessmentRegionVAHU6Subbasin',
@@ -320,6 +288,9 @@ There are some stations that are deemed permanently inappropriate for assessment
 stationHitList <- read_csv('data/stationHitList.csv')
 
 distinctSites_sf <- filter(distinctSites_sf, ! FDT_STA_ID %in% stationHitList$`StationID to Remove`)
+
+
+#saveRDS(distinctSites_sf, 'data/distinctSites_sf_withCitmon02232023.RDS')
 ```
 
 
@@ -335,17 +306,16 @@ distinctSites_sf <- filter(distinctSites_sf, ! FDT_STA_ID %in% stationHitList$`S
 #                remove = F, # don't remove these lat/lon cols from df
 #                crs = 4326) %>% 
 #   st_intersection(dplyr::select(basins, BASIN_CODE)) 
+# pin('ejones/conventionals2024_distinctdraft', board = 'rsconnect')  # see below for fix coming this way at final stage
+
 ```
 
 now pin to server
 
 
 ```{r}
-# pin final versions
-# pin(conventionals, name = 'ejones/conventionals2024draft',
-#     description = 'Working IR2024 conventionals dataset, EVJ reorganized from Roger 2/17/2023.',
-#     board = 'rsconnect')
-# pin('ejones/conventionals2024_distinctdraft', board = 'rsconnect')  # see below for fix coming this way at final stage
+# pin(distinctSites_sf, 'ejones/conventionals2024_distinctdraft', board = 'rsconnect',
+#     description = 'Working IR2024 conventionals_distinct dataset based on 02162023 conventionals draft pull from Roger and 2019-2020 citmon/nonagency data from Reid that have FDT_STA_ID')  # see below for fix coming this way at final stage
 
 ```
 
@@ -358,7 +328,7 @@ lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3. Unless y
 
 ```{r assessment and subbasin join}
 #source('preprocessingModules/assessmentLayerSubbasinJoin.R') # lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3
-distinctSites_sf <- readRDS('./data/distinctSites_sf02132023.RDS')
+distinctSites_sf <- readRDS('./data/distinctSites_sf_withCitmon02232023.RDS')
 distinctSitesToDo <- distinctSites_sf 
 # keep a copy of original distinct sites to check that no one was lost at the end
 ``` 
@@ -373,6 +343,17 @@ For 2024IR draft data, we didn't have any missingSites.
 ```{r missingSites for app}
 #saveRDS(missingSites, 'data/missingSites.RDS')
 ```
+
+
+# Citizen Monitoring WQS for older stations attributed at AU level
+
+For a lot of older citmon stations, we should have WQS info at AU level that we can backdoor to use for IR2024. going forward with new sites, we will only use the official metadata app for WQS and AU snapping, but here is a good way to glean data that already exists.
+
+```{r}
+#source('specialStepForIR2024toImportWQSinfoAttributedAtAUlevelFromODS.R')
+```
+
+
 
 
 # Attach WQS to Stations

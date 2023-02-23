@@ -4,7 +4,8 @@
 # joined to the assessment layer (using this method for capturing stations outside assessment region polygons)
 # we no longer have to repeat that method here
 
-# 
+distinctSites_sf <- readRDS('./data/distinctSites_sf_withCitmon02232023.RDS')
+
 assessmentLayer <- st_read('../GIS/AssessmentRegions_VA84_basins.shp') %>%
   st_transform( st_crs(4326)) # transform to WQS84 for spatial intersection
 
@@ -27,14 +28,11 @@ distinctSites_sf1 <- distinctSites_sf %>%
 # we need to go back in and fix them manually
 if(any(nrow(distinctSites_sf1) < nrow(distinctSites_sf) |
        nrow(filter(distinctSites_sf1, is.na(BASIN_CODE))) > 0 )   ){
-  missingSites <- filter(distinctSites_sf, ! FDT_STA_ID %in% distinctSites_sf1$FDT_STA_ID |
-                           is.na(BASIN_CODE)) %>% 
-    dplyr::select(-c(VAHU6, ASSESS_REG, OFFICE_NM, VaName, Tidal, VAHUSB, FedName, HUC10 ,Basin, BASIN_CODE))
-    #%>%
-    # st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
-    #          remove = F, # don't remove these lat/lon cols from df
-    #          crs = 4326) 
-  
+  missingSites <- bind_rows(filter(distinctSites_sf, ! FDT_STA_ID %in% distinctSites_sf1$FDT_STA_ID),
+                            filter(distinctSites_sf1, is.na(BASIN_CODE))) %>% 
+    bind_rows(filter(distinctSites_sf1, is.na(ASSESS_REG))) %>% 
+    dplyr::select(-c(VAHU6, ASSESS_REG, OFFICE_NM, VaName, Tidal, VAHUSB, FedName, HUC10 ,Basin, BASIN_CODE, BASIN_NAME, SUBBASIN))
+    
   closest <- mutate(assessmentLayer[0,], FDT_STA_ID =NA) %>%
     dplyr::select(FDT_STA_ID, everything())
   for(i in seq_len(nrow(missingSites))){
@@ -42,15 +40,17 @@ if(any(nrow(distinctSites_sf1) < nrow(distinctSites_sf) |
       mutate(FDT_STA_ID = missingSites[i,]$FDT_STA_ID) %>%
       dplyr::select(FDT_STA_ID, everything())
   }
+  closest <- closest %>% distinct(FDT_STA_ID, .keep_all = T) # sometimes there can be duplicates
   
   closestSUBB <- mutate(subbasinLayer[0,], FDT_STA_ID =NA) %>%
     dplyr::select(FDT_STA_ID, everything())
   for(i in seq_len(nrow(missingSites))){
+    print(i)
     closestSUBB[i,] <- subbasinLayer[which.min(st_distance(subbasinLayer, missingSites[i,])),] %>%
       mutate(FDT_STA_ID = missingSites[i,]$FDT_STA_ID) %>%
       dplyr::select(FDT_STA_ID, everything())
   }
-  
+  closestSUBB <- closestSUBB %>% distinct(FDT_STA_ID, .keep_all = T) # sometimes there can be duplicates
   
   missingSites <- left_join(missingSites, closest %>% st_drop_geometry(),
                             by = 'FDT_STA_ID') %>%
@@ -84,5 +84,5 @@ if(any(nrow(distinctSites_sf1) < nrow(distinctSites_sf) |
 
 
 
-rm(closest); rm(i); rm(subbasinLayer); rm(distinctSites_sf1)
-saveRDS(distinctSites_sf, './data/distinctSites_sf02132023.RDS')
+rm(closest); rm(i); rm(subbasinLayer); rm(distinctSites_sf1); rm(closestSUBB)
+#saveRDS(distinctSites_sf, './data/distinctSites_sf_withCitmon02232023.RDS')

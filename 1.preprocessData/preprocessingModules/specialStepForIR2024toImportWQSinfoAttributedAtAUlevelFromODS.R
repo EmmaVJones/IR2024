@@ -50,30 +50,50 @@ unique(citmonStationsWithWQS$`Station Type List`)
 
 
 # Bring in citmon station that need WQS
-distinctSites_sf <- readRDS('data/distinctSites_sf_withCitmon.RDS')
+distinctSites_sf <- readRDS('data/distinctSites_sf_withCitmon02232023.RDS')##distinctSites_sf_withCitmon.RDS')
 
-# stations that were sent to app for manual review after spatial snapping
-forReview <- readRDS('data/WQStableWithCitmon11142022.RDS')
+# bring in any existing citmon WQS information from previous work
+citmonStationsWithWQS <- readRDS('data/citmonStationsWithWQS.RDS') # pin_get('ejones/citmonStationsWithWQSFinal', board= 'rsconnect')# RSconnect error bc R version
 
-# remove sites from forReview that have WQS info from ODS from AU level
-fine <- filter(forReview, StationID %in% citmonStationsWithWQS$`Station Id`)
-notFine <- filter(forReview, ! StationID %in% citmonStationsWithWQS$`Station Id`)
+##### # stations that were sent to app for manual review after spatial snapping
+###### forReview <- readRDS('data/WQStableWithCitmon11142022.RDS')
+# # remove sites from forReview that have WQS info from ODS from AU level
+# fine <- filter(forReview, StationID %in% citmonStationsWithWQS$`Station Id`)
+# notFine <- filter(forReview, ! StationID %in% citmonStationsWithWQS$`Station Id`)
+
 
 # save new version of assessor WQS review list for App
-saveRDS(notFine, 'data/WQStableWithCitmon11292022.RDS')
+#saveRDS(notFine, 'data/WQStableWithCitmon11292022.RDS')
 saveRDS(citmonStationsWithWQS, 'data/citmonStationsWithWQS.RDS')
 
 # Back to R 3.6.2 
 
 citmonStationsWithWQS <- readRDS('data/citmonStationsWithWQS.RDS')
-distinctSites_sf <- readRDS('data/distinctSites_sf_withCitmon.RDS')
+distinctSites_sf <- readRDS('data/distinctSites_sf_withCitmon02232023.RDS') %>% 
+  st_drop_geometry()
+  #add in super large pull and remove non distinct
+distinctSites_sf_allIR2022citmonSites <- readRDS('data/distinctSites_sf_withCitmon.RDS') %>% st_drop_geometry()
+
+distinctSites_sf1 <- rbind(distinctSites_sf, 
+                               filter(distinctSites_sf_allIR2022citmonSites,! FDT_STA_ID %in% distinctSites_sf$FDT_STA_ID) %>% 
+                             mutate(GROUP_STA_ID= NA_character_) %>% 
+                             dplyr::select(names(distinctSites_sf))  ) #%>% 
+# Check for duplicates
+  # group_by(FDT_STA_ID) %>% 
+  # mutate( n = n()) %>% 
+  # dplyr::select(n, everything()) %>% 
+  # filter(n>1) %>% 
+  # View()
+
+
+
 WQStable <- tibble(StationID = NA, WQS_ID = NA)
 
 
 # Now we need to do backflips to get the right WQS info for lakes 
 lakeSites <- filter(citmonStationsWithWQS, `Water Type` == 'RESERVOIR') %>% 
   # get lat lng
-  left_join(dplyr::select(distinctSites_sf, FDT_STA_ID, Latitude, Longitude),
+  left_join(dplyr::select(distinctSites_sf1, FDT_STA_ID, Latitude, Longitude),
             by = c('Station Id' ='FDT_STA_ID')) %>% 
   filter(!is.na(Latitude) | !is.na(Longitude)) %>% 
   st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
@@ -135,4 +155,6 @@ WQSlookup <- pin_get('ejones/WQSlookup-withStandards', board = 'rsconnect')
 names(citmonStationsWithWQSFinal) == names(WQSlookup)
 
 pin(citmonStationsWithWQSFinal, descrption = 'IR2024 citmon stations with WQS that were attributed by assessors during IR2022', board = 'rsconnect')
+
+citmonStationsWithWQSFinal <- pin_get('ejones/citmonStationsWithWQSFinal', board = 'rsconnect')
 
