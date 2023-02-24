@@ -1,0 +1,63 @@
+---
+title: "Untitled"
+author: "Emma Jones"
+date: "2/24/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Secchi Depth Query Detour
+
+Secchi depth has not been pulled in the conventionals dataset but is required in the lakes assessment process. Where available, attach that information from ODS production.
+
+```{r establish ODS connection}
+library(pool)
+library(dbplyr)
+### Production Environment
+pool <- dbPool(
+  drv = odbc::odbc(),
+  Driver = "ODBC Driver 11 for SQL Server", #"SQL Server Native Client 11.0", 
+  Server= "DEQ-SQLODS-PROD,50000",
+  dbname = "ODS",
+  trusted_connection = "yes"
+)
+
+#station <- '4AROA167.34'
+
+stationSecchiDepth <- pool %>% tbl(in_schema('wqm', "Wqm_Field_Data_View")) %>%
+  filter(Fdt_Sta_Id %in% !! conventionals_distinct$FDT_STA_ID & #station & #
+           between(as.Date(Fdt_Date_Time), "2014-12-31", "2020-12-31") &
+           !is.na(Fdt_Secchi_Depth)) %>% # x >= left & x <= right
+  dplyr::select(Fdt_Sta_Id, Fdt_Date_Time, Fdt_Depth, Fdt_Secchi_Depth) %>%
+  as_tibble() %>%
+  mutate(Date = as.Date(Fdt_Date_Time)) %>%
+    dplyr::select(FDT_STA_ID = Fdt_Sta_Id, Date, FDT_DEPTH = Fdt_Depth, Fdt_Secchi_Depth) # name conventionals format
+  #mutate(RMK_SECCHI_DEPTH = as.character(NA), LEVEL_SECCHI_DEPTH = as.factor(NA)) 
+```
+
+Join this data to conventionals data in the new conventionals format.
+
+```{r secchi to conventionals}
+conventionalsArchive <- conventionals %>%
+  mutate(Date = as.Date(FDT_DATE_TIME))
+
+#lake <- filter(conventionalsArchive, FDT_STA_ID == '4AROA167.34') %>%
+#    mutate(Date = as.Date(FDT_DATE_TIME)) %>%
+#  dplyr::select(FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH,  Date, SECCHI_DEPTH_M)
+
+#lake2 <- left_join(lake, stationSecchiDepth, by = c('FDT_STA_ID', 'Date', 'FDT_DEPTH')) %>%
+conventionals <- left_join(conventionalsArchive, stationSecchiDepth, by = c('FDT_STA_ID', 'Date', 'FDT_DEPTH')) %>%
+  mutate(SECCHI_DEPTH_M = Fdt_Secchi_Depth) %>%
+  dplyr::select(-c(Fdt_Secchi_Depth, Date))
+  
+#glimpse(conventionals)
+#View(filter(conventionals, !is.na(SECCHI_DEPTH_M)))
+```
+
+
+```{r}
+#saveRDS(conventionals, 'data/conventionals08292022.RDS')# data to here bc so tired of rerunning everything
+
+```
