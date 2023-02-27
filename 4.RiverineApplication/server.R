@@ -25,11 +25,10 @@ historicalStationsTable2 <- readRDS('data/stationsTable2020.RDS') # two cycle ag
 intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
 
 
-WCmetals <- pin_get("ejones/WCmetalsForAnalysis",  board = "rsconnect") #pin_get("WCmetals-2022IRfinal",  board = "rsconnect")
+WCmetals <- pin_get("ejones/WCmetalsForAnalysisIR2024", board = "rsconnect")#pin_get("WCmetalsIR2024",  board = "rsconnect") 
 WCmetalsForAnalysis <- readRDS('userDataToUpload/WCmetalsForApp.RDS')
-Smetals <- pin_get("Smetals-2022IRfinal",  board = "rsconnect")
-# IR2020WCmetals <- pin_get("WCmetals-2020IRfinal",  board = "rsconnect")
-# IR2020Smetals <- pin_get("Smetals-2020IRfinal",  board = "rsconnect")
+#WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") # this is included in local data above
+Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
 VSCIresults <- pin_get("VSCIresults", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
 VCPMI63results <- pin_get("VCPMI63results", board = "rsconnect") %>%
@@ -61,16 +60,16 @@ markPCB <- read_excel('data/oldData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022
   mutate(SampleDate = as.Date(SampleDate),
          `Parameter Rounded to WQS Format` = as.numeric(signif(`Total Of Concentration`, digits = 2))) %>% # round to even for comparison to chronic criteria)
   dplyr::select(StationID: `Total Of Concentration`,`Parameter Rounded to WQS Format`, StationID_join)
-fishPCB <- read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs') %>%
-  mutate(`Parameter Rounded to WQS Format` = as.numeric(signif(`Total PCBs`, digits = 2))) %>% # round to even for comparison to chronic criteria)
-  dplyr::select(WBID:`Weight (g)`, `Water %`:`Total PCBs`, `Parameter Rounded to WQS Format`, uncorrected, `recovery corrected`, comment3, Latitude, Longitude)
-fishMetals <- read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals') %>%
-  rename("# of Fish" = "# of fish...4", "Species_Name"  = "Species_Name...5",
-         "species_name" = "Species_Name...47", "number of fish" = "# of fish...48")#,
-#         "Beryllium"= "Be",  "Aluminum" = "Al",  "Vanadium" = "V", "Chromium"= "Cr",
-#         "Manganese" = "Mn", "Nickel" = "Ni", "Copper" = "Cu" ,"Zinc"=  "Zn",  "Arsenic" = "As" , "Selenium" = "Se" ,
-#         "Silver" = "Ag" , "Cadmium" = "Cd",
-#         "Antimony" = "Sb", "Barium"=  "Ba" , "Mercury" =  "Hg", "Thallium"  = "Tl", "Lead" = "Pb"  )
+fishPCB <- pin_get('ejones/fishPCBIR2024', board = 'rsconnect')
+# read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs') %>%
+# mutate(`Parameter Rounded to WQS Format` = as.numeric(signif(`Total PCBs`, digits = 2))) %>% # round to even for comparison to chronic criteria)
+# dplyr::select(WBID:`Weight (g)`, `Water %`:`Total PCBs`, `Parameter Rounded to WQS Format`, uncorrected, `recovery corrected`, comment3, Latitude, Longitude)
+fishMetals <- pin_get('ejones/fishMetalsIR2024', board = 'rsconnect') %>% 
+  # read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals') %>%
+  rename("Beryllium"= "Be",  "Aluminum" = "Al",  "Vanadium" = "V", "Chromium"= "Cr",
+         "Manganese" = "Mn", "Nickel" = "Ni", "Copper" = "Cu" ,"Zinc"=  "Zn",  "Arsenic" = "As" , "Selenium" = "Se" ,
+         "Silver" = "Ag" , "Cadmium" = "Cd",
+         "Antimony" = "Sb", "Barium"=  "Ba" , "Mercury" =  "Hg", "Thallium"  = "Tl", "Lead" = "Pb"  )
 fishMetalsScreeningValues <- read_csv('data/FishMetalsScreeningValues.csv') %>%
   group_by(`Screening Method`) %>%
   pivot_longer(cols = -`Screening Method`, names_to = 'Metal', values_to = 'Screening Value') %>%
@@ -426,6 +425,12 @@ shinyServer(function(input, output, session) {
     filter(WCmetalsForAnalysis, StationID %in% unique(stationData()$FDT_STA_ID)) %>%
       map(1)  })
   
+  # for PWS WCmetals
+  WCmetalsStationPWS <- reactive({req(stationData())
+    left_join(dplyr::select(stationData(), FDT_STA_ID, PWS) %>% distinct(FDT_STA_ID, .keep_all = T),
+              filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID),
+              by = c('FDT_STA_ID' = 'Station_Id')) })
+  
 
   
   waterToxics <- reactive({ req(stationData())
@@ -438,8 +443,22 @@ shinyServer(function(input, output, session) {
         PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData()$FDT_STA_ID)),
           assessPWSsummary(assessPWS(stationData(), NITRATE_mg_L, LEVEL_NITRATE, 10), 'PWS_Nitrate'),
           assessPWSsummary(assessPWS(stationData(), CHLORIDE_mg_L, LEVEL_CHLORIDE, 250), 'PWS_Chloride'),
-          assessPWSsummary(assessPWS(stationData(), SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate')) %>%
+          assessPWSsummary(assessPWS(stationData(), SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), Antimony, RMK_Antimony, 5), 'PWS_Antimony'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), Arsenic, RMK_Arsenic, 10), 'PWS_Arsenic'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), Barium, RMK_Barium, 2000), 'PWS_Barium'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), Cadmium, RMK_Cadmium, 5), 'PWS_Cadmium'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), Chromium, RMK_Chromium, 100), 'PWS_ChromiumIII'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), Copper, RMK_Copper, 1300), 'PWS_Copper'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), IronDissolved, RMK_IronDissolved, 300), 'PWS_IronDissolved'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), IronTotal, RMK_IronTotal, 300), 'PWS_IronTotal'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), Lead, RMK_Lead, 15), 'PWS_Lead'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), Nickel, RMK_Nickel, 610), 'PWS_Nickel'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), Selenium, RMK_Selenium, 170), 'PWS_Selenium'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), Thallium, RMK_Thallium, 0.24), 'PWS_Thallium'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), Uranium, RMK_Uranium, 30), 'PWS_Uranium')) %>%
           dplyr::select(-ends_with('exceedanceRate')) }
+          
       
       # chloride assessment if data exists
       if(nrow(filter(stationData(), !is.na(CHLORIDE_mg_L)))){
@@ -556,26 +575,7 @@ shinyServer(function(input, output, session) {
       wellPanel(h5(strong('This station is within 100 meters of a drinking water intake. Please review whether the station
                 should be assessed for secondary human health criteria.', style = "color:red")) ) }    })
 
-  ## PWS table output marked up
-  output$PWStable <- DT::renderDataTable({  req(stationData(), waterToxics())
-    if(is.na(unique(stationData()$PWS))){
-      PWSconcat <- tibble(STATION_ID = unique(stationData()$FDT_STA_ID),
-                          PWS= 'PWS Standards Do Not Apply To Station')
-      DT::datatable(PWSconcat, escape=F, rownames = F, options= list(scrollX = TRUE, pageLength = nrow(PWSconcat), dom='t'),
-                    selection = 'none')
-
-    } else {
-      PWSconcat <- waterToxics() %>%
-        dplyr::select(PWSinfo) %>%
-        unnest(cols = c(PWSinfo)) %>%
-        dplyr::select(-ends_with('exceedanceRate'))
-
-      DT::datatable(PWSconcat, escape=F, rownames = F, options= list(scrollX = TRUE, pageLength = nrow(PWSconcat), dom='t'),
-                    selection = 'none') %>%
-        formatStyle(c("PWS_Nitrate_EXC","PWS_Nitrate_SAMP","PWS_Nitrate_STAT"), "PWS_Nitrate_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) %>%
-        formatStyle(c("PWS_Chloride_EXC","PWS_Chloride_SAMP","PWS_Chloride_STAT"), "PWS_Chloride_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) %>%
-        formatStyle(c("PWS_Total_Sulfate_EXC","PWS_Total_Sulfate_SAMP","PWS_Total_Sulfate_STAT"), "PWS_Total_Sulfate_STAT", backgroundColor = styleEqual(c('Review'), c('red'))) } })
-
+ 
 
   #### Data Sub Tab ####---------------------------------------------------------------------------------------------------
 

@@ -172,13 +172,17 @@ shinyUI(fluidPage(theme="yeti.css",
                                              'Please investigate the Historical Station Information table above for information as to why this station is
                                              included in the application.'),
                                           DT::dataTableOutput('stationTableDataSummary'), br(),
-                                          h4('PWS Criteria'),
-                                          helpText(span("PWS assessments should noted in a station's COMMENT field of the Stations Table. The table below organizes 
-                                                  PWS information to expedite the comment process.", 
-                                                  strong('Note: Chloride, Sulfate, Total Dissolved Solids, Iron, and Foaming Agents are secondary criteria and are
-                                                         only applicable to data collected at the drinking water intake.'))),
+                                          
+                                          h3('PWS Criteria have moved to the Toxics tab; regardless, if a station is within 100 meter of a drinking water intake,
+                                             this information is flagged below.'),
                                           uiOutput('intakeProximityFlag'),
-                                          DT::dataTableOutput('PWStable'),
+                                          # h4('PWS Criteria'),
+                                          # helpText(span("PWS assessments should noted in a station's COMMENT field of the Stations Table. The table below organizes 
+                                          #         PWS information to expedite the comment process.", 
+                                          #         strong('Note: Chloride, Sulfate, Total Dissolved Solids, Iron, and Foaming Agents are secondary criteria and are
+                                          #                only applicable to data collected at the drinking water intake.'))),
+                                          # uiOutput('intakeProximityFlag'),
+                                          # DT::dataTableOutput('PWStable'),
                                           br(),hr(),br(),
                                           h3('Assessment Unit Raw Data Review and Visualization'),
                                           tabsetPanel(

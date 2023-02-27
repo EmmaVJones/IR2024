@@ -387,32 +387,73 @@ assessPWS <- function(stationData, fieldName, commentName, PWSlimit){
     parameterData <- dplyr::select(stationData, FDT_DATE_TIME, !! fieldName_, !! commentName_) %>%
       filter(!( !! commentName_ %in% c('Level II', 'Level I'))) %>% # get lower levels out
       filter(!is.na(!!fieldName_ )) %>% #get rid of NA's
-      mutate(`Parameter Median` = median(!! fieldName_),
-             `Parameter Rounded to WQS Format` = signif(`Parameter Median`, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
+      # rename(parameter = !!names(.[2])) #%>% # rename columns to make functions easier to apply
+      mutate(`Parameter Rounded to WQS Format` = signif(!! fieldName_, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
+             `Parameter Median` = median(!! fieldName_),
+             `Parameter Median Rounded to WQS Format` = signif(`Parameter Median`, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
              limit =  PWSlimit) %>%
-      rename(parameter = !!names(.[5])) %>% # rename columns to make functions easier to apply
-      mutate(exceeds = ifelse(parameter > limit, T, F)) # Identify where above WQS limit
+      mutate(exceeds = ifelse(`Parameter Rounded to WQS Format` > limit, T, F),
+             medianExceeds =  ifelse(`Parameter Median Rounded to WQS Format` > limit, T, F),) # Identify where above WQS limit
     return(parameterData)
   }
   return(NULL)
 }
 
+
+  
+
 #assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10)
 #assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250)
 #assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250)
+# WCmetalsStationPWS <- left_join(dplyr::select(stationData, FDT_STA_ID, PWS) %>% distinct(FDT_STA_ID, .keep_all = T),
+#                                 filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID),
+#                                 by = c('FDT_STA_ID' = 'Station_Id'))
+# assessPWS(WCmetalsStationPWS, Antimony, RMK_Antimony, 5)
+
+
 
 
 assessPWSsummary <- function(assessPWSresults, 
                              outputName){
-  if(!is.null(assessPWSresults)){
-    return(quickStats(assessPWSresults, outputName))  
+  if(is.null(assessPWSresults) ){
+    z <- tibble(`_EXC` = as.numeric(NA), `_SAMP` = as.numeric(NA), `_exceedanceRate` = as.numeric(NA), 
+                `_STAT` = as.character(NA), `_MedianExceedance` = NA)
+    names(z) <- paste0(outputName, names(z))
+  } else{
+    if(nrow(assessPWSresults) == 0){
+      z <- tibble(`_EXC` = as.numeric(NA), `_SAMP` = as.numeric(NA), `_exceedanceRate` = as.numeric(NA), 
+                  `_STAT` = as.character(NA), `_MedianExceedance` = NA)
+      names(z) <- paste0(outputName, names(z))
+    } else{
+      #if(nrow(assessPWSresults) > 0){
+      z <- quickStats(assessPWSresults, outputName) %>% 
+        mutate(MedianExceedance = unique(assessPWSresults$medianExceeds))
+      names(z)[5] <- paste0(outputName, '_MedianExceedance')
+    }
   }
-  return(quickStats(tibble(limit = NA), outputName))
+  
+    
+  return(z)
 }
 
 #assessPWSsummary(assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10), 'PWS_Nitrate')
 #assessPWSsummary(assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250), 'PWS_Chloride')
 #assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Antimony, RMK_Antimony, 5), 'PWS_Antimony')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Arsenic, RMK_Arsenic, 10), 'PWS_Arsenic')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Barium, RMK_Barium, 2000), 'PWS_Barium')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Cadmium, RMK_Cadmium, 5), 'PWS_Cadmium')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Chromium, RMK_Chromium, 100), 'PWS_ChromiumIII')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Copper, RMK_Copper, 1300), 'PWS_Copper')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, IronDissolved, RMK_IronDissolved, 300), 'PWS_IronDissolved')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, IronTotal, RMK_IronTotal, 300), 'PWS_IronTotal')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Lead, RMK_Lead, 15), 'PWS_Lead')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Nickel, RMK_Nickel, 610), 'PWS_Nickel')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Selenium, RMK_Selenium, 170), 'PWS_Selenium')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Thallium, RMK_Thallium, 0.24), 'PWS_Thallium')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Uranium, RMK_Uranium, 30), 'PWS_Uranium')
+
+
 
 
 # Nutrients pseudo-assessment functions (for Riverine applications)
@@ -970,6 +1011,7 @@ metalsCriteriaFunction <- function(ID, Hardness, WER){
            `Copper Acute Freshwater` =  signif(WER * (exp(0.9422 * log(criteriaHardness) - 1.700)) * 0.960, digits = 2),
            `Copper Chronic Freshwater` = signif(WER * (exp(0.8545 * log(criteriaHardness) - 1.702)) * 0.960, digits = 2),
            `Copper Acute Saltwater` =  signif(9.3 * WER, digits = 2), `Copper Chronic Saltwater` =  signif(6.0 * WER, digits = 2), `Copper PWS` = 1300,
+           `IronDissolved PWS` = 300, `IronTotal PWS` = 300, # new for IR2024 when iron data pulled in conventionals
            `Lead Acute Freshwater` = signif(WER * (exp(1.273 * log(criteriaHardness) - 1.084)) * (1.46203 - (log(criteriaHardness) * 0.145712)), digits = 2),
            `Lead Chronic Freshwater` = signif(WER * (exp(1.273 * log(criteriaHardness) - 3.259)) * (1.46203 - (log(criteriaHardness) * 0.145712)), digits = 2),
            `Lead Acute Saltwater` = signif(230 * WER, digits = 2), `Lead Chronic Saltwater` = signif(8.8 * WER, digits = 2), `Lead PWS` = 15,
@@ -1511,6 +1553,8 @@ annualRollingExceedanceSummary <- function(rolledAnalysis){
       bind_rows(.,
                 filter(rolledAnalysis, str_detect(`Criteria Type`,  "All Other Surface Waters") & `Valid Window` == TRUE) )
       else . } 
+  
+  # Note: the PWS results are purposefully omitted from the rolling window assessment. These use median and reported on in a toxics module
 
   
   suppressMessages(

@@ -28,12 +28,10 @@ historicalStationsTable2 <- readRDS('data/stationsTable2020.RDS') # two cycle ag
 intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
 
 
-WCmetals <- pin_get("ejones/WCmetalsForAnalysis",  board = "rsconnect")
-# Separate object for analysis, tack on METALS and RMK designation to make the filtering of certain lab comment codes easier
+WCmetals <- pin_get("ejones/WCmetalsForAnalysisIR2024", board = "rsconnect")#pin_get("WCmetalsIR2024",  board = "rsconnect") 
 WCmetalsForAnalysis <- readRDS('userDataToUpload/WCmetalsForApp.RDS')
-Smetals <- pin_get("Smetals-2022IRfinal",  board = "rsconnect")
-# IR2020WCmetals <- pin_get("WCmetals-2020IRfinal",  board = "rsconnect")
-# IR2020Smetals <- pin_get("Smetals-2020IRfinal",  board = "rsconnect")
+#WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") # this is included in local data above
+Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
 VSCIresults <- pin_get("VSCIresults", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
 VCPMI63results <- pin_get("VCPMI63results", board = "rsconnect") %>%
@@ -64,16 +62,16 @@ markPCB <- read_excel('data/oldData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022
   mutate(SampleDate = as.Date(SampleDate),
          `Parameter Rounded to WQS Format` = as.numeric(signif(`Total Of Concentration`, digits = 2))) %>% # round to even for comparison to chronic criteria)
   dplyr::select(StationID: `Total Of Concentration`,`Parameter Rounded to WQS Format`, StationID_join)
-fishPCB <- read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs') %>%
-  mutate(`Parameter Rounded to WQS Format` = as.numeric(signif(`Total PCBs`, digits = 2))) %>% # round to even for comparison to chronic criteria)
-  dplyr::select(WBID:`Weight (g)`, `Water %`:`Total PCBs`, `Parameter Rounded to WQS Format`, uncorrected, `recovery corrected`, comment3, Latitude, Longitude)
-fishMetals <- read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals') %>%
-  rename("# of Fish" = "# of fish...4", "Species_Name"  = "Species_Name...5",
-         "species_name" = "Species_Name...47", "number of fish" = "# of fish...48")#,
-#         "Beryllium"= "Be",  "Aluminum" = "Al",  "Vanadium" = "V", "Chromium"= "Cr",
-#         "Manganese" = "Mn", "Nickel" = "Ni", "Copper" = "Cu" ,"Zinc"=  "Zn",  "Arsenic" = "As" , "Selenium" = "Se" ,
-#         "Silver" = "Ag" , "Cadmium" = "Cd",
-#         "Antimony" = "Sb", "Barium"=  "Ba" , "Mercury" =  "Hg", "Thallium"  = "Tl", "Lead" = "Pb"  )
+fishPCB <- pin_get('ejones/fishPCBIR2024', board = 'rsconnect')
+  # read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs') %>%
+  # mutate(`Parameter Rounded to WQS Format` = as.numeric(signif(`Total PCBs`, digits = 2))) %>% # round to even for comparison to chronic criteria)
+  # dplyr::select(WBID:`Weight (g)`, `Water %`:`Total PCBs`, `Parameter Rounded to WQS Format`, uncorrected, `recovery corrected`, comment3, Latitude, Longitude)
+fishMetals <- pin_get('ejones/fishMetalsIR2024', board = 'rsconnect') %>% 
+  # read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals') %>%
+  rename("Beryllium"= "Be",  "Aluminum" = "Al",  "Vanadium" = "V", "Chromium"= "Cr",
+        "Manganese" = "Mn", "Nickel" = "Ni", "Copper" = "Cu" ,"Zinc"=  "Zn",  "Arsenic" = "As" , "Selenium" = "Se" ,
+        "Silver" = "Ag" , "Cadmium" = "Cd",
+        "Antimony" = "Sb", "Barium"=  "Ba" , "Mercury" =  "Hg", "Thallium"  = "Tl", "Lead" = "Pb"  )
 fishMetalsScreeningValues <- read_csv('data/FishMetalsScreeningValues.csv') %>%
   group_by(`Screening Method`) %>%
   pivot_longer(cols = -`Screening Method`, names_to = 'Metal', values_to = 'Screening Value') %>%
@@ -138,7 +136,7 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
 # side panel arguments
 DEQregionSelection <- "BRRO"#"NRO"#"NRO"#"VRO"#"PRO"#"NRO"#'BRRO'#"PRO"#'BRRO'
 basinSelection <- "James-Upper"#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
-HUC6Selection <- "JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+HUC6Selection <- "JU21"#"JM01"#"JU11"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
 
 # pull together data based on user input on side panel
 # Pull AU data from server
@@ -200,7 +198,7 @@ if(nrow(carryoverStations) > 0){
     stationSelection_  <- c(stationSelection_ , carryoverStationsInAU)  } }
 
 # user selection
-stationSelection <- stationSelection_[2]
+stationSelection <- stationSelection_[1]
 
 
 # Pull conventionals data for just selected AU

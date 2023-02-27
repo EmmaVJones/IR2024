@@ -18,7 +18,8 @@ metalsTableSingleStationUI <- function(id){
                               column(1),
                               column(9,  h5('A summary of the exceedances of water column metals criteria available for the ',span(strong('selected site')),' and user
                                             input WER are available below. If no data is presented, then the station does not have any water 
-                                            column metals data available. Hardness based criteria are calculated as applicable.') ) ),
+                                            column metals data available. Hardness based criteria are calculated as applicable.'),
+                                     h5('Metals compared to PWS criteria can be viewed in the lower two tables. See the Toxics tab for more information on all PWS criteria.')) ),
                             DT::dataTableOutput(ns('WCmetalsSingleSiteSummary')),
                            # verbatimTextOutput(ns('testtest')),
                             hr(), 
@@ -150,61 +151,66 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
                   selection = 'none')     })
 
 
-  # 
-  # 
- 
-  # 
-  # ## Sediment Metals
-  # 
-  # # Select One station for individual review
-  # output$Smetals_oneStationSelectionUI <- renderUI({
-  #   req(stationSelectedAbove)
-  #   selectInput(ns('Smetals_oneStationSelection'),strong('Select Station to Review'),choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))),#unique(AUdata())$FDT_STA_ID,
-  #               width='300px', selected = stationSelectedAbove())})# "2-JMS279.41" )})
-  # 
-  # Smetals_oneStation <- reactive({
-  #   req(ns(input$Smetals_oneStationSelection))
-  #   filter(Smetals, Station_Id %in% input$Smetals_oneStationSelection)})
-  # 
-  # output$SmetalsRangeTableSingleSite <- DT::renderDataTable({req(Smetals_oneStation())
-  #   z <- Smetals_oneStation()
-  #   z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
-  #   DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'),
-  #                 selection = 'none')     })
-  # 
-  #  
-  # ## Fish Tissue Metals
-  # 
-  # output$Fmetals_oneStationSelectionUI <- renderUI({
-  #   req(stationSelectedAbove)
-  #   selectInput(ns('Fmetals_oneStationSelection'),strong('Select Station to Review'),choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))),#unique(AUdata())$FDT_STA_ID,
-  #               width='300px', selected = stationSelectedAbove())})# "2-JMS279.41" )})
-  # 
-  # 
-  # Fmetals_oneStation <- reactive({req(ns(input$Fmetals_oneStationSelection))
-  #   filter(Fmetals, Station_ID %in% input$Fmetals_oneStationSelection)})
-  # 
-  # output$Fmetals_exceedance <- DT::renderDataTable({req(Fmetals_oneStation())
-  #   FmetalsSV <- dplyr::select(Fmetals_oneStation(), Station_ID, Collection_Date_Time, Sample_ID,  `# of Fish`, Species_Name, length, weight, Beryllium:Lead) %>%
-  #     dplyr::select(-contains('RMK_')) %>%
-  #     group_by( Station_ID, Collection_Date_Time, Sample_ID, `# of Fish`, Species_Name, length, weight) %>%
-  #     pivot_longer(cols= Beryllium:Lead, names_to = "Metal", values_to = 'Measure') %>%
-  #     left_join(metalsSV, by = 'Metal') %>%
-  #     filter(Measure > `Screening Value`) %>%
-  #     arrange(Metal)
-  #   DT::datatable(FmetalsSV, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(FmetalsSV),
-  #                                                            scrollY = "250px", dom='Bti', buttons=list('copy')), selection = 'none') })
-  # 
-  # 
-  # output$FmetalsRangeTableSingleSite <- DT::renderDataTable({ req(input$Fmetals_oneStationSelection, Fmetals_oneStation())
-  #   # z <- dplyr::select(Smetals_oneStation(), FDT_STA_ID, `FDT_DATE_TIME`,ARSENIC:COMMENT)
-  #   # z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
-  #   DT::datatable(Fmetals_oneStation(), rownames = FALSE,
-  #                 options= list(scrollX = TRUE, pageLength = nrow(Fmetals_oneStation()), scrollY = "250px", dom='Bti', buttons=list('copy')),
-  #                 selection = 'none') #%>%
-  #   #formatStyle(names(z), backgroundColor = styleEqual(c('OE'), c('red'))) # highlight cells red if not supporting
-  # })
-  # 
+
+
+
+
+  ## Sediment Metals
+
+  # Select One station for individual review
+  output$Smetals_oneStationSelectionUI <- renderUI({
+    req(stationSelectedAbove)
+    selectInput(ns('Smetals_oneStationSelection'),strong('Select Station to Review'),choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))),#unique(AUdata())$FDT_STA_ID,
+                width='300px', selected = stationSelectedAbove())})# "2-JMS279.41" )})
+
+  output$test <- renderPrint({stationSelectedAbove()})
+  
+  Smetals_oneStation <- reactive({
+    req(ns(input$Smetals_oneStationSelection))
+    filter(Smetals, Station_Id %in% input$Smetals_oneStationSelection)})
+
+  output$SmetalsRangeTableSingleSite <- DT::renderDataTable({req(Smetals_oneStation())
+    z <- Smetals_oneStation()
+    z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
+    DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'),
+                  selection = 'none')     })
+
+
+  
+  
+
+  ## Fish Tissue Metals
+
+  output$Fmetals_oneStationSelectionUI <- renderUI({
+    req(stationSelectedAbove)
+    selectInput(ns('Fmetals_oneStationSelection'),strong('Select Station to Review'),choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))),#unique(AUdata())$FDT_STA_ID,
+                width='300px', selected = stationSelectedAbove())})# "2-JMS279.41" )})
+
+
+  Fmetals_oneStation <- reactive({req(ns(input$Fmetals_oneStationSelection))
+    filter(Fmetals, Station_ID %in% input$Fmetals_oneStationSelection)})
+
+  output$Fmetals_exceedance <- DT::renderDataTable({req(Fmetals_oneStation())
+    FmetalsSV <- dplyr::select(Fmetals_oneStation(), Station_ID, Collection_Date_Time, Sample_ID,  `# of Fish`, Species_Name, length, weight, Beryllium:Lead) %>%
+      dplyr::select(-contains('RMK_')) %>%
+      group_by( Station_ID, Collection_Date_Time, Sample_ID, `# of Fish`, Species_Name, length, weight) %>%
+      pivot_longer(cols= Beryllium:Lead, names_to = "Metal", values_to = 'Measure') %>%
+      left_join(metalsSV, by = 'Metal') %>%
+      filter(Measure > `Screening Value`) %>%
+      arrange(Metal)
+    DT::datatable(FmetalsSV, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(FmetalsSV),
+                                                             scrollY = "250px", dom='Bti', buttons=list('copy')), selection = 'none') })
+
+
+  output$FmetalsRangeTableSingleSite <- DT::renderDataTable({ req(input$Fmetals_oneStationSelection, Fmetals_oneStation())
+    # z <- dplyr::select(Smetals_oneStation(), FDT_STA_ID, `FDT_DATE_TIME`,ARSENIC:COMMENT)
+    # z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
+    DT::datatable(Fmetals_oneStation(), rownames = FALSE,
+                  options= list(scrollX = TRUE, pageLength = nrow(Fmetals_oneStation()), scrollY = "250px", dom='Bti', buttons=list('copy')),
+                  selection = 'none') #%>%
+    #formatStyle(names(z), backgroundColor = styleEqual(c('OE'), c('red'))) # highlight cells red if not supporting
+  })
+
   
 }
 
@@ -226,7 +232,9 @@ server <- function(input,output,session){
   
   
   #AUData <- reactive({filter_at(conventionals_HUC, vars(starts_with("ID305B")), any_vars(. %in% AUselection) ) })
-  AUData <- reactive({filter(conventionals, Huc6_Vahu6 %in% c("PL30", 'JM01','JM02', 'JM03', 'JM04', 'JM05', 'JM06', "JU11")) %>%
+  AUData <- reactive({filter(conventionals, Huc6_Vahu6 %in% c("PL30", 'JM01','JM02', 'JM03', 'JM04', 'JM05', 'JM06', "JU11", "JU21", 
+                                                              # for sediment metal testing
+                                                              'RD77', 'RD46', 'RD41')) %>%
       left_join(dplyr::select(stationTable, STATION_ID:VAHU6,
                               WQS_ID:CLASS_DESCRIPTION),
                 #WQS_ID:`Max Temperature (C)`), 

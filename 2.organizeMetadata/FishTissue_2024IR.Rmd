@@ -1,0 +1,254 @@
+---
+title: "FishTissue_IR2024"
+author: "Joe Famularo"
+date: "2023-01-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(lubridate)
+library(pins)
+
+# Function to match classes between 2 dataframes based on shared column names
+# Sets class of df2 to match class of df1
+ matchColClasses<- function(df1, df2){
+
+      sharedColNames <- names(df1)[names(df1) %in% names(df2)]
+      sharedColTypes <- lapply(df1[,sharedColNames], class)
+
+      for (n in sharedColNames) {
+        class(df2[[n]]) <- sharedColTypes[[n]]
+      }
+
+      return(df2)
+ }
+```
+
+```{r load data, warning= FALSE}
+# Read in existing data 
+markPCB <- read_excel('data/FishTissueData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ')
+fishPCB <- read_excel('data/FishTissueData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs')
+fishMetals <- read_excel('data/FishTissueData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals')
+
+# Read in 2021 data
+fishMetals21_input<-read_excel("data/FishTissueData/2021_fish_Metals_v121.xlsx", sheet = 1)
+fishPCBs21_input<-read_excel("data/FishTissueData/2021_fish_PCBs_v121.xlsx", sheet = 1)
+
+#CEDS FT Data (Roger)
+CEDS_FT<-read_excel("data/FishTissueData/IR2024_FISH_20230207_CEDS.xlsx")
+```
+
+```{r Format Metals}
+
+fishMetals21<-row_to_names(fishMetals21_input, 7)%>% # Select row to convert to column names
+  clean_names()%>% # Clean names to simplify field name matching later on
+  select(1:collection_date_2)%>% # Select columns to include
+  filter(!row_number() %in% c(1,2))%>% # Remove nonsense rows
+  drop_na(site_number)%>% # Drop rows that have NA site numbers
+  # Convert excel numeric to datetime
+  mutate(collection_date = excel_numeric_to_date(as.numeric(as.character(collection_date)), 
+                                                 date_system = "modern", include_time = TRUE), 
+         collection_date_2 = excel_numeric_to_date(as.numeric(as.character(collection_date_2)), 
+                                                   date_system = "modern", include_time = TRUE))%>%
+  rename(# Rename fishMetals21 so that column names match fishMetals
+      "Site #"               = "site_number",
+      "Station_ID"           = "station_id2", 
+      "Collection_Date_Time" = "collection_date",  
+      "# of fish...4"        = "number_of_fish", 
+      "Species_Name...5"     = "species_name", 
+      "Sample_ID"            = "sample_id",
+      "Be"                   = "be",
+      "RMK_Be"               = "na",
+      "Al"                   = "al", 
+      "RMK_Al"               = "na_2", 
+      "V"                    = "v",
+      "RMK_V"                = "na_3", 
+      "Cr"                   = "cr",
+      "RMK_Cr"               = "na_4", 
+      "Mn"                   = "mn", 
+      "RMK_Mn"               = "na_5", 
+      "Ni"                   = "ni",
+      "RMK_Ni"               = "na_6", 
+      "Cu"                   = "cu", 
+      "RMK_Cu"               = "na_7", 
+      "Zn"                   = "zn", 
+      "RMK_Zn"               = "na_8", 
+      "As"                   = "as",
+      "RMK_As"               = "na_9",
+      "Se"                   = "se", 
+      "RMK_Se"               = "na_10", 
+      "Ag"                   = "ag", 
+      "RMK_AG"               = "na_11",
+      "Cd"                   = "cd", 
+      "RMK_Cd"               = "na_12", 
+      "Sb"                   = "sb", 
+      "RMK_Sb"               = "na_13", 
+      "Ba"                   = "ba", 
+      "RMK_Ba"               = "na_14", 
+      "Hg"                   = "hg", 
+      "RMK_Hg"               = "na_15",
+      "Tl"                   = "tl",
+      "RMK_Tl"               = "na_16", 
+      "Pb"                   = "pb", 
+      "RMK_Pb"               = "na_17", 
+      "LAB_NUM"              = "lab_num", 
+      "Cont_ID"              = "cont_id", 
+      "DEQ_ID"               = "deq_id", 
+      "Station name"         = "station_name",
+      "Latitude"             = "latitude",
+      "Longitude"            = "longitude", 
+      "Species_Name...47"    = "species_name_2", 
+      "# of fish...48"       = "number_of_fish_2", 
+      "length"               = "length", 
+      "weight"               = "weight", 
+      "Rivermile"            = "rivermile", 
+      "Collection_date"      = "collection_date_2")%>%
+  filter(year(Collection_Date_Time) == 2021) # Include only 2021 data
+ 
+# Match classes between these dataframes
+fishMetals21<-matchColClasses(fishMetals, fishMetals21) 
+
+# Bind dataframes and add Date column as a key for the CEDS pull later
+fishMetals<-bind_rows(fishMetals21, fishMetals)%>%mutate(Date=as.Date(Collection_Date_Time))
+
+```
+
+```{r CEDS FT Data Pull}
+CEDS_FT_Cleaned<-CEDS_FT%>%
+  filter(year(CEDS_FT$FSF_COLL_DATETIME) == 2021)%>% #include only 2021 data
+  mutate(`# of fish...4` = str_count(SPECIMEN_ID, "[0-9A-Za-z]+"), #count the number of specimens based on the number of unique SPECIMEN_ID's in the string
+         SPE_COMMON_NAME = str_to_title(SPE_COMMON_NAME), #Capitalize first letters of common name
+         `Species_Name...5` = SPE_COMMON_NAME, # I do this so that I can make a duplicate column later to match existing schema
+         "length" = ifelse(`# of fish...4` == 1, unlist(lapply(str_extract_all(SPECIMEN_LENGTH, "[0-9A-Za-z]+\\.*[0-9A-Za-z]+"), as.numeric)) ,unlist(lapply(lapply(str_extract_all(SPECIMEN_LENGTH, "[0-9A-Za-z]+\\.*[0-9A-Za-z]+"), as.numeric), function(x) paste0(min(x), " - ", max(x))))), #If there's only one fish, report the length, else capture the min and max value in the character string
+         
+         "weight" = ifelse(`# of fish...4` ==1, unlist(lapply(str_extract_all(SPECIMEN_WEIGHT, "[0-9A-Za-z]+\\.*[0-9A-Za-z]+"),as.numeric)),unlist(lapply(lapply(str_extract_all(SPECIMEN_WEIGHT, "[0-9A-Za-z]+\\.*[0-9A-Za-z]+"), as.numeric), function(x) paste0(min(x), " - ", max(x))))), #If there's only one fish, report the length, else capture the min and max value in the character string
+         "Collection_date" = FSF_COLL_DATETIME, #duplicated field to match schema
+         `Species_Name...47` = `Species_Name...5`, #duplicated field to match schema
+         `# of fish...48` = `# of fish...4`, #duplicated field to match schema
+          Date = as.Date(FSF_COLL_DATETIME))%>% #field used to match records with fishMetals
+  rename( # Rename fields to match schema
+    "Station_ID"           = FSF_STA_ID,
+    "Site #"               = FSF_SITE_NO,
+    "Collection_Date_Time" = FSF_COLL_DATETIME,
+    "Be"                   = `Beryllium, MG/KG WET WEIGHT`, 
+    "RMK_Be"               = RMK_Beryllium, 
+    "Al"                   = `Aluminum, MG/KG WET WEIGHT`, 
+    "RMK_Al"               = RMK_Aluminum, 
+    "V"                    = `Vanadium, MG/KG WET WEIGHT`, 
+    "RMK_V"                = RMK_Vanadium, 
+    "Cr"                   = `Chromium, MG/KG WET WEIGHT`, 
+    "RMK_Cr"               = RMK_Chromium,
+    "Mn"                   = `Manganese, MG/KG WET WEIGHT`,
+    "RMK_Mn"               = RMK_Manganese,
+    "Ni"                   = `Nickel, MG/KG WET WEIGHT`,
+    "RMK_Ni"               = RMK_Nickel,
+    "Cu"                   = `Copper, MG/KG WET WEIGHT`,
+    "RMK_Cu"               = RMK_Copper,
+    "Zn"                   = `Zinc, MG/KG WET WEIGHT`,
+    "RMK_Zn"               = RMK_Zinc,
+    "As"                   = `Arsenic, MG/KG WET WEIGHT`,
+    "RMK_As"               = RMK_Arsenic,
+    "Se"                   = `Selenium, MG/KG WET WEIGHT`,
+    "RMK_Se"               = RMK_Selenium,
+    "Ag"                   = `Silver, MG/KG WET WEIGHT`,
+    "RMK_Ag"               = RMK_Silver,
+    "Cd"                   = `Cadmium, MG/KG WET WEIGHT`,
+    "RMK_Cd"               = RMK_Cadmium,
+    "Sb"                   = `Antimony, MG/KG WET WEIGHT`,
+    "RMK_Sb"               = RMK_Antimony,
+    "Ba"                   = `Barium, MG/KG WET WEIGHT`,
+    "RMK_Ba"               = RMK_Barium,
+    "Hg"                   = `Mercury, MG/KG WET WEIGHT...29`,
+    "RMK_Hg"               = RMK_Mercury...30, 
+    "Tl"                   = `Thallium, MG/KG WET WEIGHT`,
+    "RMK_Tl"               = RMK_Thallium,
+    "Pb"                   = `Lead, MG/KG WET WEIGHT`,
+    "RMK_Pb"               = RMK_Lead,
+    "Cont_ID"              = TSR_FSS_CONTAINER_ID) %>% 
+left_join(., fishMetals, by=c("Station_ID", "Site #", "# of fish...4", "Species_Name...5", "length", "weight", "Cont_ID", "Date"))%>% #Join with fishMetals to try and add Rivermile, Latitude, Longitude, etc. to CEDS data that have exact matches with fishMetals records
+  select(1:Date, Sample_ID, Rivermile, Latitude, Longitude, `Station name`, DEQ_ID, LAB_NUM)%>% #Retain the columns from fishMetals that have missing descriptive info from CEDS data
+  rename_with(~str_remove(., '.y'))%>% #Drop field name additions from join
+  rename_with(~str_remove(., '.x'))%>% #Drop field name additions from join
+      select(`Site #`, Station_ID, Collection_Date_Time, `# of fish...4`, `Species_Name...5`, 
+           Sample_ID, Be, RMK_Be, Al, RMK_Al, V, RMK_V, Cr, RMK_Cr, Mn, RMK_Mn, Ni, RMK_Ni, 
+           Cu, RMK_Cu, Zn, RMK_Zn, As, RMK_As, Se, RMK_Se, Ag, RMK_Ag, Cd, RMK_Cd, Sb, RMK_Sb, Ba, RMK_Ba, Hg, RMK_Hg, Tl, RMK_Tl, Pb, RMK_Pb, LAB_NUM, Cont_ID, DEQ_ID, `Station name`, Latitude, Longitude, `Species_Name...47`, `# of fish...48`, length, weight, Rivermile, Collection_date, Date) #Reorder dataframe
+
+#Match classes
+CEDS_FT_Cleaned<-matchColClasses(fishMetals, CEDS_FT_Cleaned)
+
+#Drop all observations in fishMetals that match records in CEDS_FT_Cleaned
+fishMetals<-anti_join(fishMetals, CEDS_FT_Cleaned, by=c("Station_ID", "Site #", "# of fish...4", "Species_Name...5", "length", "weight", "Cont_ID", "Date", "Be", "Al", "V", "Cr", "Mn", "Ni", "Cu", "Zn", "As", "Se", "Ag", "Cd", "Sb", "Ba", "Hg", "Tl", "Pb"))%>%
+#Add in the formatted CEDS FT data
+  bind_rows(CEDS_FT_Cleaned)%>% 
+  #Drop the Date Column used in anti_join
+                select(!Date)%>%
+  rename("# of Fish" = "# of fish...4", "Species_Name"  = "Species_Name...5",         "species_name" = "Species_Name...47", "number of fish" = "# of fish...48")#,#         "Beryllium"= "Be",  "Aluminum" = "Al",  "Vanadium" = "V", "Chromium"= "Cr",#         "Manganese" = "Mn", "Nickel" = "Ni", "Copper" = "Cu" ,"Zinc"=  "Zn",  "Arsenic" = "As" , "Selenium" = "Se" ,#         "Silver" = "Ag" , "Cadmium" = "Cd",#         "Antimony" = "Sb", "Barium"=  "Ba" , "Mercury" =  "Hg", "Thallium"  = "Tl", "Lead" = "Pb"  )
+
+# just IR2024 data
+fishMetals <- mutate(fishMetals, year = year(Collection_Date_Time)) %>% 
+  filter(year %in% c(2017:2021)) %>%  # 2022 not included in IR2024 bc data not back in time
+  dplyr::select(-year)
+
+
+#Pin data
+# pin(fishMetals, "ejones/fishMetalsIR2024", board = 'rsconnect',
+#     description = 'IR2024 fish metals data less 2022 data because data not back from lab in time for assessment data cutoff.')
+```
+
+```{r fish PCBs}
+
+fishPCBs21<-row_to_names(fishPCBs21_input, 4)%>% # Select row to convert to column names
+  clean_names()%>% # Clean names to simplify field name matching later on
+  select(1:na_5)%>% # Select columns to include
+  filter(!row_number() %in% 1:5)%>% # Remove nonsense rows
+  # Convert excel numeric to datetime
+  mutate(sampling = excel_numeric_to_date(as.numeric(as.character(sampling)), 
+                                          date_system = "modern", include_time = TRUE))%>%
+    rename(# Rename fishPCBs21 so that column names match fishPCB
+    "VIMS ID"                           = "vims", 
+    "DEQ site #"                        = "deq", 
+    "Station name/location/description" = "na", 
+    "DEQ rivermile"                     = "deq_2", 
+    "Date"                              = "sampling", 
+    "Species ID"                        = "species", 
+    "Fish species name"                 = "na_2", 
+    "No. of fish analyzed"              = "no_of_fish", 
+    "Length (cm)"                       = "length", 
+    "Weight (g)"                        = "weight", 
+    "Latitude"                          = "latitude", 
+    "Longitude"                         = "longitude", 
+    "Water %"                           = "water", 
+    "Lipid %"                           = "lipid", 
+    "Total PCBs"                        = "total", 
+    "comment3"                          = "na_3", 
+    "uncorrected"                       = "na_5")%>%
+    select(!c("study", "study_2", "na_4"))%>% # Drop unwanted columns
+    mutate("recovery corrected" = `Total PCBs`, # Create "Total PCBs" column
+           "WBID" = NA)%>% # Create WBID column
+    filter(year(Date) == 2021) # Include only 2021 data
+
+# Match classes between these dataframes
+fishPCBs21<-matchColClasses(fishPCB, fishPCBs21) 
+
+# Bind dataframes
+fishPCB<-bind_rows(fishPCB, fishPCBs21)%>%
+  mutate(`Parameter Rounded to WQS Format` = as.numeric(signif(`Total PCBs`, digits = 2))) %>% # round to even for comparison to chronic criteria)
+   dplyr::select(WBID:`Weight (g)`, `Water %`:`Total PCBs`, `Parameter Rounded to WQS Format`, uncorrected, `recovery corrected`, comment3, Latitude, Longitude)
+
+# just IR2024 data
+fishPCB <- mutate(fishPCB, year = year(Date)) %>% 
+  filter(year %in% c(2017:2021)) %>%  # 2022 not included in IR2024 bc data not back in time
+  dplyr::select(-year)
+
+
+#Pin data
+# pin(fishPCB , "ejones/fishPCBIR2024", board = 'rsconnect',
+#     description = 'IR2024 fish PCB data less 2022 data because data not back from lab in time for assessment data cutoff.')
+```
+
+
+
