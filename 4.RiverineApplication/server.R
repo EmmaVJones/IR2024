@@ -25,9 +25,9 @@ historicalStationsTable2 <- readRDS('data/stationsTable2020.RDS') # two cycle ag
 intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
 
 
-WCmetals <- pin_get("ejones/WCmetalsForAnalysisIR2024", board = "rsconnect")#pin_get("WCmetalsIR2024",  board = "rsconnect") 
-WCmetalsForAnalysis <- readRDS('userDataToUpload/WCmetalsForApp.RDS')
-#WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") # this is included in local data above
+WCmetals <- pin_get("WCmetalsIR2024",  board = "rsconnect")#pin_get("WCmetalsIR2024",  board = "rsconnect") 
+WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") # this is included in local data above
+WCmetalsAnalyzed <- readRDS('userDataToUpload/WCmetalsForApp.RDS')
 Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
 VSCIresults <- pin_get("VSCIresults", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
@@ -422,7 +422,7 @@ shinyServer(function(input, output, session) {
   
   
   WCmetalsStationAnalysisStation <- reactive({req(stationData())
-    filter(WCmetalsForAnalysis, StationID %in% unique(stationData()$FDT_STA_ID)) %>%
+    filter(WCmetalsAnalyzed, StationID %in% unique(stationData()$FDT_STA_ID)) %>%
       map(1)  })
   
   # for PWS WCmetals
@@ -430,9 +430,9 @@ shinyServer(function(input, output, session) {
     left_join(dplyr::select(stationData(), FDT_STA_ID, PWS) %>% distinct(FDT_STA_ID, .keep_all = T),
               filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID),
               by = c('FDT_STA_ID' = 'Station_Id')) })
-  
 
-  
+
+
   waterToxics <- reactive({ req(stationData())
     # PWS stuff
     if(nrow(stationData()) > 0){
@@ -441,14 +441,14 @@ shinyServer(function(input, output, session) {
           PWS= NA)
       } else {
         PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData()$FDT_STA_ID)),
-          assessPWSsummary(assessPWS(stationData(), NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_Nitrate'),
+          assessPWSsummary(assessPWS(stationData(), NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_NitrateTotal'),
           assessPWSsummary(assessPWS(stationData(), CHLORIDE_TOTAL_00940_mg_L, LEVEL_00940, 250), 'PWS_ChlorideTotal'),
           assessPWSsummary(assessPWS(stationData(), SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate'),
           assessPWSsummary(assessPWS(WCmetalsStationPWS(), AntimonyTotal, RMK_AntimonyTotal, 5), 'PWS_AntimonyTotal'),
           assessPWSsummary(assessPWS(WCmetalsStationPWS(), ArsenicTotal, RMK_ArsenicTotal, 10), 'PWS_ArsenicTotal'),
           assessPWSsummary(assessPWS(WCmetalsStationPWS(), BariumTotal, RMK_BariumTotal, 2000), 'PWS_BariumTotal'),
           assessPWSsummary(assessPWS(WCmetalsStationPWS(), CadmiumTotal, RMK_CadmiumTotal, 5), 'PWS_CadmiumTotal'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), ChromiumTotal, RMK_ChromiumTotal, 100), 'PWS_ChromiumIIITotal'),
+          assessPWSsummary(assessPWS(WCmetalsStationPWS(), ChromiumTotal, RMK_ChromiumTotal, 100), 'PWS_ChromiumTotal'),
           assessPWSsummary(assessPWS(WCmetalsStationPWS(), CopperTotal, RMK_CopperTotal, 1300), 'PWS_CopperTotal'),
           assessPWSsummary(assessPWS(WCmetalsStationPWS(), IronDissolved, RMK_IronDissolved, 300), 'PWS_IronDissolved'),
           assessPWSsummary(assessPWS(WCmetalsStationPWS(), IronTotal, RMK_IronTotal, 300), 'PWS_IronTotal'),
@@ -458,8 +458,8 @@ shinyServer(function(input, output, session) {
           assessPWSsummary(assessPWS(WCmetalsStationPWS(), ThalliumTotal, RMK_ThalliumTotal, 0.24), 'PWS_ThalliumTotal'),
           assessPWSsummary(assessPWS(WCmetalsStationPWS(), UraniumTotal, RMK_UraniumTotal, 30), 'PWS_UraniumTotal')) %>%
           dplyr::select(-ends_with('exceedanceRate')) }
-          
-      
+
+
       # chloride assessment if data exists
       if(nrow(filter(stationData(), !is.na(CHLORIDE_mg_L)))){
         chlorideFreshwater <- rollingWindowSummary(
@@ -467,7 +467,7 @@ shinyServer(function(input, output, session) {
             annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData()), yearsToRoll = 3, aquaticLifeUse = TRUE) ), "CHL")
       } else {
         chlorideFreshwater <- tibble(CHL_EXC = NA, CHL_STAT= NA)}
-      
+
       # Water toxics combination with PWS, Chloride Freshwater, and water column PCB data
       if(nrow(bind_cols(PWSconcat,
                         chlorideFreshwater,
@@ -475,8 +475,8 @@ shinyServer(function(input, output, session) {
                                             filter(StationID %in% stationData()$FDT_STA_ID), 'WAT_TOX')) %>%
               dplyr::select(contains(c('_EXC','_STAT'))) %>%
               mutate(across( everything(),  as.character)) %>%
-              pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) %>% 
-              filter(! str_detect(values, 'WQS info missing from analysis')) %>% 
+              pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) %>%
+              filter(! str_detect(values, 'WQS info missing from analysis')) %>%
               filter(! values %in% c("S", 0))) >= 1  ) {
         WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = 'Review',
                            PWSinfo = list(PWSconcat))# add in PWS information so you don't need to run this analysis again
@@ -485,62 +485,62 @@ shinyServer(function(input, output, session) {
     } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
                                 PWSinfo = list(PWSconcat))}# add in PWS information so you don't need to run this analysis again
     return(WCtoxics) })
-  
 
-  # Create station table row for each site
-  observe({
-    req(nrow(ecoli()) > 0, nrow(enter()) > 0)# need to tell the app to wait for data to exist in these objects before smashing data together or will bomb out when switching between VAHU6's on the Watershed Selection Page
-    siteData$stationTableOutput <- bind_rows(stationsTemplate,
-                                             cbind(StationTableStartingData(stationData()),
-                                                   tempExceedances(stationData()) %>% quickStats('TEMP'),
-                                                   DOExceedances_Min(stationData()) %>% quickStats('DO'),
-                                                   pHExceedances(stationData()) %>% quickStats('PH'),
 
-                                                   # this runs the bacteria assessment again (unfortunately), but it suppresses
-                                                   # any unnecessary bacteria fields for the stations table to avoid unnecessary flags
-                                                   # and it only runs the 2 year analysis per IR2024 rules
-                                                   bacteriaAssessmentDecisionClass( # NEW for IR2024, bacteria only assessed in two most recent years of assessment period
-                                                     filter(stationData(), between(FDT_DATE_TIME, assessmentPeriod[1] + years(4), assessmentPeriod[2])),
-                                                     uniqueStationName = unique(stationData()$FDT_STA_ID)),
+# Create station table row for each site
+observe({
+  req(nrow(ecoli()) > 0, nrow(enter()) > 0)# need to tell the app to wait for data to exist in these objects before smashing data together or will bomb out when switching between VAHU6's on the Watershed Selection Page
+  siteData$stationTableOutput <- bind_rows(stationsTemplate,
+                                           cbind(StationTableStartingData(stationData()),
+                                                 tempExceedances(stationData()) %>% quickStats('TEMP'),
+                                                 DOExceedances_Min(stationData()) %>% quickStats('DO'),
+                                                 pHExceedances(stationData()) %>% quickStats('PH'),
 
-                                                   rollingWindowSummary(
-                                                     annualRollingExceedanceSummary(
-                                                       annualRollingExceedanceAnalysis(ammoniaAnalysisStation(), yearsToRoll = 3, aquaticLifeUse = FALSE)), parameterAbbreviation = "AMMONIA"),
+                                                 # this runs the bacteria assessment again (unfortunately), but it suppresses
+                                                 # any unnecessary bacteria fields for the stations table to avoid unnecessary flags
+                                                 # and it only runs the 2 year analysis per IR2024 rules
+                                                 bacteriaAssessmentDecisionClass( # NEW for IR2024, bacteria only assessed in two most recent years of assessment period
+                                                   filter(stationData(), between(FDT_DATE_TIME, assessmentPeriod[1] + years(4), assessmentPeriod[2])),
+                                                   uniqueStationName = unique(stationData()$FDT_STA_ID)),
 
-                                                   # Water Column Metals
-                                                   metalsAssessmentFunction(WCmetalsStationAnalysisStation()$WCmetalsExceedanceSummary),
-                                                  
-                                                   # takes too long to run this in app form, sourced from pre-analyzed data to expedite rendering time
-                                                   # filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID) %>% 
-                                                   #   metalsAnalysis( stationData(), WER = 1) %>% 
-                                                   #   rename(FDT_STA_ID = Station_Id) %>% 
-                                                   #   mutate(`Criteria Type` = Criteria) %>% 
-                                                   #   annualRollingExceedanceAnalysis(yearsToRoll = 3, aquaticLifeUse = TRUE) %>% 
-                                                   #   annualRollingExceedanceSummary() %>% 
-                                                   #   metalsAssessmentFunction(),
+                                                 rollingWindowSummary(
+                                                   annualRollingExceedanceSummary(
+                                                     annualRollingExceedanceAnalysis(ammoniaAnalysisStation(), yearsToRoll = 3, aquaticLifeUse = FALSE)), parameterAbbreviation = "AMMONIA"),
 
-                                                   # Water Toxics combo fields
-                                                   waterToxics(),
+                                                 # Water Column Metals
+                                                 metalsAssessmentFunction(WCmetalsStationAnalysisStation()$WCmetalsExceedanceSummary),
 
-                                                   # Roger's sediment metals analysis, transcribed
-                                                   metalsData(filter(Smetals, Station_Id %in% stationData()$FDT_STA_ID), 'SED_MET'),
-                                                   # Mark's sediment PCB results, flagged
-                                                   PCBmetalsDataExists(filter(markPCB, str_detect(SampleMedia, 'Sediment')) %>%
-                                                                         filter(StationID %in%  stationData()$FDT_STA_ID), 'SED_TOX'),
-                                                   # Gabe's fish metals results, flagged
-                                                   PCBmetalsDataExists(filter(fishMetals, Station_ID %in% stationData()$FDT_STA_ID), 'FISH_MET'),
-                                                   # Gabe's fish PCB results, flagged
-                                                   PCBmetalsDataExists(filter(fishPCB, `DEQ rivermile` %in%  stationData()$FDT_STA_ID), 'FISH_TOX'),
-                                                   benthicAssessment(stationData(), VSCIresults),
-                                                   countNutrients(stationData(), PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, NA) %>% quickStats('NUT_TP') %>%
-                                                     mutate(NUT_TP_STAT = ifelse(NUT_TP_STAT != "S", "Review", NA)), # flag OE but don't show a real assessment decision
-                                                   countNutrients(stationData(), CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA) %>% quickStats('NUT_CHLA') %>%
-                                                     mutate(NUT_CHLA_STAT = NA)) %>% # don't show a real assessment decision) %>%
-                                               left_join(dplyr::select(stationTable(), STATION_ID, COMMENTS),
-                                                         by = 'STATION_ID') %>%
-                                               dplyr::select(-ends_with(c('exceedanceRate','Assessment Decision', 'VERBOSE', 'StationID', "PWSinfo",
-                                                                          'BACTERIADECISION', 'BACTERIASTATS')))) %>%
-      filter(!is.na(STATION_ID))
+                                                 # takes too long to run this in app form, sourced from pre-analyzed data to expedite rendering time
+                                                 # filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID) %>%
+                                                 #   metalsAnalysis( stationData(), WER = 1) %>%
+                                                 #   rename(FDT_STA_ID = Station_Id) %>%
+                                                 #   mutate(`Criteria Type` = Criteria) %>%
+                                                 #   annualRollingExceedanceAnalysis(yearsToRoll = 3, aquaticLifeUse = TRUE) %>%
+                                                 #   annualRollingExceedanceSummary() %>%
+                                                 #   metalsAssessmentFunction(),
+
+                                                 # Water Toxics combo fields
+                                                 waterToxics(),
+
+                                                 # Roger's sediment metals analysis, transcribed
+                                                 metalsData(filter(Smetals, Station_Id %in% stationData()$FDT_STA_ID), 'SED_MET'),
+                                                 # Mark's sediment PCB results, flagged
+                                                 PCBmetalsDataExists(filter(markPCB, str_detect(SampleMedia, 'Sediment')) %>%
+                                                                       filter(StationID %in%  stationData()$FDT_STA_ID), 'SED_TOX'),
+                                                 # Gabe's fish metals results, flagged
+                                                 PCBmetalsDataExists(filter(fishMetals, Station_ID %in% stationData()$FDT_STA_ID), 'FISH_MET'),
+                                                 # Gabe's fish PCB results, flagged
+                                                 PCBmetalsDataExists(filter(fishPCB, `DEQ rivermile` %in%  stationData()$FDT_STA_ID), 'FISH_TOX'),
+                                                 benthicAssessment(stationData(), VSCIresults),
+                                                 countNutrients(stationData(), PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, NA) %>% quickStats('NUT_TP') %>%
+                                                   mutate(NUT_TP_STAT = ifelse(NUT_TP_STAT != "S", "Review", NA)), # flag OE but don't show a real assessment decision
+                                                 countNutrients(stationData(), CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA) %>% quickStats('NUT_CHLA') %>%
+                                                   mutate(NUT_CHLA_STAT = NA)) %>% # don't show a real assessment decision) %>%
+                                             left_join(dplyr::select(stationTable(), STATION_ID, COMMENTS),
+                                                       by = 'STATION_ID') %>%
+                                             dplyr::select(-ends_with(c('exceedanceRate','Assessment Decision', 'VERBOSE', 'StationID', "PWSinfo",
+                                                                        'BACTERIADECISION', 'BACTERIASTATS')))) %>%
+    filter(!is.na(STATION_ID))
   })
 
   # Display marked up station table row for each site
@@ -577,7 +577,7 @@ shinyServer(function(input, output, session) {
       wellPanel(h5(strong('This station is within 100 meters of a drinking water intake. Please review whether the station
                 should be assessed for secondary human health criteria.', style = "color:red")) ) }    })
 
- 
+
 
   #### Data Sub Tab ####---------------------------------------------------------------------------------------------------
 
@@ -737,14 +737,16 @@ shinyServer(function(input, output, session) {
     DT::datatable(z,  escape=F, rownames = F,
                   options= list(dom= 't' , pageLength = nrow(assessmentDecision_UserSelection()),scrollX = TRUE, scrollY = "250px"),
                   selection = 'none')})
-  
-  
-  
-  
-  
-  #### Metals Sub Tab ####---------------------------------------------------------------------------------------------------
-  callModule(metalsTableSingleStation,'metals', AUData,  WCmetals, WCmetalsForAnalysis, Smetals, 
-             fishMetals, fishMetalsScreeningValues, stationSelected, staticLimit)
-  
+
+
+
+
+
+  ### Metals Sub Tab ####---------------------------------------------------------------------------------------------------
+  callModule(metalsTableSingleStation,'metals', AUData,  WCmetals, WCmetalsForAnalysis, Smetals,
+           fishMetals, fishMetalsScreeningValues, stationSelected, staticLimit)
+
+ ### Toxics Sub Tab ####---------------------------------------------------------------------------------------------------
+ callModule(toxicsSingleStation,'PBC',  AUData,  stationData, waterToxics, WCmetalsStationPWS, intakeSites, markPCB, fishPCB, stationSelected)
 
 })

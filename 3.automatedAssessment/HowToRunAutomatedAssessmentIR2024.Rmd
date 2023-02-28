@@ -85,7 +85,7 @@ stations2020IR <- pin_get("stations2020IR-sf-final", board = "rsconnect")
 
 markPCB <- read_excel('data/oldData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ')
 fishPCB <- pin_get("ejones/fishPCBIR2024", board = "rsconnect")#read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs')
-fishMetals <- pin_get("ejones/fishMetalsIR2024", board = "rsconnect") %>% #read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals')
+fishMetals <- pin_get("ejones/fishMetalsIR2024", board = "rsconnect") #read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals')
 ```
 
 
@@ -391,7 +391,7 @@ for(i in 1:nrow(stationTable)){
     if(is.na(unique(stationData$PWS))  ){
       PWSconcat <- tibble(PWS= NA)
    } else {
-     PWSconcat <- cbind(assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_Nitrate'),
+     PWSconcat <- cbind(assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_NitrateTotal'),
                         assessPWSsummary(assessPWS(stationData, CHLORIDE_TOTAL_00940_mg_L, LEVEL_00940, 250), 'PWS_ChlorideTotal'),
                         assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate'),
                         assessPWSsummary(assessPWS(WCmetalsStationPWS, AntimonyTotal, RMK_AntimonyTotal, 5), 'PWS_AntimonyTotal'),

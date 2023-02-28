@@ -19,7 +19,8 @@ metalsTableSingleStationUI <- function(id){
                               column(9,  h5('A summary of the exceedances of water column metals criteria available for the ',span(strong('selected site')),' and user
                                             input WER are available below. If no data is presented, then the station does not have any water 
                                             column metals data available. Hardness based criteria are calculated as applicable.'),
-                                     h5('Metals compared to PWS criteria can be viewed in the lower two tables. See the Toxics tab for more information on all PWS criteria.')) ),
+                                     h5('Dissolved metal values compared to PWS criteria can be viewed in the lower two tables if a station is attributed to a PWS
+                                        segment. See the Toxics tab for more information on total metal values compared to PWS criteria.')) ),
                             DT::dataTableOutput(ns('WCmetalsSingleSiteSummary')),
                             # verbatimTextOutput(ns('testtest')),
                             hr(), 

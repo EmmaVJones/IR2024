@@ -28,9 +28,9 @@ historicalStationsTable2 <- readRDS('data/stationsTable2020.RDS') # two cycle ag
 intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
 
 
-WCmetals <- pin_get("ejones/WCmetalsForAnalysisIR2024", board = "rsconnect")#pin_get("WCmetalsIR2024",  board = "rsconnect") 
-WCmetalsForAnalysis <- readRDS('userDataToUpload/WCmetalsForApp.RDS')
-#WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") # this is included in local data above
+WCmetals <- pin_get("WCmetalsIR2024",  board = "rsconnect")#pin_get("WCmetalsIR2024",  board = "rsconnect")
+WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") # this is included in local data above
+WCmetalsAnalyzed <- readRDS('userDataToUpload/WCmetalsForApp.RDS')
 Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
 VSCIresults <- pin_get("VSCIresults", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
@@ -136,7 +136,7 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
 # side panel arguments
 DEQregionSelection <- "BRRO"#"NRO"#"NRO"#"VRO"#"PRO"#"NRO"#'BRRO'#"PRO"#'BRRO'
 basinSelection <- "James-Upper"#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
-HUC6Selection <- "JU21"#"JM01"#"JU11"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+HUC6Selection <- "JU11"#"JU21"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
 
 # pull together data based on user input on side panel
 # Pull AU data from server
@@ -198,7 +198,7 @@ if(nrow(carryoverStations) > 0){
     stationSelection_  <- c(stationSelection_ , carryoverStationsInAU)  } }
 
 # user selection
-stationSelection <- stationSelection_[1]
+stationSelection <- stationSelection_[2]
 
 
 # Pull conventionals data for just selected AU
@@ -404,14 +404,14 @@ enter <- bacteriaAssessmentDecision(stationData, 'ENTEROCOCCI', 'LEVEL_ENTEROCOC
 z <- filter(ammoniaAnalysis, StationID %in% unique(stationData$FDT_STA_ID)) %>%
   map(1) 
 ammoniaAnalysisStation <- z$AmmoniaAnalysis 
-WCmetalsStationAnalysisStation <- filter(WCmetalsForAnalysis, StationID %in% unique(stationData$FDT_STA_ID)) %>%
+WCmetalsStationAnalysisStation <- filter(WCmetalsAnalyzed, StationID %in% unique(stationData$FDT_STA_ID)) %>%
     map(1)  
 
 WCmetalsStationAnalysisStation$WCmetalsExceedanceSummary
 
 # for PWS WCmetals
 WCmetalsStationPWS <- left_join(dplyr::select(stationData, FDT_STA_ID, PWS) %>% distinct(FDT_STA_ID, .keep_all = T),
-                                filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID),
+                                filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID), 
                                 by = c('FDT_STA_ID' = 'Station_Id'))
 
 
@@ -422,14 +422,14 @@ WCmetalsStationPWS <- left_join(dplyr::select(stationData, FDT_STA_ID, PWS) %>% 
       PWSconcat <- tibble(#STATION_ID = unique(stationData$FDT_STA_ID),
         PWS= NA)
     } else {
-      PWSconcat <- cbind(assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_Nitrate'),
+      PWSconcat <- cbind(assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_NitrateTotal'),
                          assessPWSsummary(assessPWS(stationData, CHLORIDE_TOTAL_00940_mg_L, LEVEL_00940, 250), 'PWS_ChlorideTotal'),
                          assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate'),
                          assessPWSsummary(assessPWS(WCmetalsStationPWS, AntimonyTotal, RMK_AntimonyTotal, 5), 'PWS_AntimonyTotal'),
                          assessPWSsummary(assessPWS(WCmetalsStationPWS, ArsenicTotal, RMK_ArsenicTotal, 10), 'PWS_ArsenicTotal'),
                          assessPWSsummary(assessPWS(WCmetalsStationPWS, BariumTotal, RMK_BariumTotal, 2000), 'PWS_BariumTotal'),
                          assessPWSsummary(assessPWS(WCmetalsStationPWS, CadmiumTotal, RMK_CadmiumTotal, 5), 'PWS_CadmiumTotal'),
-                         assessPWSsummary(assessPWS(WCmetalsStationPWS, ChromiumTotal, RMK_ChromiumTotal, 100), 'PWS_ChromiumIIITotal'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, ChromiumTotal, RMK_ChromiumTotal, 100), 'PWS_ChromiumTotal'),
                          assessPWSsummary(assessPWS(WCmetalsStationPWS, CopperTotal, RMK_CopperTotal, 1300), 'PWS_CopperTotal'),
                          assessPWSsummary(assessPWS(WCmetalsStationPWS, IronDissolved, RMK_IronDissolved, 300), 'PWS_IronDissolved'),
                          assessPWSsummary(assessPWS(WCmetalsStationPWS, IronTotal, RMK_IronTotal, 300), 'PWS_IronTotal'),

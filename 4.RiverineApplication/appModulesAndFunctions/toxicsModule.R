@@ -8,7 +8,7 @@ toxicsSingleStationUI <- function(id){
                  uiOutput(ns('WCPWS_oneStationSelectionUI')),
                  uiOutput(ns('intakeProximityFlag')),
                  h5('All water column metals data',span(strong('with Public Water Supply (PWS) criteria')), 'that are available for the ',
-                 span(strong('selected site')),' are available below. If no data is presented, then the station does not have any water 
+                    span(strong('selected site')),' are available below. If no data is presented, then the station does not have any water 
                  column metals data available.'),
                  DT::dataTableOutput(ns('WCPWSRangeTableSingleSite')),
                  br(),
@@ -135,7 +135,7 @@ toxicsSingleStation <- function(input,output,session, AUdata, stationData, Water
                   selection = 'none') })
   
   
-
+  
   
   
   ## Water Column PCBs
@@ -216,98 +216,3 @@ toxicsSingleStation <- function(input,output,session, AUdata, stationData, Water
   
   
 }
-
-
-
-
-ui <- fluidPage(
-  #verbatimTextOutput('uiTest'),
-  uiOutput('stationSelectionFromApp_'),
-  helpText('Review each site using the single site visualization section. There are no WQS for Specific Conductivity.'),
-  toxicsSingleStationUI('PBC')
-)
-
-server <- function(input,output,session){
-  
-  output$stationSelectionFromApp_ <- renderUI({
-    selectInput('stationSelection', "select station from above matter", choices = unique(AUData()$FDT_STA_ID))  })
-  
-  stationData <- eventReactive( input$stationSelection, {
-    filter(AUData(), FDT_STA_ID %in% input$stationSelection) })
-  stationSelected <- reactive({input$stationSelection})
-  
-  AUData <- reactive({filter(conventionals_HUC, FDT_STA_ID %in% filter(stationTable, VAHU6 %in% c('JU11','JU21'))$STATION_ID) %>% 
-      left_join(WQSvalues, by = 'CLASS')})
-  
-  
- # output$uiTest <- renderPrint({WaterToxics()})
-  
-  
-  
-  
-  # for PWS WCmetals
-  WCmetalsStationPWS <- reactive({req(stationData())
-    left_join(dplyr::select(stationData(), FDT_STA_ID, PWS) %>% distinct(FDT_STA_ID, .keep_all = T),
-              filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID),
-              by = c('FDT_STA_ID' = 'Station_Id')) })
-  
-  
-  WaterToxics <- reactive({ req(stationData())
-    # PWS stuff
-    if(nrow(stationData()) > 0){
-      if(is.na(unique(stationData()$PWS))  ){
-        PWSconcat <- tibble(#STATION_ID = unique(stationData()$FDT_STA_ID),
-          PWS= NA)
-      } else {
-        PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData()$FDT_STA_ID)),
-          assessPWSsummary(assessPWS(stationData(), NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_NitrateTotal'),
-          assessPWSsummary(assessPWS(stationData(), CHLORIDE_TOTAL_00940_mg_L, LEVEL_00940, 250), 'PWS_ChlorideTotal'),
-          assessPWSsummary(assessPWS(stationData(), SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), AntimonyTotal, RMK_AntimonyTotal, 5), 'PWS_AntimonyTotal'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), ArsenicTotal, RMK_ArsenicTotal, 10), 'PWS_ArsenicTotal'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), BariumTotal, RMK_BariumTotal, 2000), 'PWS_BariumTotal'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), CadmiumTotal, RMK_CadmiumTotal, 5), 'PWS_CadmiumTotal'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), ChromiumTotal, RMK_ChromiumTotal, 100), 'PWS_ChromiumTotal'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), CopperTotal, RMK_CopperTotal, 1300), 'PWS_CopperTotal'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), IronDissolved, RMK_IronDissolved, 300), 'PWS_IronDissolved'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), IronTotal, RMK_IronTotal, 300), 'PWS_IronTotal'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), LeadTotal, RMK_LeadTotal, 15), 'PWS_LeadTotal'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), NickelTotal, RMK_NickelTotal, 610), 'PWS_NickelTotal'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), SeleniumTotal, RMK_SeleniumTotal, 170), 'PWS_SeleniumTotal'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), ThalliumTotal, RMK_ThalliumTotal, 0.24), 'PWS_ThalliumTotal'),
-          assessPWSsummary(assessPWS(WCmetalsStationPWS(), UraniumTotal, RMK_UraniumTotal, 30), 'PWS_UraniumTotal')) %>%
-          dplyr::select(-ends_with('exceedanceRate')) }
-      
-      
-      # chloride assessment if data exists
-      if(nrow(filter(stationData(), !is.na(CHLORIDE_mg_L)))){
-        chlorideFreshwater <- rollingWindowSummary(
-          annualRollingExceedanceSummary(
-            annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData()), yearsToRoll = 3, aquaticLifeUse = TRUE) ), "CHL")
-      } else {
-        chlorideFreshwater <- tibble(CHL_EXC = NA, CHL_STAT= NA)}
-      
-      # Water toxics combination with PWS, Chloride Freshwater, and water column PCB data
-      if(nrow(bind_cols(PWSconcat,
-                        chlorideFreshwater,
-                        PCBmetalsDataExists(filter(markPCB, str_detect(SampleMedia, 'Water')) %>%
-                                            filter(StationID %in% stationData()$FDT_STA_ID), 'WAT_TOX')) %>%
-              dplyr::select(contains(c('_EXC','_STAT'))) %>%
-              mutate(across( everything(),  as.character)) %>%
-              pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) ) >= 1) {
-        WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = 'Review',
-                           PWSinfo = list(PWSconcat))# add in PWS information so you don't need to run this analysis again
-      } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
-                                  PWSinfo = list(PWSconcat))}# add in PWS information so you don't need to run this analysis again
-    } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
-                                PWSinfo = list(PWSconcat))}# add in PWS information so you don't need to run this analysis again
-    return(WCtoxics) })
-  
-  IntakeSites <- reactive({intakeSites})
-  
-  callModule(toxicsSingleStation,'PBC', AUData,  stationData, WaterToxics, WCmetalsStationPWS, IntakeSites, markPCB, fishPCB, stationSelected)
-  
-}
-
-shinyApp(ui,server)
-
