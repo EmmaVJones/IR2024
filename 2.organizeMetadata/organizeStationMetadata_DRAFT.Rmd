@@ -484,10 +484,11 @@ WCmetalsForAnalysis <- WCmetals %>%
                 METAL_ZincDissolved = `STORET_01090_ZINC, DISSOLVED (UG/L AS ZN)`, RMK_ZincDissolved = RMK_01090,
                 METAL_ZincTotal = `STORET_01092_ZINC, TOTAL (UG/L AS ZN)`, RMK_ZincTotal = RMK_01092,
                 METAL_HardnessDissolved = `STORET_DHARD_HARDNESS, CA MG CALCULATED (MG/L AS CACO3) AS DISSOLVED`, RMK_HardnessDissolved = RMK_DHARD,
-                METAL_HardnessTotal = `STORET_46570_HARDNESS, CA MG CALCULATED (MG/L AS CACO3)`, RMK_HardnessTotal = RMK_46570) %>%
+                METAL_HardnessTotal = `STORET_46570_HARDNESS, CA MG CALCULATED (MG/L AS CACO3)`, RMK_HardnessTotal = RMK_46570,
+                METAL_HARDNESS = HARDNESS) %>%
   group_by(Station_Id, FDT_DATE_TIME, FDT_DEPTH) %>%
   mutate_if(is.numeric, as.character) %>% # need everyone as character so we can pivot longer in one go
-  pivot_longer(cols = METAL_AntimonyDissolved:RMK_HardnessTotal, #RMK_Antimony:RMK_Hardness,
+  pivot_longer(cols = METAL_AntimonyDissolved:METAL_HARDNESS, #RMK_Antimony:RMK_Hardness,
                names_to = c('Type', 'Metal'),
                names_sep = "_",
                values_to = 'Value') %>%
@@ -546,6 +547,10 @@ scripts from last time
 ### Fish Tissue Data
 
 Joe is a special human and he organized the fish tissue data for pinning. His scripts are available in this directory: FishTissue_2024IR.Rmd
+
+these are pinned to the server as:
+pin_get("ejones/fishPCBIR2024", board = "rsconnect") 
+pin_get("ejones/fishMetalsIR2024", board = "rsconnect")
 
 
 

@@ -409,16 +409,35 @@ WCmetalsStationAnalysisStation <- filter(WCmetalsForAnalysis, StationID %in% uni
 
 WCmetalsStationAnalysisStation$WCmetalsExceedanceSummary
 
+# for PWS WCmetals
+WCmetalsStationPWS <- left_join(dplyr::select(stationData, FDT_STA_ID, PWS) %>% distinct(FDT_STA_ID, .keep_all = T),
+                                filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID),
+                                by = c('FDT_STA_ID' = 'Station_Id'))
+
+
+
   # PWS stuff
   if(nrow(stationData) > 0){
     if(is.na(unique(stationData$PWS))  ){
       PWSconcat <- tibble(#STATION_ID = unique(stationData$FDT_STA_ID),
         PWS= NA)
     } else {
-      PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData()$FDT_STA_ID)),
-        assessPWSsummary(assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10), 'PWS_Nitrate'),
-        assessPWSsummary(assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250), 'PWS_Chloride'),
-        assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate')) %>%
+      PWSconcat <- cbind(assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_Nitrate'),
+                         assessPWSsummary(assessPWS(stationData, CHLORIDE_TOTAL_00940_mg_L, LEVEL_00940, 250), 'PWS_ChlorideTotal'),
+                         assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, AntimonyTotal, RMK_AntimonyTotal, 5), 'PWS_AntimonyTotal'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, ArsenicTotal, RMK_ArsenicTotal, 10), 'PWS_ArsenicTotal'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, BariumTotal, RMK_BariumTotal, 2000), 'PWS_BariumTotal'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, CadmiumTotal, RMK_CadmiumTotal, 5), 'PWS_CadmiumTotal'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, ChromiumTotal, RMK_ChromiumTotal, 100), 'PWS_ChromiumIIITotal'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, CopperTotal, RMK_CopperTotal, 1300), 'PWS_CopperTotal'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, IronDissolved, RMK_IronDissolved, 300), 'PWS_IronDissolved'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, IronTotal, RMK_IronTotal, 300), 'PWS_IronTotal'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, LeadTotal, RMK_LeadTotal, 15), 'PWS_LeadTotal'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, NickelTotal, RMK_NickelTotal, 610), 'PWS_NickelTotal'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, SeleniumTotal, RMK_SeleniumTotal, 170), 'PWS_SeleniumTotal'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, ThalliumTotal, RMK_ThalliumTotal, 0.24), 'PWS_ThalliumTotal'),
+                         assessPWSsummary(assessPWS(WCmetalsStationPWS, UraniumTotal, RMK_UraniumTotal, 30), 'PWS_UraniumTotal')) %>%
         dplyr::select(-ends_with('exceedanceRate')) }
     
     # chloride assessment if data exists
@@ -436,7 +455,9 @@ WCmetalsStationAnalysisStation$WCmetalsExceedanceSummary
                                           filter(StationID %in% stationData$FDT_STA_ID), 'WAT_TOX')) %>%
             dplyr::select(contains(c('_EXC','_STAT'))) %>%
             mutate(across( everything(),  as.character)) %>%
-            pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) ) > 1) {
+            pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) %>% 
+            filter(! str_detect(values, 'WQS info missing from analysis')) %>% 
+            filter(! values %in% c("S", 0))) >= 1) {
       WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = 'Review',
                          PWSinfo = list(PWSconcat))# add in PWS information so you don't need to run this analysis again
     } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
