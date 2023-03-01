@@ -743,8 +743,8 @@ observe({
 
 
   ### Metals Sub Tab ####---------------------------------------------------------------------------------------------------
-  callModule(metalsTableSingleStation,'metals', AUData,  WCmetals, WCmetalsForAnalysis, Smetals,
-           fishMetals, fishMetalsScreeningValues, stationSelected, staticLimit)
+  callModule(metalsTableSingleStation,'metals', AUData,  WCmetals, WCmetalsAnalyzed, Smetals, 
+             fishMetals, fishMetalsScreeningValues, stationSelected, staticLimit)
 
  ### Toxics Sub Tab ####---------------------------------------------------------------------------------------------------
  callModule(toxicsSingleStation,'PBC',  AUData,  stationData, waterToxics, WCmetalsStationPWS, intakeSites, markPCB, fishPCB, stationSelected)

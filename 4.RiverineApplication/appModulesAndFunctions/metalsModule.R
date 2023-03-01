@@ -1,7 +1,6 @@
 
 # work through appTesting.R through the creation of stationData object
 
-
 metalsTableSingleStationUI <- function(id){
   ns <- NS(id)
   tagList(
@@ -65,7 +64,7 @@ metalsTableSingleStationUI <- function(id){
 }
 
 
-metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WCmetalsForAnalysis, Smetals,  Fmetals, 
+metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WCmetalsAnalyzed, Smetals,  Fmetals, 
                                      metalsSV, stationSelectedAbove, staticLimit){
   ns <- session$ns
   
@@ -80,7 +79,7 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
     filter(WCmetals, Station_Id %in% input$WCmetals_oneStationSelection)})
   
   WCmetals_oneStationForAnalysis <- reactive({req(ns(input$WCmetals_oneStationSelection), nrow(WCmetals_oneStation()) > 0)
-    filter(WCmetalsForAnalysis, StationID %in% input$WCmetals_oneStationSelection) %>%
+    filter(WCmetalsAnalyzed, StationID %in% input$WCmetals_oneStationSelection) %>%
       map(1)  })
   
   # Extract metals analysis or calculate based on user input
@@ -178,19 +177,19 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
   
   
   
-
-
+  
+  
   ## Fish Tissue Metals
-
+  
   output$Fmetals_oneStationSelectionUI <- renderUI({
     req(stationSelectedAbove)
     selectInput(ns('Fmetals_oneStationSelection'),strong('Select Station to Review'),choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))),#unique(AUdata())$FDT_STA_ID,
                 width='300px', selected = stationSelectedAbove())})# "2-JMS279.41" )})
-
-
+  
+  
   Fmetals_oneStation <- reactive({req(ns(input$Fmetals_oneStationSelection))
     filter(Fmetals, Station_ID %in% input$Fmetals_oneStationSelection)})
-
+  
   output$Fmetals_exceedance <- DT::renderDataTable({req(Fmetals_oneStation())
     FmetalsSV <- dplyr::select(Fmetals_oneStation(), Station_ID, Collection_Date_Time, Sample_ID,  `# of Fish`, Species_Name, length, weight, Beryllium:Lead) %>%
       dplyr::select(-contains('RMK_')) %>%
@@ -201,8 +200,8 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
       arrange(Metal)
     DT::datatable(FmetalsSV, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(FmetalsSV),
                                                              scrollY = "250px", dom='Bti', buttons=list('copy')), selection = 'none') })
-
-
+  
+  
   output$FmetalsRangeTableSingleSite <- DT::renderDataTable({ req(input$Fmetals_oneStationSelection, Fmetals_oneStation())
     # z <- dplyr::select(Smetals_oneStation(), FDT_STA_ID, `FDT_DATE_TIME`,ARSENIC:COMMENT)
     # z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
@@ -211,6 +210,10 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
                   selection = 'none') #%>%
     #formatStyle(names(z), backgroundColor = styleEqual(c('OE'), c('red'))) # highlight cells red if not supporting
   })
-
-
+  
+  
 }
+
+
+
+

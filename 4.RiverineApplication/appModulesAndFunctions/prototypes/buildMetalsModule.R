@@ -2,6 +2,9 @@
 # work through appTesting.R through the creation of stationData object
 
 
+
+# work through appTesting.R through the creation of stationData object
+
 metalsTableSingleStationUI <- function(id){
   ns <- NS(id)
   tagList(
@@ -22,7 +25,7 @@ metalsTableSingleStationUI <- function(id){
                                      h5('Dissolved metal values compared to PWS criteria can be viewed in the lower two tables if a station is attributed to a PWS
                                         segment. See the Toxics tab for more information on total metal values compared to PWS criteria.')) ),
                             DT::dataTableOutput(ns('WCmetalsSingleSiteSummary')),
-                           # verbatimTextOutput(ns('testtest')),
+                            # verbatimTextOutput(ns('testtest')),
                             hr(), 
                             h5('All 3 year rolled window water column metals results for the for the ',span(strong('selected site')),' are highlighted below. 
                                Click on a row to show all the data contained within the chosen window in the table to the right.'),
@@ -33,8 +36,8 @@ metalsTableSingleStationUI <- function(id){
                             fluidRow(column(6, h5("Three year window summaries"),
                                             dataTableOutput(ns('stationRolledExceedanceRate'))),
                                      column(6, h5("All data within chosen three year window. Select a row to your left to reveal data analyzed within the chosen window/criteria combination."),
-                         dataTableOutput(ns('detailedStationRolledExceedanceRate')))),
-                         br()),
+                                            dataTableOutput(ns('detailedStationRolledExceedanceRate')))),
+                            br()),
                    tabPanel('Raw Data',
                             h5('All water column metals data available for the ',span(strong('selected site')),' are available below. 
                                If no data is presented, then the station does not have any water column metals data available.'),
@@ -65,7 +68,7 @@ metalsTableSingleStationUI <- function(id){
 }
 
 
-metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WCmetalsForAnalysis, Smetals,  Fmetals, 
+metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WCmetalsAnalyzed, Smetals,  Fmetals, 
                                      metalsSV, stationSelectedAbove, staticLimit){
   ns <- session$ns
   
@@ -80,7 +83,7 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
     filter(WCmetals, Station_Id %in% input$WCmetals_oneStationSelection)})
   
   WCmetals_oneStationForAnalysis <- reactive({req(ns(input$WCmetals_oneStationSelection), nrow(WCmetals_oneStation()) > 0)
-    filter(WCmetalsForAnalysis, StationID %in% input$WCmetals_oneStationSelection) %>%
+    filter(WCmetalsAnalyzed, StationID %in% input$WCmetals_oneStationSelection) %>%
       map(1)  })
   
   # Extract metals analysis or calculate based on user input
@@ -94,18 +97,18 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
         rename(FDT_STA_ID = Station_Id) %>% 
         mutate(`Criteria Type` = Criteria) %>% 
         annualRollingExceedanceAnalysis(yearsToRoll = 3, aquaticLifeUse = TRUE)
-      } })
+    } })
   
- # output$testtest <- renderPrint({WCmetals_oneStationAnalysis()})
+  # output$testtest <- renderPrint({WCmetals_oneStationAnalysis()})
   
-
+  
   
   WCmetals_oneStationAssessment <- reactive({req(WCmetals_oneStationForAnalysis(), input$WER)
     if(input$WER == 1){
       WCmetals_oneStationForAnalysis()$WCmetalsExceedanceSummary
     } else {
       annualRollingExceedanceSummary(WCmetals_oneStationAnalysis())     } })
-
+  
   output$WCmetalsSingleSiteSummary <- DT::renderDataTable({req(WCmetals_oneStationAssessment())
     DT::datatable(WCmetals_oneStationAssessment() %>% dplyr::select(-FDT_DEPTH),
                   rownames = FALSE,extensions = 'Buttons',
@@ -131,7 +134,7 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
     z <- z$associatedData %>%
       #dplyr::select(-c(associatedData)) %>%
       rename(#"Chloride Average Value"  = "Value",
-             'Parameter Rounded to WQS Format' = parameterRound) %>%
+        'Parameter Rounded to WQS Format' = parameterRound) %>%
       dplyr::select(-`Valid Window`)
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
               selection = 'none') %>%
@@ -150,47 +153,47 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
                                              list(extend='csv',filename=paste('WCmetalsRaw_',paste(assessmentCycle,input$WCmetals_oneStationSelection, collapse = "_"),Sys.Date(),sep='')),
                                              list(extend='excel',filename=paste('WCmetalsRaw_',paste(assessmentCycle,input$WCmetals_oneStationSelection, collapse = "_"),Sys.Date(),sep='')))),
                   selection = 'none')     })
-
-
-
-
-
-
+  
+  
+  
+  
+  
+  
   ## Sediment Metals
-
+  
   # Select One station for individual review
   output$Smetals_oneStationSelectionUI <- renderUI({
     req(stationSelectedAbove)
     selectInput(ns('Smetals_oneStationSelection'),strong('Select Station to Review'),choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))),#unique(AUdata())$FDT_STA_ID,
                 width='300px', selected = stationSelectedAbove())})# "2-JMS279.41" )})
-
+  
   output$test <- renderPrint({stationSelectedAbove()})
   
   Smetals_oneStation <- reactive({
     req(ns(input$Smetals_oneStationSelection))
     filter(Smetals, Station_Id %in% input$Smetals_oneStationSelection)})
-
+  
   output$SmetalsRangeTableSingleSite <- DT::renderDataTable({req(Smetals_oneStation())
     z <- Smetals_oneStation()
     z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
     DT::datatable(z, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "250px", dom='t'),
                   selection = 'none')     })
-
-
   
   
-
+  
+  
+  
   ## Fish Tissue Metals
-
+  
   output$Fmetals_oneStationSelectionUI <- renderUI({
     req(stationSelectedAbove)
     selectInput(ns('Fmetals_oneStationSelection'),strong('Select Station to Review'),choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))),#unique(AUdata())$FDT_STA_ID,
                 width='300px', selected = stationSelectedAbove())})# "2-JMS279.41" )})
-
-
+  
+  
   Fmetals_oneStation <- reactive({req(ns(input$Fmetals_oneStationSelection))
     filter(Fmetals, Station_ID %in% input$Fmetals_oneStationSelection)})
-
+  
   output$Fmetals_exceedance <- DT::renderDataTable({req(Fmetals_oneStation())
     FmetalsSV <- dplyr::select(Fmetals_oneStation(), Station_ID, Collection_Date_Time, Sample_ID,  `# of Fish`, Species_Name, length, weight, Beryllium:Lead) %>%
       dplyr::select(-contains('RMK_')) %>%
@@ -201,8 +204,8 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
       arrange(Metal)
     DT::datatable(FmetalsSV, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(FmetalsSV),
                                                              scrollY = "250px", dom='Bti', buttons=list('copy')), selection = 'none') })
-
-
+  
+  
   output$FmetalsRangeTableSingleSite <- DT::renderDataTable({ req(input$Fmetals_oneStationSelection, Fmetals_oneStation())
     # z <- dplyr::select(Smetals_oneStation(), FDT_STA_ID, `FDT_DATE_TIME`,ARSENIC:COMMENT)
     # z$FDT_DATE_TIME <- as.character(as.POSIXct(z$FDT_DATE_TIME, format="%m/%d/%Y %H:%M"))
@@ -211,9 +214,13 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
                   selection = 'none') #%>%
     #formatStyle(names(z), backgroundColor = styleEqual(c('OE'), c('red'))) # highlight cells red if not supporting
   })
-
+  
   
 }
+
+
+
+
 
 
 
@@ -247,7 +254,7 @@ server <- function(input,output,session){
   output$testStationData <- renderPrint({input$stationSelection })#stationSelected() })#stationData1()})   # this is the problem
   
   #### Metals Sub Tab ####---------------------------------------------------------------------------------------------------
-  callModule(metalsTableSingleStation,'metals', AUData,  WCmetals, WCmetalsForAnalysis, Smetals, 
+  callModule(metalsTableSingleStation,'metals', AUData,  WCmetals, WCmetalsAnalyzed, Smetals, 
              fishMetals, fishMetalsScreeningValues, stationSelected, staticLimit)
   
   

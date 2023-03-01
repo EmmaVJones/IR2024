@@ -387,32 +387,73 @@ assessPWS <- function(stationData, fieldName, commentName, PWSlimit){
     parameterData <- dplyr::select(stationData, FDT_DATE_TIME, !! fieldName_, !! commentName_) %>%
       filter(!( !! commentName_ %in% c('Level II', 'Level I'))) %>% # get lower levels out
       filter(!is.na(!!fieldName_ )) %>% #get rid of NA's
-      mutate(`Parameter Median` = median(!! fieldName_),
-             `Parameter Rounded to WQS Format` = signif(`Parameter Median`, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
+      # rename(parameter = !!names(.[2])) #%>% # rename columns to make functions easier to apply
+      mutate(`Parameter Rounded to WQS Format` = signif(!! fieldName_, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
+             `Parameter Median` = median(!! fieldName_),
+             `Parameter Median Rounded to WQS Format` = signif(`Parameter Median`, digits = 2),  # two significant figures based on WQS https://law.lis.virginia.gov/admincode/title9/agency25/chapter260/section140/
              limit =  PWSlimit) %>%
-      rename(parameter = !!names(.[5])) %>% # rename columns to make functions easier to apply
-      mutate(exceeds = ifelse(parameter > limit, T, F)) # Identify where above WQS limit
+      mutate(exceeds = ifelse(`Parameter Rounded to WQS Format` > limit, T, F),
+             medianExceeds =  ifelse(`Parameter Median Rounded to WQS Format` > limit, T, F),) # Identify where above WQS limit
     return(parameterData)
   }
   return(NULL)
 }
 
+
+  
+
 #assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10)
 #assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250)
 #assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250)
+# WCmetalsStationPWS <- left_join(dplyr::select(stationData, FDT_STA_ID, PWS) %>% distinct(FDT_STA_ID, .keep_all = T),
+#                                 filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID),
+#                                 by = c('FDT_STA_ID' = 'Station_Id'))
+# assessPWS(WCmetalsStationPWS, Antimony, RMK_Antimony, 5)
+
+
 
 
 assessPWSsummary <- function(assessPWSresults, 
                              outputName){
-  if(!is.null(assessPWSresults)){
-    return(quickStats(assessPWSresults, outputName))  
+  if(is.null(assessPWSresults) ){
+    z <- tibble(`_EXC` = as.numeric(NA), `_SAMP` = as.numeric(NA), `_exceedanceRate` = as.numeric(NA), 
+                `_STAT` = as.character(NA), `_MedianExceedance` = NA)
+    names(z) <- paste0(outputName, names(z))
+  } else{
+    if(nrow(assessPWSresults) == 0){
+      z <- tibble(`_EXC` = as.numeric(NA), `_SAMP` = as.numeric(NA), `_exceedanceRate` = as.numeric(NA), 
+                  `_STAT` = as.character(NA), `_MedianExceedance` = NA)
+      names(z) <- paste0(outputName, names(z))
+    } else{
+      #if(nrow(assessPWSresults) > 0){
+      z <- quickStats(assessPWSresults, outputName) %>% 
+        mutate(MedianExceedance = unique(assessPWSresults$medianExceeds))
+      names(z)[5] <- paste0(outputName, '_MedianExceedance')
+    }
   }
-  return(quickStats(tibble(limit = NA), outputName))
+  
+    
+  return(z)
 }
 
 #assessPWSsummary(assessPWS(stationData, NITRATE_mg_L, LEVEL_NITRATE, 10), 'PWS_Nitrate')
 #assessPWSsummary(assessPWS(stationData, CHLORIDE_mg_L, LEVEL_CHLORIDE, 250), 'PWS_Chloride')
 #assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Antimony, RMK_Antimony, 5), 'PWS_Antimony')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Arsenic, RMK_Arsenic, 10), 'PWS_Arsenic')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Barium, RMK_Barium, 2000), 'PWS_Barium')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Cadmium, RMK_Cadmium, 5), 'PWS_Cadmium')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Chromium, RMK_Chromium, 100), 'PWS_ChromiumIII')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Copper, RMK_Copper, 1300), 'PWS_Copper')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, IronDissolved, RMK_IronDissolved, 300), 'PWS_IronDissolved')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, IronTotal, RMK_IronTotal, 300), 'PWS_IronTotal')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Lead, RMK_Lead, 15), 'PWS_Lead')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Nickel, RMK_Nickel, 610), 'PWS_Nickel')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Selenium, RMK_Selenium, 170), 'PWS_Selenium')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Thallium, RMK_Thallium, 0.24), 'PWS_Thallium')
+# assessPWSsummary(assessPWS(WCmetalsStationPWS, Uranium, RMK_Uranium, 30), 'PWS_Uranium')
+
+
 
 
 # Nutrients pseudo-assessment functions (for Riverine applications)
@@ -957,36 +998,38 @@ metalsCriteriaFunction <- function(ID, Hardness, WER){
   criteriaHardness <- ifelse(Hardness < 25, 25, ifelse(Hardness > 400, 400, Hardness))
   
   metalsCriteria <- suppressWarnings(
-    tibble(ID= ID, `Antimony PWS` = 5.6, `Antimony All Other Surface Waters` = 640,
-           `Arsenic Acute Freshwater` = 340, `Arsenic Chronic Freshwater` = 150, `Arsenic PWS` = 10,
-           `Arsenic Acute Saltwater` = 69, `Arsenic Chronic Saltwater` = 36,
-           `Barium PWS` = 2000,
-           `Cadmium Acute Freshwater` =  signif(WER * exp(0.9789 * (log(criteriaHardness))-3.866) * (1.136672 - (log(criteriaHardness) * 0.041838)), digits = 2),
-           `Cadmium Chronic Freshwater` = signif(WER * exp(0.7977 * log(criteriaHardness) - 3.909) * (1.101672 - (log(criteriaHardness) * (0.041838))), digits = 2),
-           `Cadmium Acute Saltwater` = signif(33 * WER, digits = 2), `Cadmium Chronic Saltwater` = signif(7.9 * WER, digits = 2), `Cadmium PWS` = 5,
-           `ChromiumIII Acute Freshwater` = signif(WER *  (exp(0.8190 * (log(criteriaHardness)) + 3.7256)) * 0.316, digits = 2), 
-           `ChromiumIII Chronic Freshwater` = signif(WER *  (exp(0.8190 * (log(criteriaHardness))  +0.6848)) * 0.860, digits = 2), `ChromiumIII PWS` = 100,
-           `ChromiumVI Acute Freshwater` = 16, `ChromiumVI Chronic Freshwater` = 11, `ChromiumVI Acute Saltwater` = 1100, `ChromiumVI Chronic Saltwater` = 50, 
-           `Copper Acute Freshwater` =  signif(WER * (exp(0.9422 * log(criteriaHardness) - 1.700)) * 0.960, digits = 2),
-           `Copper Chronic Freshwater` = signif(WER * (exp(0.8545 * log(criteriaHardness) - 1.702)) * 0.960, digits = 2),
-           `Copper Acute Saltwater` =  signif(9.3 * WER, digits = 2), `Copper Chronic Saltwater` =  signif(6.0 * WER, digits = 2), `Copper PWS` = 1300,
-           `Lead Acute Freshwater` = signif(WER * (exp(1.273 * log(criteriaHardness) - 1.084)) * (1.46203 - (log(criteriaHardness) * 0.145712)), digits = 2),
-           `Lead Chronic Freshwater` = signif(WER * (exp(1.273 * log(criteriaHardness) - 3.259)) * (1.46203 - (log(criteriaHardness) * 0.145712)), digits = 2),
-           `Lead Acute Saltwater` = signif(230 * WER, digits = 2), `Lead Chronic Saltwater` = signif(8.8 * WER, digits = 2), `Lead PWS` = 15,
+    tibble(ID= ID, `AntimonyDissolved PWS` = 5.6, `AntimonyDissolved All Other Surface Waters` = 640,
+           `ArsenicDissolved Acute Freshwater` = 340, `ArsenicDissolved Chronic Freshwater` = 150, `ArsenicDissolved PWS` = 10,
+           `ArsenicDissolved Acute Saltwater` = 69, `ArsenicDissolved Chronic Saltwater` = 36,
+           `BariumDissolved PWS` = 2000,
+           `CadmiumDissolved Acute Freshwater` =  signif(WER * exp(0.9789 * (log(criteriaHardness))-3.866) * (1.136672 - (log(criteriaHardness) * 0.041838)), digits = 2),
+           `CadmiumDissolved Chronic Freshwater` = signif(WER * exp(0.7977 * log(criteriaHardness) - 3.909) * (1.101672 - (log(criteriaHardness) * (0.041838))), digits = 2),
+           `CadmiumDissolved Acute Saltwater` = signif(33 * WER, digits = 2), `CadmiumDissolved Chronic Saltwater` = signif(7.9 * WER, digits = 2), `CadmiumDissolved PWS` = 5,
+           `ChromiumIIIDissolved Acute Freshwater` = signif(WER *  (exp(0.8190 * (log(criteriaHardness)) + 3.7256)) * 0.316, digits = 2), 
+           `ChromiumIIIDissolved Chronic Freshwater` = signif(WER *  (exp(0.8190 * (log(criteriaHardness))  +0.6848)) * 0.860, digits = 2), `ChromiumIIIDissolved PWS` = 100,
+           `ChromiumVIDissolved Acute Freshwater` = 16, `ChromiumVIDissolved Chronic Freshwater` = 11, `ChromiumVIDissolved Acute Saltwater` = 1100, `ChromiumVIDissolved Chronic Saltwater` = 50, 
+           `CopperDissolved Acute Freshwater` =  signif(WER * (exp(0.9422 * log(criteriaHardness) - 1.700)) * 0.960, digits = 2),
+           `CopperDissolved Chronic Freshwater` = signif(WER * (exp(0.8545 * log(criteriaHardness) - 1.702)) * 0.960, digits = 2),
+           `CopperDissolved Acute Saltwater` =  signif(9.3 * WER, digits = 2), `CopperDissolved Chronic Saltwater` =  signif(6.0 * WER, digits = 2), `CopperDissolved PWS` = 1300,
+           `IronDissolved PWS` = 300, `IronTotal PWS` = 300, # new for IR2024 when iron data pulled in conventionals
+           `LeadDissolved Acute Freshwater` = signif(WER * (exp(1.273 * log(criteriaHardness) - 1.084)) * (1.46203 - (log(criteriaHardness) * 0.145712)), digits = 2),
+           `LeadDissolved Chronic Freshwater` = signif(WER * (exp(1.273 * log(criteriaHardness) - 3.259)) * (1.46203 - (log(criteriaHardness) * 0.145712)), digits = 2),
+           `LeadDissolved Acute Saltwater` = signif(230 * WER, digits = 2), `LeadDissolved Chronic Saltwater` = signif(8.8 * WER, digits = 2), `LeadDissolved PWS` = 15,
            `Mercury Acute Freshwater` = 1.4, `Mercury Chronic Freshwater` = 0.77, `Mercury Acute Saltwater` = 1.8, `Mercury Chronic Saltwater` = 0.94,
-           `Nickel Acute Freshwater` = signif(WER * (exp (0.8460 * log(criteriaHardness) + 1.312)) * 0.998, digits = 2), 
-           `Nickel Chronic Freshwater` = signif(WER * (exp(0.8460 * log(criteriaHardness) - 0.8840)) * 0.997, digits = 2),
-           `Nickel Acute Saltwater` = signif(74 * WER, digits = 2), `Nickel Chronic Saltwater` = signif(8.2 * WER, digits = 2), `Nickel PWS` = 610,  `Nickel All Other Surface Waters` = 4600,
-           `Uranium PWS` = 30,
-           `Selenium Acute Freshwater` = 20, `Selenium Chronic Freshwater` = 5.0, 
-           `Selenium Acute Saltwater` = signif(290 * WER, digits = 2), `Selenium Chronic Saltwater` = signif(71 * WER, digits = 2),
-           `Selenium PWS` = 170, `Selenium All Other Surface Waters` = 4200,
-           `Silver Acute Freshwater` = signif(WER * (exp(1.72 * log(criteriaHardness) - 6.52)) * 0.85, digits = 2), `Silver Acute Saltwater` = signif(1.9 * WER, digits = 2),
-           `Thallium PWS` = 0.24, `Thallium All Other Surface Waters` = 0.47,
-           `Zinc Acute Freshwater` = signif(WER * (exp(0.8473 * log(criteriaHardness) + 0.884)) * 0.978, digits = 2),
-           `Zinc Chronic Freshwater` = signif(WER * (exp(0.8473 * log(criteriaHardness) + 0.884)) * 0.986, digits = 2),
-           `Zinc Acute Saltwater` = signif(90 * WER, digits = 2), `Zinc Chronic Saltwater` = signif(81 * WER, digits = 2), 
-           `Zinc PWS` = 7400, `Zinc All Other Surface Waters` = 26000) %>% 
+           `NickelDissolved Acute Freshwater` = signif(WER * (exp (0.8460 * log(criteriaHardness) + 1.312)) * 0.998, digits = 2), 
+           `NickelDissolved Chronic Freshwater` = signif(WER * (exp(0.8460 * log(criteriaHardness) - 0.8840)) * 0.997, digits = 2),
+           `NickelDissolved Acute Saltwater` = signif(74 * WER, digits = 2), `NickelDissolved Chronic Saltwater` = signif(8.2 * WER, digits = 2), 
+           `NickelDissolved PWS` = 610,  `NickelDissolved All Other Surface Waters` = 4600,
+           `UraniumTotal PWS` = 30,
+           `SeleniumDissolved Acute Freshwater` = 20, `SeleniumDissolved Chronic Freshwater` = 5.0, 
+           `SeleniumDissolved Acute Saltwater` = signif(290 * WER, digits = 2), `SeleniumDissolved Chronic Saltwater` = signif(71 * WER, digits = 2),
+           `SeleniumDissolved PWS` = 170, `SeleniumDissolved All Other Surface Waters` = 4200,
+           `SilverDissolved Acute Freshwater` = signif(WER * (exp(1.72 * log(criteriaHardness) - 6.52)) * 0.85, digits = 2), `SilverDissolved Acute Saltwater` = signif(1.9 * WER, digits = 2),
+           `ThalliumDissolved PWS` = 0.24, `ThalliumDissolved All Other Surface Waters` = 0.47,
+           `ZincDissolved Acute Freshwater` = signif(WER * (exp(0.8473 * log(criteriaHardness) + 0.884)) * 0.978, digits = 2),
+           `ZincDissolved Chronic Freshwater` = signif(WER * (exp(0.8473 * log(criteriaHardness) + 0.884)) * 0.986, digits = 2),
+           `ZincDissolved Acute Saltwater` = signif(90 * WER, digits = 2), `ZincDissolved Chronic Saltwater` = signif(81 * WER, digits = 2), 
+           `ZincDissolved PWS` = 7400, `ZincDissolved All Other Surface Waters` = 26000) %>% 
       pivot_longer(!ID, names_to = 'Criteria', values_to = 'CriteriaValue') %>% 
       mutate(Criteria2 = Criteria) %>%  #duplicate column to split
       separate(Criteria2, c("Metal", "Criteria Type", "Waterbody"), sep = " ") %>% 
@@ -1172,10 +1215,20 @@ metalsAnalysis <- function(stationMetalsData, stationData, WER){
                                    CLASS == "II" & ZONE == 'Tidal Fresh' ~ 'Freshwater',
                                    CLASS %in% c('III', "IV","V","VI","VII") ~ 'Freshwater',
                                    TRUE ~ as.character(NA)),
-           ChromiumIII= Chromium, RMK_ChromiumIII = RMK_Chromium, 
-           ChromiumVI= Chromium, RMK_ChromiumVI = RMK_Chromium ) %>% # add individual Chromium variables to make joining to assessment criteria easier
+           ChromiumIIIDissolved= ChromiumDissolved, RMK_ChromiumIIIDissolved = RMK_ChromiumDissolved, 
+           ChromiumVIDissolved= ChromiumDissolved, RMK_ChromiumVIDissolved = RMK_ChromiumDissolved,  # add individual Chromium variables to make joining to assessment criteria easier
+           Iron = IronTotal, RMK_Iron = RMK_IronTotal,
+           Uranium = UraniumTotal, RMK_Uranium = RMK_UraniumTotal,
+           Hardness = HardnessTotal, RMK_Hardness = RMK_HardnessTotal) %>% # duplicate this in lower case because we want this to pass through select(-contains('Total')) later
     # Roger uses ChromiumIII and VI to flag any potential chromium issues, likely further lab analyses needed if either chromium criteria blown
-    dplyr::select(Station_Id:RMK_Cadmium, ChromiumIII:RMK_ChromiumVI, Cadmium:`Assess As`)
+    dplyr::select(-contains('Total', ignore.case = T)) %>%  # only apply criteria to dissolved metals for aquatic life use, except Uranium bc only total
+    dplyr::select(Station_Id:RMK_CadmiumDissolved, ChromiumIIIDissolved:RMK_ChromiumVIDissolved, 
+                  CopperDissolved:RMK_IronDissolved, 
+                  IronTotal = Iron, RMK_IronTotal = RMK_Iron,
+                  LeadDissolved:RMK_ThalliumDissolved,
+                  UraniumTotal = Uranium, RMK_UraniumTotal = RMK_Uranium, ZincDissolved:RMK_HardnessDissolved,
+                  HardnessTotal = Hardness, RMK_HardnessTotal = RMK_Hardness, 
+                  HARDNESS:`Assess As`) # reorder to desired format and rename 
   
   # make a place to store raw analysis results
   rawCriteriaResults <- tibble(Station_Id = as.character(NA), WindowDateTimeStart = as.POSIXct(NA), FDT_DEPTH = as.numeric(NA),
@@ -1197,12 +1250,12 @@ metalsAnalysis <- function(stationMetalsData, stationData, WER){
       rawData <- rawDataWindow %>% 
         group_by(Station_Id, FDT_DATE_TIME, FDT_DEPTH, CLASS, PWS, ZONE, `Assess As`) %>% 
         dplyr::select(-c(contains('RMK_'))) %>% 
-        pivot_longer(cols = Antimony:Hardness, names_to = "Metal", values_to = "Value") %>% 
+        pivot_longer(cols = AntimonyDissolved:HARDNESS, names_to = "Metal", values_to = "Value") %>% 
         mutate(ValueType = 'Raw Result',
                ID = paste(Station_Id, FDT_DATE_TIME, FDT_DEPTH, sep = '_')) %>% # make a uniqueID in case >1 sample for given datetime
         ungroup()
       # Calculate criteria based on raw data
-      rawDataCriteria <- metalsCriteriaFunction(filter(rawData, Metal == "Hardness")$ID, filter(rawData, Metal == "Hardness")$Value, WER = 1) %>% 
+      rawDataCriteria <- metalsCriteriaFunction(filter(rawData, Metal == "HARDNESS")$ID, filter(rawData, Metal == "HARDNESS")$Value, WER = 1) %>% 
         filter(`Criteria Type` %in% c('All Other Waters', 'PWS')) %>% # don't need other criteria for acute window
         {if(is.na(unique(rawData$PWS)))
           filter(., `Criteria Type` != 'PWS')
@@ -1224,14 +1277,14 @@ metalsAnalysis <- function(stationMetalsData, stationData, WER){
       acuteData <- suppressMessages(acuteDataWindow %>% 
                                       group_by(Station_Id, FDT_DEPTH, CLASS, PWS, ZONE, `Assess As`) %>% # can't group by datetime or summary can't happen
                                       dplyr::select(-c(contains('RMK_'))) %>% 
-                                      pivot_longer(cols = Antimony:Hardness, names_to = "Metal", values_to = "CriteriaValue") %>% 
+                                      pivot_longer(cols = AntimonyDissolved:HARDNESS, names_to = "Metal", values_to = "CriteriaValue") %>% 
                                       ungroup() %>% group_by(Station_Id, FDT_DEPTH, CLASS, PWS, ZONE, `Assess As`, Metal) %>% 
                                       summarise(`Sample Count` = length(CriteriaValue),
                                                 Value = mean(CriteriaValue, na.rm=T)) %>%  # get hourly average
                                       mutate(ValueType = 'Hourly Average',
                                              ID = paste(Station_Id, FDT_DEPTH, sep = '_')) ) # make a uniqueID in case >1 sample for given datetime
       # Calculate criteria based on hourly averaged data
-      acuteDataCriteria <- metalsCriteriaFunction(filter(acuteData, Metal == "Hardness")$ID, filter(acuteData, Metal == "Hardness")$Value, WER = 1) %>% 
+      acuteDataCriteria <- metalsCriteriaFunction(filter(acuteData, Metal == "HARDNESS")$ID, filter(acuteData, Metal == "HARDNESS")$Value, WER = 1) %>% 
         filter(`Criteria Type` == 'Acute') %>% # don't need other criteria for acute window
         # Keep only the criteria needed 
         {if(unique(acuteData$`Assess As`) %in% c('Freshwater', 'Saltwater'))
@@ -1256,14 +1309,14 @@ metalsAnalysis <- function(stationMetalsData, stationData, WER){
       chronicData <- suppressMessages(chronicDataWindow %>% 
                                         group_by(Station_Id, FDT_DEPTH, CLASS, PWS, ZONE, `Assess As`) %>% # can't group by datetime or summary can't happen
                                         dplyr::select(-c(contains('RMK_'))) %>% 
-                                        pivot_longer(cols = Antimony:Hardness, names_to = "Metal", values_to = "CriteriaValue") %>% 
+                                        pivot_longer(cols = AntimonyDissolved:HARDNESS, names_to = "Metal", values_to = "CriteriaValue") %>% 
                                         ungroup() %>% group_by(Station_Id, FDT_DEPTH, CLASS, PWS, ZONE, `Assess As`, Metal) %>% 
                                         summarise(`Sample Count` = length(CriteriaValue),
                                                   Value = mean(CriteriaValue, na.rm=T)) %>% # get four day average
                                         mutate(ValueType = 'Four Day Average',
                                                ID = paste(Station_Id, FDT_DEPTH, sep = '_')) ) # make a uniqueID in case >1 sample for given datetime
       # Calculate criteria based on hourly averaged data
-      chronicDataCriteria <- metalsCriteriaFunction(filter(chronicData, Metal == "Hardness")$ID, filter(chronicData, Metal == "Hardness")$Value, WER = 1) %>% 
+      chronicDataCriteria <- metalsCriteriaFunction(filter(chronicData, Metal == "HARDNESS")$ID, filter(chronicData, Metal == "HARDNESS")$Value, WER = 1) %>% 
         filter(`Criteria Type` == 'Chronic') %>% # don't need other criteria for chronic window analysis
         # Keep only the criteria needed 
         {if(unique(chronicData$`Assess As`) %in% c('Freshwater', 'Saltwater'))
@@ -1511,6 +1564,8 @@ annualRollingExceedanceSummary <- function(rolledAnalysis){
       bind_rows(.,
                 filter(rolledAnalysis, str_detect(`Criteria Type`,  "All Other Surface Waters") & `Valid Window` == TRUE) )
       else . } 
+  
+  # Note: the PWS results are purposefully omitted from the rolling window assessment. These use median and reported on in a toxics module
 
   
   suppressMessages(

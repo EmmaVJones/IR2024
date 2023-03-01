@@ -1,3 +1,6 @@
+
+# work through appTesting.R through the creation of stationData object
+
 toxicsSingleStationUI <- function(id){
   ns <- NS(id)
   tagList(
@@ -8,7 +11,7 @@ toxicsSingleStationUI <- function(id){
                  uiOutput(ns('WCPWS_oneStationSelectionUI')),
                  uiOutput(ns('intakeProximityFlag')),
                  h5('All water column metals data',span(strong('with Public Water Supply (PWS) criteria')), 'that are available for the ',
-                 span(strong('selected site')),' are available below. If no data is presented, then the station does not have any water 
+                    span(strong('selected site')),' are available below. If no data is presented, then the station does not have any water 
                  column metals data available.'),
                  helpText(span("PWS assessments should noted in a station's COMMENT field of the Stations Table. The table below organizes
                                                   PWS information to expedite the comment process.",
@@ -142,7 +145,7 @@ toxicsSingleStation <- function(input,output,session, AUdata, stationData, Water
                   selection = 'none') })
   
   
-
+  
   
   
   ## Water Column PCBs
@@ -227,6 +230,7 @@ toxicsSingleStation <- function(input,output,session, AUdata, stationData, Water
 
 
 
+
 ui <- fluidPage(
   #verbatimTextOutput('uiTest'),
   uiOutput('stationSelectionFromApp_'),
@@ -243,11 +247,16 @@ server <- function(input,output,session){
     filter(AUData(), FDT_STA_ID %in% input$stationSelection) })
   stationSelected <- reactive({input$stationSelection})
   
-  AUData <- reactive({filter(conventionals_HUC, FDT_STA_ID %in% filter(stationTable, VAHU6 %in% c('JU11','JU21'))$STATION_ID) %>% 
-      left_join(WQSvalues, by = 'CLASS')})
+  AUData <- reactive({filter(conventionals, Huc6_Vahu6 %in% c("JU08", "RD65")) %>%
+      left_join(dplyr::select(stationTable, STATION_ID:VAHU6,
+                              WQS_ID:CLASS_DESCRIPTION),
+                #WQS_ID:`Max Temperature (C)`), 
+                by = c('FDT_STA_ID' = 'STATION_ID')) %>%
+      filter(!is.na(ID305B_1)) %>%
+      pHSpecialStandardsCorrection() })
   
   
- # output$uiTest <- renderPrint({WaterToxics()})
+  # output$uiTest <- renderPrint({WaterToxics()})
   
   
   
@@ -314,7 +323,12 @@ server <- function(input,output,session){
   
   callModule(toxicsSingleStation,'PBC', AUData,  stationData, WaterToxics, WCmetalsStationPWS, IntakeSites, markPCB, fishPCB, stationSelected)
   
+                               
+                            
+  
 }
 
 shinyApp(ui,server)
+
+
 

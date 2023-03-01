@@ -158,12 +158,15 @@ shinyUI(fluidPage(theme="yeti.css",
                                              included in the application.'),
                                           DT::dataTableOutput('stationTableDataSummary'), br(),
                                           h4('PWS Criteria'),
-                                          helpText(span("PWS assessments should noted in a station's COMMENT field of the Stations Table. The table below organizes
-                                                  PWS information to expedite the comment process.",
-                                                  strong('Note: Chloride, Sulfate, Total Dissolved Solids, Iron, and Foaming Agents are secondary criteria and are
-                                                         only applicable to data collected at the drinking water intake.'))),
+                                          h3('PWS Criteria have moved to the Toxics tab; regardless, if a station is within 100 meter of a drinking water intake,
+                                             this information is flagged below.'),
                                           uiOutput('intakeProximityFlag'),
-                                          DT::dataTableOutput('PWStable'),
+                                          # helpText(span("PWS assessments should noted in a station's COMMENT field of the Stations Table. The table below organizes
+                                          #         PWS information to expedite the comment process.",
+                                          #         strong('Note: Chloride, Sulfate, Total Dissolved Solids, Iron, and Foaming Agents are secondary criteria and are
+                                          #                only applicable to data collected at the drinking water intake.'))),
+                                          # uiOutput('intakeProximityFlag'),
+                                          # DT::dataTableOutput('PWStable'),
                                           br(),hr(),br(),
                                           h3('Assessment Unit Raw Data Review and Visualization'),
                                           tabsetPanel(
@@ -238,9 +241,9 @@ shinyUI(fluidPage(theme="yeti.css",
                                             tabPanel('Metals Data',
                                                      HTML("<p>For detailed explanations on how individual parameters are calculated using the automated assessment process,
                                                                      please see the <a href='https://rconnect.deq.virginia.gov/WQAautomatedAssessmentUserManual/individual-parameter-analyses.html#individual-parameter-analyses' target='_blank'>Automated Assessment User Guide</a></p>"),
-                                                     metalsTableSingleStationUI('metals'))#,
-                                 #            tabPanel('Toxics Data',
-                                 #                     toxicsSingleStationUI('PBC')))#,
-                                 #
+                                                     metalsTableSingleStationUI('metals')),
+                                            tabPanel('Toxics Data',
+                                                     toxicsSingleStationUI('PBC')))
 
-                                          )))))))
+
+                                          ))))))
