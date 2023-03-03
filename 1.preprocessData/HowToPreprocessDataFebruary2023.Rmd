@@ -82,12 +82,31 @@ Now we will create a list of all stations that are relevant to the IR 2024 asses
 
 The largest dataset needed for these analyses is the conventionals dataset that Roger Stewart pulls every two years for each IR window. This is inclusive of data pulled from CEDS that should be used in the assessment. 
 
-**Draft**
 
-This is the February draft data pull that will help expedite the process when the official Conventionals data pull is released in March 2023. 
+```{r conventionals final, echo=F, warning=F, error=FALSE}
+conventionalsRaw <- read_excel('data/finalData/CEDSWQM_2024_IR_20230302.xlsx', sheet = 'CONVENTIONALS')
 
-```{r conventionals, echo=F, warning=F, error=FALSE}
-conventionalsRaw <- read_excel('data/draftData/CEDSWQM_2024_IR_20230216.xlsx', sheet = 'CONVENTIONALS')
+# before removing data from your environment, here is how to clean Roger's data up to match with schema expected by automated tools
+#source('preprocessingModules/updateConventionalsSchema.R') # version working with old names, works for Feb 16 data pull
+# pin final versions
+# pin(conventionals, name = 'ejones/conventionals2024final',
+#     description = 'Final IR2024 conventionals dataset, EVJ reorganized from Roger 3/03/2023.',
+#     board = 'rsconnect')
+
+conventionals <- pin_get('ejones/conventionals2024final', board = 'rsconnect') 
+
+
+# An object named conventionals is now in your environment to following the cleanup step above
+
+```
+
+It is important to troubleshoot and develop as much as possible prior to the final data pull. Below is how draft data pulls were used when the final data was not yet available.
+
+```{r conventionals draft, echo=F, warning=F, error=FALSE, eval=FALSE}
+# **Draft**
+# 
+# This is the February draft data pull that will help expedite the process when the official Conventionals data pull is released in March 2023. 
+#conventionalsRaw <- read_excel('data/draftData/CEDSWQM_2024_IR_20230216.xlsx', sheet = 'CONVENTIONALS')
   #read_excel('data/draftData/CONVENTIONALS_20230216.xlsx', sheet = 'CONVENTIONALS') 
   #read_excel('data/draftData/CEDSWQM_2024_IR_20230209.XLSX', sheet = 'CONVENTIONALS') 
 
@@ -99,7 +118,7 @@ conventionalsRaw <- read_excel('data/draftData/CEDSWQM_2024_IR_20230216.xlsx', s
 #     description = 'Working IR2024 conventionals dataset, EVJ reorganized from Roger 2/23/2023.',
 #     board = 'rsconnect')
 
-conventionals <- pin_get('ejones/conventionals2024draft', board = 'rsconnect') 
+#conventionals <- pin_get('ejones/conventionals2024draft', board = 'rsconnect') 
 
 
 # An object named conventionals is now in your environment to following the cleanup step above
@@ -151,22 +170,39 @@ distinctSites_sf <- distinctSites %>%
             remove = F, # don't remove these lat/lon cols from df
             crs = 4326)
 # save for later just in case
-#saveRDS(distinctSites_sf, './data/distinctSites_sf02232023.RDS')
+#saveRDS(distinctSites_sf, './data/distinctSites_sf03032023.RDS')
 ```
 
 
 
 ### Other data: Citizen Monitoring and Non Agency
 
-Bring in and organize citmonNonagency sites. Below is for 2019-2020 data from Reid.
 
-```{r reid citmon data}
-citmonNonAgency <- read.csv('data/draftData/CMC_FOSR_19_20.csv')
+Reid and Joe organized citizen monitoring data for 2017-2020. Here is how we smash together the results.
 
-# force into conventionals format
-#source('preprocessingModules/citizenMonitoringDataToConventionals.R')
-
+```{r citmon smash}
+#source('preprocessingModules/citmonDataSmash.R')
 ```
+
+
+
+
+
+
+Stay tuned for adding in new data from 2021-2022 pulled from the CMC API.
+
+
+
+## Citizen Monitoring WQS for older stations attributed at AU level
+
+For a lot of older citmon stations, we should have WQS info at AU level that we can backdoor to use for IR2024. going forward with new sites, we will only use the official metadata app for WQS and AU snapping, but here is a good way to glean data that already exists.
+
+```{r}
+#source('specialStepForIR2024toImportWQSinfoAttributedAtAUlevelFromODS.R')
+```
+
+
+
 
 
 Organize data to match distinctSites_sf format
@@ -343,16 +379,6 @@ For 2024IR draft data, we didn't have any missingSites.
 ```{r missingSites for app}
 #saveRDS(missingSites, 'data/missingSites.RDS')
 ```
-
-
-# Citizen Monitoring WQS for older stations attributed at AU level
-
-For a lot of older citmon stations, we should have WQS info at AU level that we can backdoor to use for IR2024. going forward with new sites, we will only use the official metadata app for WQS and AU snapping, but here is a good way to glean data that already exists.
-
-```{r}
-#source('specialStepForIR2024toImportWQSinfoAttributedAtAUlevelFromODS.R')
-```
-
 
 
 

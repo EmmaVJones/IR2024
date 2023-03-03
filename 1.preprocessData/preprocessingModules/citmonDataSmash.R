@@ -1,6 +1,20 @@
-# This script takes the citizen monitoring data provided by Reid and ensures it is in the same schema as 
-# conventionals for automated assessment purposes
+# this script smashes together citmon/non agency data from 2017-2020
 
+citmon1718 <- read.csv('data/draftData/CITMON_NONA_17_18.csv')
+
+
+# do all sites have FDT_STA_ID?
+nrow(filter(citmon1718, is.na(FDT_STA_ID))) # 0, excellent
+
+# there is a separate spreadsheet from Reid where no FDT_STA_ID was found. This data will not be used for this assessment due to timeline 
+#'data/draftData/CITMON_NONA_17_18_noSiteID.csv'
+
+
+
+# Now moving to 2019-2020. Emma reviewed this data from Reid and found a number of missing FDT_STA_ID.
+# the process below overviews how these problems were overcome and data was decided to be used or not used for the assessment by the regional assessors
+
+citmonNonAgency <- read.csv('data/draftData/CMC_FOSR_19_20.csv')
 
 
 # first, we need FDT_STA_ID filled out for each station
@@ -55,7 +69,7 @@ citmonNonAgencyFixed <- citmonNonAgency %>%
 
 # double check same size as original
 nrow(citmonNonAgencyFixed)== nrow(citmonNonAgency)
-  
+
 
 # There are still a number of sites that don't have FDT_STA_ID, smash the entire dataset
 # together and then write to csv for manual fixing
@@ -85,18 +99,64 @@ forReview <- citmonNonAgencyFixed %>%
 # for review by each regional assessor.
 
 
-# in the meantime moving forward with just stations that have appropriate station information
+# once the assessors reviewed all the sites, Emma corrected the names as desired in 'data/draftData/REVIEW_NEEDED_CMC_FOSR_19_203022023.csv'
+# bring that back in and keep moving
+citmon1920 <- read.csv('data/draftData/CMC_FOSR_19_20_EVJ03022023.csv')
+
+# for all regions but Northern, drop all stations and data that don't have an FDT_STA_ID. For NRO, smash together the group name and
+# group station name to generate a new FDT_STA_ID that they will correct mid cycle.
+reviewed <- read_excel('data/draftData/REVIEW_NEEDED_CMC_FOSR_19_2002232023_complete.xlsx', sheet = "Combo")
+fine <- filter(reviewed, !is.na(FDT_STA_ID)) %>% 
+  filter(! str_detect(FDT_STA_ID, 'n/a') & ! str_detect(FDT_STA_ID,  'intermittent') &
+           ! str_detect(FDT_STA_ID,  'need') & ! str_detect(FDT_STA_ID,  'not NRO'))
+NROissues <- filter(reviewed, !is.na(FDT_STA_ID)) %>% 
+  filter( str_detect(FDT_STA_ID, 'n/a') | str_detect(FDT_STA_ID,  'intermittent') |
+            str_detect(FDT_STA_ID,  'need') | str_detect(FDT_STA_ID,  'not NRO')) %>% 
+  # drop these
+  filter(! str_detect(FDT_STA_ID, 'n/a 2022IR - Level 1 data'))  %>%  
+  filter(! str_detect(FDT_STA_ID, 'n/a - Lake Anna hot side'))  %>%  
+  filter(! str_detect(FDT_STA_ID, 'n/a - within HOA lake') )  %>%  
+  filter(! str_detect(FDT_STA_ID, 'n/a - pond monitoring/not NHD'))  %>%  
+  filter(! str_detect(FDT_STA_ID, 'n/a - location not verified/not on NHD'))  %>%  
+  filter(! str_detect(FDT_STA_ID, 'not NRO')) %>% 
+  filter(! str_detect(FDT_STA_ID, 'n/a - HOA drainage ditch/not NHD')) %>% 
+  mutate(FDT_STA_ID = paste(Data_Source, GROUP_STA_ID, sep='.'))
+
+# add these new FDT_STA_ID to the raw data (manually added for `fine` above but we will still double check)
+citmon1920fixed <- filter(citmon1920, GROUP_STA_ID %in% NROissues$GROUP_STA_ID) %>% 
+  left_join(dplyr::select(NROissues, FDT_STA_ID, GROUP_STA_ID), by = 'GROUP_STA_ID') %>% 
+  mutate(FDT_STA_ID = FDT_STA_ID.y) %>%
+  dplyr::select(-c(FDT_STA_ID.x, FDT_STA_ID.y)) %>% 
+  dplyr::select(FDT_STA_ID, everything()) %>% 
+  bind_rows(filter(citmon1920, ! GROUP_STA_ID %in% NROissues$GROUP_STA_ID)) %>% 
+  filter(! is.na(FDT_STA_ID) &  FDT_STA_ID != '')
+
+# organize AU and WQS_ID info from assessors and make sure all raw data have correct attributes to move forward
+citmon1920metadata <- bind_rows(fine, NROissues) %>% 
+  dplyr::select(FDT_STA_ID, WQS_ID, `WQS_ID Comments`, ID305B_1)
+
+citmon1920finalData <- filter(citmon1920fixed, !is.na(FDT_STA_ID) & FDT_STA_ID != "")
+
+# save these and send to Reid for tracking purposes
+citmon1920noSiteID <- filter(citmon1920, ! GROUP_STA_ID %in% citmon1920fixed$GROUP_STA_ID)
+# make sure we didnt lose anyone
+nrow(citmon1920noSiteID)+nrow(citmon1920finalData) == nrow(citmon1920) # perfect!
+#write.csv(citmon1920finalData, 'data/draftData/citmon20192020final_EVJ.csv', na = '', row.names = F)
+#write.csv(citmon1920noSiteID, 'data/draftData/citmon1920noSiteID_EVJ.csv', na = '', row.names = F)
 
 
-citmonNonAgency <- filter(citmonNonAgencyFixed, ! is.na(FDT_STA_ID))
-rm(list=setdiff(ls(), c( "citmonNonAgency", 'conventionals', 'missingCoordinates', 'distinctSites_sf',
-                'conn', 'distinctSites')))
+
+# Now, combine all the "good" citmon data from 2017-2020
+
+citmonNonAgency <- rbind(citmon1718, citmon1920finalData) # use rbind to make sure schema matches
+rm(list=setdiff(ls(), c( "citmonNonAgency", 'conn', 'citmon1920metadata', 'stationOptions', 
+                         'distinctSites', 'distinctSites_sf', 'conventionals')))
 
 
 
 # conventionals reorganization bit
 
-conventionalsSchema <- pin_get('ejones/conventionals2024draft', board = 'rsconnect')
+conventionalsSchema <- pin_get('ejones/conventionals2024final', board = 'rsconnect')#pin_get('ejones/conventionals2024draft', board = 'rsconnect')
 
 names(citmonNonAgency) == names(conventionalsSchema)
 
@@ -150,7 +210,7 @@ citmonNonAgency1 <- citmonNonAgency %>%
   dplyr::select(-STA_CBP_NAME) %>% 
   # reorder columns to conventionals schema
   dplyr::select(names(conventionalsSchema))
-         
+
 # double checks
 names(citmonNonAgency1)[!names(citmonNonAgency1) %in%  names(conventionalsSchema)]
 names(conventionalsSchema)[!names(conventionalsSchema) %in%  names(citmonNonAgency1)]
@@ -164,13 +224,17 @@ conventionalsSchema <- bind_rows(conventionalsSchema,
                                  citmonNonAgency1)
 
 # pin this versions
-pin(conventionalsSchema, name = 'ejones/conventionals2024draft',
-    description = 'Working IR2024 conventionals dataset, EVJ reorganized from Roger 2/23/2023 with citmon with FDT_STA_ID from 2019-2020',
+pin(conventionalsSchema, name = 'ejones/conventionals2024final',
+    description = 'Final IR2024 conventionals dataset, EVJ reorganized from Roger 3/03/2023 with citmon with FDT_STA_ID from 2017-2020',
     board = 'rsconnect')
+# pin(conventionalsSchema, name = 'ejones/conventionals2024draft',
+#     description = 'Working IR2024 conventionals dataset, EVJ reorganized from Roger 2/23/2023 with citmon with FDT_STA_ID from 2019-2020',
+#     board = 'rsconnect')
 
 #totally clear environment except citmon we need to work through back in larger RMD
 citmonNonAgency <- citmonNonAgency1
 
 rm(list=setdiff(ls(), c('citmonNonAgency', 'conventionals', 'missingCoordinates', 'distinctSites_sf',
-                'conn', 'distinctSites')))
+                        'conn', 'distinctSites', 'citmon1920metadata')))
+
 

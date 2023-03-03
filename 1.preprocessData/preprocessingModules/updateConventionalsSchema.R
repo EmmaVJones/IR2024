@@ -85,7 +85,10 @@ conventionals <- conventionalsRaw %>%
   # # remove duplicate ecoli
   # dplyr::select(-c(`E.COLI_ECOLI_CFU/100mL`,	RMK_ECOLI)) %>%
   # change to naming system 
-  mutate(FDT_TEMP_CELCIUS  = `TEMPERATURE_00010_DEGREES CENTIGRADE`,
+  mutate( # new for IR2024, this is provided in conventionals pull
+         Data_Source = FDT_CAG_CODE,
+         
+         FDT_TEMP_CELCIUS  = `TEMPERATURE_00010_DEGREES CENTIGRADE`,
          RMK_FDT_TEMP_CELCIUS = FDT_TEMP_CELCIUS_RMK,  
          LEVEL_FDT_TEMP_CELCIUS  = as.factor(NA),
          FDT_FIELD_PH = pH_00400_STD_UNITS ,          
@@ -228,7 +231,7 @@ conventionals <- conventionalsRaw %>%
   mutate(FDT_DATE_TIME = as.POSIXct(FDT_DATE_TIME, format="%m/%d/%Y %H:%M"), # fix date time
          GROUP_STA_ID = as.character(NA),  #Source_Sta_Id = NA,
          OTHER_CITMON_NONAGENCY_INFO = as.character(NA), 
-         Data_Source = "DEQ",
+         #Data_Source = "DEQ", # new for IR2024, this is provided in the conventionals pull
          Waterbody = as.character(NA)) %>% #, 
          # SECCHI_DEPTH_M = as.numeric(NA),
          # RMK_SECCHI_DEPTH = as.character(NA), 
