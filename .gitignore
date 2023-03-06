@@ -41,6 +41,7 @@ vignettes/*.pdf
 rsconnect/
 *.yml
 *.csv
+*.xlsx
 *.RDS
 *.zip
 data/

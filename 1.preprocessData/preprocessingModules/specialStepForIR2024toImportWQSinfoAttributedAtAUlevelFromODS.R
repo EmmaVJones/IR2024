@@ -50,7 +50,7 @@ unique(citmonStationsWithWQS$`Station Type List`)
 
 
 # Bring in citmon station that need WQS
-distinctSites_sf <- readRDS('data/distinctSites_sf_withCitmon02232023.RDS')##distinctSites_sf_withCitmon.RDS')
+distinctSites_sf <- readRDS('data/distinctSites_sf03062023.RDS')#'data/distinctSites_sf_withCitmon02232023.RDS')##distinctSites_sf_withCitmon.RDS')
 
 # bring in any existing citmon WQS information from previous work
 citmonStationsWithWQS <- readRDS('data/citmonStationsWithWQS.RDS') # pin_get('ejones/citmonStationsWithWQSFinal', board= 'rsconnect')# RSconnect error bc R version
@@ -69,14 +69,14 @@ saveRDS(citmonStationsWithWQS, 'data/citmonStationsWithWQS.RDS')
 # Back to R 3.6.2 
 
 citmonStationsWithWQS <- readRDS('data/citmonStationsWithWQS.RDS')
-distinctSites_sf <- readRDS('data/distinctSites_sf_withCitmon02232023.RDS') %>% 
+distinctSites_sf <-  readRDS('data/distinctSites_sf03062023.RDS') %>% #readRDS('data/distinctSites_sf_withCitmon02232023.RDS') %>% 
   st_drop_geometry()
   #add in super large pull and remove non distinct
 distinctSites_sf_allIR2022citmonSites <- readRDS('data/distinctSites_sf_withCitmon.RDS') %>% st_drop_geometry()
 
 distinctSites_sf1 <- rbind(distinctSites_sf, 
                                filter(distinctSites_sf_allIR2022citmonSites,! FDT_STA_ID %in% distinctSites_sf$FDT_STA_ID) %>% 
-                             mutate(GROUP_STA_ID= NA_character_) %>% 
+                             #mutate(GROUP_STA_ID= NA_character_) %>% 
                              dplyr::select(names(distinctSites_sf))  ) #%>% 
 # Check for duplicates
   # group_by(FDT_STA_ID) %>% 
@@ -124,6 +124,7 @@ lakeSitesWQS <- WQStable %>%
 citmonStationsWithWQSFinal <- lakeSitesWQS %>% 
   bind_rows(filter(citmonStationsWithWQS, ! `Station Id` %in% lakeSitesWQS$StationID) %>% 
               dplyr::select(STATION_ID = `Station Id`, CLASS = `WQS Class`, SEC = `WQS Section`, SPSTDS = `WQS Special Standard`)) %>% 
+  mutate(StationID = coalesce(StationID, STATION_ID)) %>% 
   dplyr::select(-c(STATION_ID, OBJECTID)) %>% 
   mutate( ZONE= as.character(NA),
           StreamType = as.factor(NA),
@@ -135,6 +136,14 @@ citmonStationsWithWQSFinal <- lakeSitesWQS %>%
                 Shape_Length = Shape_Leng, Shape_Area,
                 WQS_COMMENT, Trout, StreamType, Lakes_187B)
 
+
+# add in manual additions
+#write.csv(citmonStationsWithWQSFinal, 'citmonStationsWithWQSFinal.csv', na='', row.names = F)
+citmonWQS1 <- read.csv('data/CitizenMonitoringNonAgencyStationInformationFromRegions/citmonStationsWithWQSFinal.csv')
+# these only have WQS_ID, will join in actual WQS information later but for now this is okay bc all we care about is which stations have WQSinformation available
+
+citmonStationsWithWQSFinal <- citmonWQS1 %>% 
+  rename("Buffer Distance" = "Buffer.Distance")
 
 
 # double check that data it correct format
@@ -154,7 +163,12 @@ WQSlookup <- pin_get('ejones/WQSlookup-withStandards', board = 'rsconnect')
 
 names(citmonStationsWithWQSFinal) == names(WQSlookup)
 
-pin(citmonStationsWithWQSFinal, descrption = 'IR2024 citmon stations with WQS that were attributed by assessors during IR2022', board = 'rsconnect')
+citmonStationsWithWQSFinal1 <- dplyr::select(citmonStationsWithWQSFinal, any_of(names(WQSlookup)))
+names(citmonStationsWithWQSFinal1) == names(WQSlookup) # okay don't match perfectly
+
+
+pin(citmonStationsWithWQSFinal1, name = 'ejones/citmonStationsWithWQSFinal', 
+    descrption = 'IR2024 citmon stations with WQS that were attributed by assessors during IR2022 and some manually attributed', board = 'rsconnect')
 
 citmonStationsWithWQSFinal <- pin_get('ejones/citmonStationsWithWQSFinal', board = 'rsconnect')
 

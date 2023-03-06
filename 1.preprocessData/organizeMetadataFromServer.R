@@ -43,7 +43,7 @@ write.csv(WQStableCombined, 'WQSlookupTable/20230213_0000_WQSlookup.csv', row.na
 #   mutate(CYCLE = 2024) %>% 
 #   dplyr::select(CYCLE, everything())
 AUtableExisting <- bind_rows(pin_get("ejones/AUlookup", board = "rsconnect"),
-                             read_csv('AUlookupTable/20221202_0000_AUlookup.csv') %>%  #'AUlookupTable/blank_AUlookup.csv') 
+                             read_csv('AUlookupTable/20230213_0000_AUlookup.csv') %>% #'AUlookupTable/20221202_0000_AUlookup.csv') %>%  #'AUlookupTable/blank_AUlookup.csv') 
                                mutate(CYCLE = 2024) %>% 
                                dplyr::select(CYCLE, everything())) %>% 
   filter(FDT_STA_ID != 'FakeStation') %>% 
@@ -63,7 +63,10 @@ View(filter(AUtableCombined, FDT_STA_ID %in% doubled$FDT_STA_ID))
 write.csv(AUtableCombined, 'AUlookupTable/20230213_0000_AUlookup.csv', row.names = F, na = "")
 # manually clean up the doubles
 
-
+# pin to server
+pin(AUtableCombined, name = 'AUlookup', 
+    description = 'AUlookup table, draft until data are submitted to CEDS and cycle is approved (use that data instead). Last run by EVJ on 03/06/2023.',
+    board = 'rsconnect')
 
 
 

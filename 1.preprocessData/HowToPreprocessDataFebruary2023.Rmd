@@ -132,7 +132,8 @@ conventionals <- conventionals %>%
   dplyr::select(FDT_STA_ID, STA_DESC, Data_Source, Latitude, Longitude) %>% 
   distinct(FDT_STA_ID, .keep_all = T)
 
-distinctSites <- dplyr::select(conventionals, -c(Latitude, Longitude)) # object to save unique sites for later, use standardized other lat/lng
+distinctSites <- conventionals
+#dplyr::select(conventionals, -c(Latitude, Longitude)) # object to save unique sites for later, use standardized other lat/lng
 ```
 
 
@@ -147,8 +148,11 @@ rm(WQMstationsView)
 
 distinctSites1 <- left_join(distinctSites, WQMstations, by = c('FDT_STA_ID' = 'StationID')) %>% 
   distinct(FDT_STA_ID, .keep_all = T) %>% 
-  mutate(STA_DESC = coalesce(STA_DESC, Sta_Desc)) %>% 
-  dplyr::select(-Sta_Desc) # remove duplicate column
+  mutate(STA_DESC = coalesce(STA_DESC, Sta_Desc),
+         Latitude = coalesce(Latitude.x, Latitude.y),
+         Longitude = coalesce(Longitude.x, Longitude.y)) %>% 
+  dplyr::select(-c(Sta_Desc, Latitude.x, Latitude.y, Longitude.x, Longitude.y)) %>%  # remove duplicate column
+  dplyr::select(FDT_STA_ID, STA_DESC, Data_Source, Latitude, Longitude, everything())
   
 # make sure we didn't lose anyone
 distinctSites$FDT_STA_ID[! distinctSites$FDT_STA_ID %in% distinctSites1$FDT_STA_ID]
@@ -170,7 +174,7 @@ distinctSites_sf <- distinctSites %>%
             remove = F, # don't remove these lat/lon cols from df
             crs = 4326)
 # save for later just in case
-#saveRDS(distinctSites_sf, './data/distinctSites_sf03032023.RDS')
+#saveRDS(distinctSites_sf, './data/distinctSites_sf03062023.RDS')
 ```
 
 
@@ -198,7 +202,7 @@ Stay tuned for adding in new data from 2021-2022 pulled from the CMC API.
 For a lot of older citmon stations, we should have WQS info at AU level that we can backdoor to use for IR2024. going forward with new sites, we will only use the official metadata app for WQS and AU snapping, but here is a good way to glean data that already exists.
 
 ```{r}
-#source('specialStepForIR2024toImportWQSinfoAttributedAtAUlevelFromODS.R')
+#source('preprocessingModules/specialStepForIR2024toImportWQSinfoAttributedAtAUlevelFromODS.R')
 ```
 
 
@@ -326,7 +330,7 @@ stationHitList <- read_csv('data/stationHitList.csv')
 distinctSites_sf <- filter(distinctSites_sf, ! FDT_STA_ID %in% stationHitList$`StationID to Remove`)
 
 
-#saveRDS(distinctSites_sf, 'data/distinctSites_sf_withCitmon02232023.RDS')
+#saveRDS(distinctSites_sf, 'data/distinctSites_sf03062023.RDS')#data/distinctSites_sf_withCitmon02232023.RDS')
 ```
 
 
@@ -364,7 +368,7 @@ lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3. Unless y
 
 ```{r assessment and subbasin join}
 #source('preprocessingModules/assessmentLayerSubbasinJoin.R') # lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3
-distinctSites_sf <- readRDS('./data/distinctSites_sf_withCitmon02232023.RDS')
+distinctSites_sf <- readRDS('./data/distinctSites_sf03062023.RDS') #distinctSites_sf_withCitmon02232023.RDS')
 distinctSitesToDo <- distinctSites_sf 
 # keep a copy of original distinct sites to check that no one was lost at the end
 ``` 

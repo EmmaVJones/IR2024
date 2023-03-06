@@ -4,7 +4,8 @@
 # joined to the assessment layer (using this method for capturing stations outside assessment region polygons)
 # we no longer have to repeat that method here
 
-distinctSites_sf <- readRDS('./data/distinctSites_sf_withCitmon02232023.RDS')
+distinctSites_sf <- readRDS('./data/distinctSites_sf03062023.RDS') #distinctSites_sf_withCitmon02232023.RDS')
+
 
 assessmentLayer <- st_read('../GIS/AssessmentRegions_VA84_basins.shp') %>%
   st_transform( st_crs(4326)) # transform to WQS84 for spatial intersection
