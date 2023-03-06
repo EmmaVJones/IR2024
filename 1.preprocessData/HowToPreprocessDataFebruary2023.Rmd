@@ -368,7 +368,7 @@ lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3. Unless y
 
 ```{r assessment and subbasin join}
 #source('preprocessingModules/assessmentLayerSubbasinJoin.R') # lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3
-distinctSites_sf <- readRDS('./data/distinctSites_sf03062023.RDS') #distinctSites_sf_withCitmon02232023.RDS')
+distinctSites_sf <- readRDS('./data/distinctSites_sf_withCitmon03062023.RDS') #distinctSites_sf_withCitmon02232023.RDS')
 distinctSitesToDo <- distinctSites_sf 
 # keep a copy of original distinct sites to check that no one was lost at the end
 ``` 
@@ -430,7 +430,7 @@ Identify real number of sites that need spatial joining.
 ```{r find where spatial joins have already happened}
 distinctSitesToDoWQS <- filter(distinctSitesToDo, ! FDT_STA_ID  %in% WQStableExisting$StationID) %>% 
   filter(! FDT_STA_ID  %in% citmonWQS$StationID)
-write.csv(distinctSitesToDoWQS, 'needsWQS.csv')
+#write.csv(distinctSitesToDoWQS, 'needsWQS.csv')
 ```
 
 

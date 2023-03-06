@@ -5,6 +5,10 @@
 # we no longer have to repeat that method here
 
 distinctSites_sf <- readRDS('./data/distinctSites_sf03062023.RDS') #distinctSites_sf_withCitmon02232023.RDS')
+# use other data if possible first
+distinctSites_sfold <- readRDS('./data/distinctSites_sf_withCitmon02232023.RDS')
+
+distinctSites_sfhelp <- filter(distinctSites_sf, ! FDT_STA_ID %in% distinctSites_sfold$FDT_STA_ID)
 
 
 assessmentLayer <- st_read('../GIS/AssessmentRegions_VA84_basins.shp') %>%
@@ -16,7 +20,7 @@ subbasinLayer <- st_read('../GIS/DEQ_VAHUSB_subbasins_EVJ.shp')  %>%
 
 
 
-distinctSites_sf1 <- distinctSites_sf %>% 
+distinctSites_sf1 <- distinctSites_sfhelp %>% 
   # st_as_sf(distinctSites,
   #                           coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
   #                           remove = F, # don't remove these lat/lon cols from df
@@ -29,7 +33,7 @@ distinctSites_sf1 <- distinctSites_sf %>%
 # we need to go back in and fix them manually
 if(any(nrow(distinctSites_sf1) < nrow(distinctSites_sf) |
        nrow(filter(distinctSites_sf1, is.na(BASIN_CODE))) > 0 )   ){
-  missingSites <- bind_rows(filter(distinctSites_sf, ! FDT_STA_ID %in% distinctSites_sf1$FDT_STA_ID),
+  missingSites <- bind_rows(filter(distinctSites_sfhelp, ! FDT_STA_ID %in% distinctSites_sf1$FDT_STA_ID),
                             filter(distinctSites_sf1, is.na(BASIN_CODE))) %>% 
     bind_rows(filter(distinctSites_sf1, is.na(ASSESS_REG))) %>% 
     dplyr::select(-c(VAHU6, ASSESS_REG, OFFICE_NM, VaName, Tidal, VAHUSB, FedName, HUC10 ,Basin, BASIN_CODE, BASIN_NAME, SUBBASIN))
@@ -37,6 +41,7 @@ if(any(nrow(distinctSites_sf1) < nrow(distinctSites_sf) |
   closest <- mutate(assessmentLayer[0,], FDT_STA_ID =NA) %>%
     dplyr::select(FDT_STA_ID, everything())
   for(i in seq_len(nrow(missingSites))){
+    print(i)
     closest[i,] <- assessmentLayer[which.min(st_distance(assessmentLayer, missingSites[i,])),] %>%
       mutate(FDT_STA_ID = missingSites[i,]$FDT_STA_ID) %>%
       dplyr::select(FDT_STA_ID, everything())
@@ -61,29 +66,30 @@ if(any(nrow(distinctSites_sf1) < nrow(distinctSites_sf) |
     dplyr::select(-c(geometry), geometry) %>%
     dplyr::select(names(distinctSites_sf1))
   
+  # 3/26/23
+  distinctSites_sf2 <- rbind(filter(distinctSites_sf1,! FDT_STA_ID %in% missingSites$FDT_STA_ID),
+                            missingSites) %>% 
+    #left_join(dplyr::select(distinctSites_sf, FDT_STA_ID, GROUP_STA_ID), by = 'FDT_STA_ID')
+    mutate(GROUP_STA_ID = NA_character_) %>% # fix this later
+    dplyr::select(FDT_STA_ID, GROUP_STA_ID, STA_DESC, everything())
   
-  distinctSites_sf <- rbind(filter(distinctSites_sf1,! FDT_STA_ID %in% missingSites$FDT_STA_ID),
-                             missingSites)
+  # distinctSites_sf <- rbind(filter(distinctSites_sf1,! FDT_STA_ID %in% missingSites$FDT_STA_ID),
+  #                            missingSites)
   
-  
-  # original method but so many sites are so close, seems silly to not give it a go
-#  missingSites <- filter(distinctSites, ! FDT_STA_ID %in% distinctSites_sf$FDT_STA_ID) %>%
-#    st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
-#             remove = F, # don't remove these lat/lon cols from df
-#             crs = 4326) %>%
-#    mutate(HUC12 = NA, VAHU6 = NA,Portion = NA, MAP = NA, ASSESS_REG = NA, OFFICE_NM = NA, 
-#           States = NA, HUType = NA, HUMod = NA, ToHUC = NA, META_ID = NA, Location = NA, 
-#           VaName = NA, PC_Water = NA, Tidal = NA, VAHUSB = NA, FedName = NA, HUC10 = NA, 
-#           VAHU5 = NA, Basin = NA) %>%
-#    st_join(dplyr::select(subbasinLayer, BASIN_NAME, BASIN_CODE, SUBBASIN), join = st_intersects) %>%
-#    dplyr::select(-c(geometry), geometry)
   
 } else{
   distinctSites_sf <- distinctSites_sf1
 }
 
+distinctSites_sffixed <- rbind(distinctSites_sfold,
+                               distinctSites_sf2) %>% 
+  distinct(FDT_STA_ID, .keep_all = T)
+  # group_by(FDT_STA_ID) %>% 
+  # mutate(n = n()) %>% 
+  # arrange(desc(n)) %>% 
+  # dplyr::select(n, everything())
 
 
 
 rm(closest); rm(i); rm(subbasinLayer); rm(distinctSites_sf1); rm(closestSUBB)
-#saveRDS(distinctSites_sf, './data/distinctSites_sf_withCitmon02232023.RDS')
+#saveRDS(distinctSites_sf, './data/distinctSites_sf_withCitmon03062023.RDS')#'./data/distinctSites_sf_withCitmon02232023.RDS')
