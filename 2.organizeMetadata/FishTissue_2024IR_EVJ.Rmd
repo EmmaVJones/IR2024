@@ -1,5 +1,5 @@
 ---
-title: "FishTissue_IR2024"
+title: "PCB_Metals_IR2024"
 author: "Joe Famularo"
 date: "2023-01-24"
 output: html_document
@@ -12,6 +12,7 @@ library(readxl)
 library(janitor)
 library(lubridate)
 library(pins)
+library(config)
 
 # Function to match classes between 2 dataframes based on shared column names
 # Sets class of df2 to match class of df1
@@ -26,29 +27,42 @@ library(pins)
 
       return(df2)
  }
+
+#Set config path here
+path<-"C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/config.yml"
+ 
+conn <- config::get(file = path, "connectionSettings")
+
+board_register_rsconnect(key = conn$CONNECT_API_KEY, 
+                         server = conn$CONNECT_SERVER)
+ 
+ 
 ```
 
 ```{r load data, warning= FALSE}
 # Read in existing data 
-markPCB <- read_excel('data/FishTissueData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ')
-fishPCB <- read_excel('data/FishTissueData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs')
+markPCBs <- read_excel('data/FishTissueData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ')
+fishPCBs <- read_excel('data/FishTissueData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs')
 fishMetals <- read_excel('data/FishTissueData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals')
 
 # Read in 2021 data
 fishMetals21_input<-read_excel("data/FishTissueData/2021_fish_Metals_v121.xlsx", sheet = 1)
 fishPCBs21_input<-read_excel("data/FishTissueData/2021_fish_PCBs_v121.xlsx", sheet = 1)
 
+#Marks PCB water/sediment Pull
+markPCBs_input<-read_excel("data/FishTissueData/total PCB results 2017_2022.xlsx", sheet = 1)
+
 #CEDS FT Data (Roger)
-CEDS_FT<-read_excel("data/FishTissueData/IR2024_FISH_20230207_CEDS.xlsx")
+CEDS_FT<-read_excel("data/FishTissueData/IR2024_FISH_20230227_CEDS.xlsx")
 ```
 
-```{r Format Metals}
-
+```{r Format Metals Gabes Data}
+#Format Gabe's Data
 fishMetals21<-row_to_names(fishMetals21_input, 7)%>% # Select row to convert to column names
   clean_names()%>% # Clean names to simplify field name matching later on
   select(1:collection_date_2)%>% # Select columns to include
   filter(!row_number() %in% c(1,2))%>% # Remove nonsense rows
-  drop_na(site_number)%>% # Drop rows that have NA site numbers
+  drop_na(site_number)%>% # Drop rows that have NA site numbers, this removes the blank rows in middle of dataset
   # Convert excel numeric to datetime
   mutate(collection_date = excel_numeric_to_date(as.numeric(as.character(collection_date)), 
                                                  date_system = "modern", include_time = TRUE), 
@@ -162,8 +176,8 @@ CEDS_FT_Cleaned<-CEDS_FT%>%
     "RMK_Sb"               = RMK_Antimony,
     "Ba"                   = `Barium, MG/KG WET WEIGHT`,
     "RMK_Ba"               = RMK_Barium,
-    "Hg"                   = `Mercury, MG/KG WET WEIGHT...29`,
-    "RMK_Hg"               = RMK_Mercury...30, 
+    "Hg"                   = `Mercury, MG/KG WET WEIGHT...20`,
+    "RMK_Hg"               = RMK_Mercury...21, 
     "Tl"                   = `Thallium, MG/KG WET WEIGHT`,
     "RMK_Tl"               = RMK_Thallium,
     "Pb"                   = `Lead, MG/KG WET WEIGHT`,
@@ -181,17 +195,13 @@ left_join(., fishMetals, by=c("Station_ID", "Site #", "# of fish...4", "Species_
 CEDS_FT_Cleaned<-matchColClasses(fishMetals, CEDS_FT_Cleaned)
 
 #Drop all observations in fishMetals that match records in CEDS_FT_Cleaned
-fishMetals<-anti_join(fishMetals, CEDS_FT_Cleaned, by=c("Station_ID", "Site #", "# of fish...4", "Species_Name...5", "length", "weight", "Cont_ID", "Date", "Be", "Al", "V", "Cr", "Mn", "Ni", "Cu", "Zn", "As", "Se", "Ag", "Cd", "Sb", "Ba", "Hg", "Tl", "Pb"))%>%
+fishMetals_IR<-anti_join(fishMetals, CEDS_FT_Cleaned, by=c("Station_ID", "Site #", "# of fish...4", "Species_Name...5", "Cont_ID", "length", "weight", "Date"))%>%
 #Add in the formatted CEDS FT data
   bind_rows(CEDS_FT_Cleaned)%>% 
   #Drop the Date Column used in anti_join
                 select(!Date)%>%
-  rename("# of Fish" = "# of fish...4", "Species_Name"  = "Species_Name...5",         "species_name" = "Species_Name...47", "number of fish" = "# of fish...48")#,#         "Beryllium"= "Be",  "Aluminum" = "Al",  "Vanadium" = "V", "Chromium"= "Cr",#         "Manganese" = "Mn", "Nickel" = "Ni", "Copper" = "Cu" ,"Zinc"=  "Zn",  "Arsenic" = "As" , "Selenium" = "Se" ,#         "Silver" = "Ag" , "Cadmium" = "Cd",#         "Antimony" = "Sb", "Barium"=  "Ba" , "Mercury" =  "Hg", "Thallium"  = "Tl", "Lead" = "Pb"  )
+  rename("# of Fish" = "# of fish...4", "Species_Name"  = "Species_Name...5",         "species_name" = "Species_Name...47", "number of fish" = "# of fish...48")
 
-# just IR2024 data
-fishMetals <- mutate(fishMetals, year = year(Collection_Date_Time)) %>% 
-  filter(year %in% c(2017:2021)) %>%  # 2022 not included in IR2024 bc data not back in time
-  dplyr::select(-year)
 
 
 #Pin data
@@ -208,7 +218,7 @@ fishPCBs21<-row_to_names(fishPCBs21_input, 4)%>% # Select row to convert to colu
   # Convert excel numeric to datetime
   mutate(sampling = excel_numeric_to_date(as.numeric(as.character(sampling)), 
                                           date_system = "modern", include_time = TRUE))%>%
-    rename(# Rename fishPCBs21 so that column names match fishPCB
+    rename(# Rename fishPCBs21 so that column names match fishPCBs
     "VIMS ID"                           = "vims", 
     "DEQ site #"                        = "deq", 
     "Station name/location/description" = "na", 
@@ -232,22 +242,87 @@ fishPCBs21<-row_to_names(fishPCBs21_input, 4)%>% # Select row to convert to colu
     filter(year(Date) == 2021) # Include only 2021 data
 
 # Match classes between these dataframes
-fishPCBs21<-matchColClasses(fishPCB, fishPCBs21) 
+fishPCBs21<-matchColClasses(fishPCBs, fishPCBs21) 
 
 # Bind dataframes
-fishPCB<-bind_rows(fishPCB, fishPCBs21)%>%
+fishPCBs_IR<-bind_rows(fishPCBs, fishPCBs21)%>%
   mutate(`Parameter Rounded to WQS Format` = as.numeric(signif(`Total PCBs`, digits = 2))) %>% # round to even for comparison to chronic criteria)
-   dplyr::select(WBID:`Weight (g)`, `Water %`:`Total PCBs`, `Parameter Rounded to WQS Format`, uncorrected, `recovery corrected`, comment3, Latitude, Longitude)
+   select(all_of(colnames(fishPCBs))) # Retain columns from original schema only
 
 # just IR2024 data
-fishPCB <- mutate(fishPCB, year = year(Date)) %>% 
+fishPCBs_IR <- mutate(fishPCBs_IR, year = year(Date)) %>% 
   filter(year %in% c(2017:2021)) %>%  # 2022 not included in IR2024 bc data not back in time
   dplyr::select(-year)
 
 
 #Pin data
-# pin(fishPCB , "ejones/fishPCBIR2024", board = 'rsconnect',
+# pin(fishPCBs_IR , "ejones/fishPCBIR2024", board = 'rsconnect',
 #     description = 'IR2024 fish PCB data less 2022 data because data not back from lab in time for assessment data cutoff.')
+
+```
+
+```{r Sed/Water PCBs}
+#Bring in names from existing schema
+column_names<-colnames(markPCBs)
+
+#Format marks most recent data pull
+markPCBs_21<-markPCBs_input%>%
+  mutate(
+    #drop the -s where it occurs to create StationID
+    StationID = gsub("-S", "", LocID),
+    #create the date time field 
+    SampleDateTime = as.POSIXct(paste(SampleDate, format(SampleTime, format = "%H:%M:%S"))))%>%
+  #Rename columns
+  rename(
+  "Major Basin" = "Basin", 
+  "SampleMedia" = "SampleMatrix", 
+  "Total Of Concentration" = "Total PCB"
+  )
+
+#Match classes of 2 dataframes
+markPCBs_21 <-matchColClasses(markPCBs, markPCBs_21)
+
+#Identify records in the most recent data pull that aren't in the existing PCB dataset
+markPCBs_21<-anti_join(markPCBs_21, markPCBs, by= c("LocID", "Major Basin", "SampleDate"))
+
+#Pull the station info
+WQM_Stations<-pin_get('ejones/WQM-Sta-GIS-View', board='rsconnect')
+
+#Join with station info to associate regions
+markPCBs_IR<-markPCBs_21%>%left_join(.,WQM_Stations%>%select(Station_Id, Deq_Region), by=c("StationID" = "Station_Id"))%>%
+  #Change to code for consistency with existing schema
+  mutate(RegOff = case_when(
+    Deq_Region == "Northern" ~ "NRO", 
+    Deq_Region == "Piedmont" ~ "PRO", 
+    Deq_Region == "Tidewater" ~ "TRO", 
+    TRUE ~ Deq_Region
+  ), 
+  #Assign description of join
+  #Note that 2 records aren't in CEDS and don't have fuzzy matches
+  #They are spatially close to 3-MTN012.03 but have distinct lat long
+  StationID_join = case_when(
+    is.na(Deq_Region) == FALSE ~ "Direct Match to WQM_Sta_GIS_View", 
+    is.na(Deq_Region) ~ "No Match to WQM_Sta_GIS_View"
+  )
+  )%>%
+  #select column in original schema
+  select(all_of(column_names))%>%
+  #bind rows with older data
+  bind_rows(markPCBs)
+
+# just IR2024 data
+markPCBs_IR <- mutate(markPCBs_IR, year = year(SampleDateTime)) %>% 
+  filter(year %in% c(2017:2022)) %>%  
+  dplyr::select(-year)
+
+
+
+
+#Pin data
+# pin(markPCBs_IR , "ejones/PCBIR2024", board = 'rsconnect',
+#     description = 'IR2024 water column and sediment PCB data from Mark Richards, less 2022 data because data not back from lab in time for assessment data cutoff.')
+
+
 ```
 
 

@@ -53,7 +53,7 @@ This data is pulled from the R server and acts as "The" conventionals dataset fo
 
 
 ```{r}
-conventionals <- pin_get('ejones/conventionals2024draft', board = 'rsconnect')
+conventionals <- pin_get('ejones/conventionals2024final', board = 'rsconnect') #pin_get('ejones/conventionals2024draft', board = 'rsconnect')
 ```
 
 #### Station Hit list
@@ -63,7 +63,7 @@ These are the stations that assessors have asked to never see again in an assess
 Remove the offenders marked by assessors during metadata attribution process that need to be cut from the conventionals pull and not assessed. 
 
 ```{r station hit list}
-hitList <- read_csv('data/stationHitList.csv')
+# hitList <- read_csv('data/stationHitList.csv')
 
 conventionals <- filter(conventionals, ! FDT_STA_ID %in% toupper(hitList$`StationID to Remove`))
 rm(hitList)
@@ -365,8 +365,8 @@ So what stations do we have left? These are stations that are in the conventiona
 stationsToDo <- filter(conventionals_distinct, ! FDT_STA_ID %in% stationsTable2024begin$STATION_ID) %>% 
   # glean what we can to populate the data template
   dplyr::select(STATION_ID = FDT_STA_ID,
-                WATER_TYPE = Sta_Lv1_Code,
-                TYPE_1 = Sta_Lv2_Code,
+                WATER_TYPE = STA_LV1_CODE,
+                TYPE_1 = STA_LV2_CODE,
                 LATITUDE = Latitude,
                 LONGITUDE = Longitude) %>% 
   mutate(# throw in a flag for swamp but still need to force it to a waterbody type the assessment tools understand
@@ -407,7 +407,7 @@ rm(list = c('stationsLeft', 'stationsToDo', 'stationsTemplate',
 Now let's pin this to the R server so others can use the data.
 
 ```{r}
-pin(stationsTable2024begin, description = 'DRAFT stationsTable2024begin for IR2024 development', board = 'rsconnect')
+pin(stationsTable2024begin, description = 'stationsTable2024begin for IR2024 development', board = 'rsconnect')
 ```
 
 ### Pull Final Stations table from last cycle for application
@@ -423,8 +423,8 @@ stationsTable2020 <-  pool %>% tbl(in_schema('wqa', 'WQA Station Details')) %>%
   filter(`Assessment Cycle` == 2020) %>% 
   as_tibble() 
 
-saveRDS(stationsTable2022, 'data/stationsTable2022.RDS')
-saveRDS(stationsTable2020, 'data/stationsTable2020.RDS')
+# saveRDS(stationsTable2022, 'data/stationsTable2022.RDS')
+# saveRDS(stationsTable2020, 'data/stationsTable2020.RDS')
 
 ```
 
@@ -436,8 +436,10 @@ We need to reorganize raw water column metals data to enable better exceedance a
 
 
 ```{r WC metals}
-WCmetals <- read_excel('data/draftData/CEDSWQM_2024_IR_20230216.xlsx', sheet = 'WATER_METALS') %>% 
-  dplyr::select(Station_Id:`RMK_7440-61-1T`) %>%  #drop "pre analyzed" fields and calculated (truncated) hardness
+WCmetals <- read_excel('data/finalData/CEDSWQM_2024_IR_20230302.xlsx', sheet = 'WATER_METALS') %>% 
+  #read_excel('data/draftData/CEDSWQM_2024_IR_20230216.xlsx', sheet = 'WATER_METALS') %>% 
+  #dplyr::select(Station_Id:`RMK_7440-61-1T`) %>%  #drop "pre analyzed" fields and calculated (truncated) hardness
+  dplyr::select(Station_Id:RMK_DHARD) %>% 
   rowwise() %>% 
   # use total over dissolved where you have both
   mutate(HARDNESS = coalesce(`STORET_46570_HARDNESS, CA MG CALCULATED (MG/L AS CACO3)`,
@@ -454,6 +456,10 @@ WCmetals2022 <- pin_get("ejones/WCmetals-2022IRfinal", board = "rsconnect")
 
 # Separate object for analysis, tack on METALS and RMK designation to make the filtering of certain lab comment codes easier
 WCmetalsForAnalysis <- WCmetals %>%
+  # IR 2024 final data pull did not include uranium for an unknown reason. This is required for the automated process, so adding a field of nothing here
+  mutate(METAL_UraniumTotal = as.numeric(NA), RMK_UraniumTotal = NA_character_) %>% 
+  
+  
   dplyr::select(Station_Id, FDT_DATE_TIME, FDT_DEPTH, # include depth bc a few samples taken same datetime but different depths
                 METAL_AntimonyDissolved = `STORET_01095_ANTIMONY, DISSOLVED (UG/L AS SB)`, RMK_AntimonyDissolved = RMK_01095,
                 METAL_AntimonyTotal = `STORET_01097_ANTIMONY, TOTAL (UG/L AS SB)`, RMK_AntimonyTotal = RMK_01097,
@@ -475,7 +481,11 @@ WCmetalsForAnalysis <- WCmetals %>%
                 METAL_Mercury = `STORET_50091_MERCURY-TL,FILTERED WATER,ULTRATRACE METHOD UG/L`, RMK_Mercury = RMK_50091,
                 METAL_NickelDissolved = `STORET_01065_NICKEL, DISSOLVED (UG/L AS NI)`, RMK_NickelDissolved = RMK_01065,
                 METAL_NickelTotal = `STORET_01067_NICKEL, TOTAL (UG/L AS NI)`, RMK_NickelTotal = RMK_01067,
-                METAL_UraniumTotal = `URANIUM_TOT`, RMK_UraniumTotal = `RMK_7440-61-1T`,
+                
+                
+                # IR 2024 final data pull did not include uranium for an unknown reason. This is required for the automated process, so adding a field of nothing here
+                METAL_UraniumTotal, RMK_UraniumTotal ,
+#                METAL_UraniumTotal = `URANIUM_TOT`, RMK_UraniumTotal = `RMK_7440-61-1T`,
                 METAL_SeleniumDissolved = `STORET_01145_SELENIUM, DISSOLVED (UG/L AS SE)`, RMK_SeleniumDissolved = RMK_01145,
                 METAL_SeleniumTotal = `STORET_01147_SELENIUM, TOTAL (UG/L AS SE)`, RMK_SeleniumTotal = RMK_01147,
                 METAL_SilverDissolved = `STORET_01075_SILVER, DISSOLVED (UG/L AS AG)`, RMK_SilverDissolved = RMK_01075,
@@ -503,8 +513,8 @@ WCmetalsForAnalysis <- WCmetals %>%
 Best to pin water column metals data to the R server to expedite app rendering.
 
 ```{r pin wcmetals reformatted}
-# pin(WCmetals, name = 'WCmetalsIR2024', description = "Draft water column metals data for IR2024 from the 2/16/2023 conventionals pull", board = 'rsconnect')
-# pin(WCmetalsForAnalysis, name = 'WCmetalsForAnalysisIR2024', description = "Draft water column metals data for IR2024. This is used for the shiny app versions of the automated assessment protocol to save rendering time", board = 'rsconnect')
+# pin(WCmetals, name = 'WCmetalsIR2024', description = "Final water column metals data for IR2024 from the 03/02/2023 conventionals pull", board = 'rsconnect')
+# pin(WCmetalsForAnalysis, name = 'WCmetalsForAnalysisIR2024', description = "Final water column metals data for IR2024. This is used for the shiny app versions of the automated assessment protocol to save rendering time", board = 'rsconnect')
 ```
 
 
@@ -514,7 +524,8 @@ Best to pin water column metals data to the R server to expedite app rendering.
 **Draft Data:** working with Feb 16 conventionals metals data.
 
 ```{r sediment metals}
-Smetals <- read_excel('data/draftData/CEDSWQM_2024_IR_20230216.xlsx', sheet = 'SEDIMENT') 
+Smetals <- read_excel('data/finalData/CEDSWQM_2024_IR_20230302.xlsx', sheet = 'SEDIMENT') 
+#read_excel('data/draftData/CEDSWQM_2024_IR_20230216.xlsx', sheet = 'SEDIMENT') 
 Smetals2022 <- pin_get("ejones/Smetals-2022IRfinal", board = "rsconnect")
 
 names(Smetals) %in% names(Smetals2022)
@@ -525,12 +536,16 @@ names(Smetals) %in% names(Smetals2022)
 Pin to server 
 
 ```{r pin smetals}
-#pin(Smetals, name = 'SmetalsIR2024', description = "Draft sediment metals data for IR2024 from the 2/16/2023 conventionals pull", board = 'rsconnect')
+#pin(Smetals, name = 'SmetalsIR2024', description = "Final sediment metals data for IR2024 from the 03/02/2023 conventionals pull", board = 'rsconnect')
 ```
 
 ### PCB data
 
-Will likely need to be reorganized when it is received.
+Method in FishTissue_2024IR_EVJ.Rmd by Joe. see fish tissue section below for data organization and pin to server.
+
+these are pinned to the server as:
+pin_get("ejones/PCBIR2024", board = "rsconnect")
+
 
 scripts from last time
 
@@ -546,42 +561,24 @@ scripts from last time
 
 ### Fish Tissue Data
 
-Joe is a special human and he organized the fish tissue data for pinning. His scripts are available in this directory: FishTissue_2024IR.Rmd
+Joe is a special human and he organized the fish tissue data for pinning. His scripts are available in this directory: FishTissue_2024IR_EVJ.Rmd
+
+Information from Joe about the changes across the draft to final datasets:
+"Here's a rundown of the changes to the data based on the pulls for the 2024 IR. 
+
+We started off with 1376 fish metals records, Gabe's data added 465 records, and the CEDS pull included another 558. Based on Station ID, Site #, # of fish, Species name, length, weight, Container ID, and date (not date-time), there were 235 records that were included in both Gabe's data and the CEDS pull.  These were replaced with the CEDS data. This resulted in a total of 2164 records. 
+
+For fish PCBs we start with 1067 records and Gabe's data contributes 431 records. Those 431 records are all from 2021. 
+
+For sediment and water column PCB's we start with 360 records and we added 152 records from the most recent pull (all from 2021). I retained your existing data and only added what was new from the most recent pull.  Note that 2 records did not have a match with WQM-Sta-GIS-View. "
+
+from email on 3/7/2023
+
 
 these are pinned to the server as:
 pin_get("ejones/fishPCBIR2024", board = "rsconnect") 
 pin_get("ejones/fishMetalsIR2024", board = "rsconnect")
 
-
-
-## Pin all data to the server so it can be used by apps/people
-
-
-Once the data is organized, we need to pin data used in assessment prerequisite steps to be available to the assessors and to the assessment scripts. 
-
-Repeat as necessary in order to access the most recent data available for assessment.
-
-```{r pin data}
-
-stations2020IR_sf_final <- lastCycleStation_sf
-
-
-# 2022 final metals data from Roger (not assessed)
-WCmetals_2022IRfinal <- read_excel('data/final2022data/CEDSWQM/WATER_METALS_2022_20210201.xlsx')
-Smetals_2022IRfinal <- read_excel('data/final2022data/CEDSWQM/SEDIMENT_2022_20210201.xlsx')
-
-# Pin data
-pin(conventionals2022IRfinalWithSecchi, description = "Final 2022IR conventionals dataset from Roger Stewart", board = "rsconnect")
-pin(conventionals_distinct_final, description = "Final 2022IR conventionals distinct stations from Roger Stewart", board = "rsconnect")
-
-
-
-pin(stations2020IR_sf_final, description = "Final 2020IR stations from Cleo Baker", board = "rsconnect")
-
-pin(WCmetals_2022IRfinal, description = "FINAL 2022IR water column metals data from Roger Stewart", board = "rsconnect")
-pin(Smetals_2022IRfinal, description = "FINAL 2022IR sediment metals data from Roger Stewart", board = "rsconnect")
-
-```
 
 
 
@@ -601,7 +598,7 @@ Then, take the most recent WQSlookup table and upload to server. This should be 
 
 ```{r wqs information}
 # most recent version taken from ..\1.preprocessData\WQSlookupTable
-WQSlookup <- read_csv('data/metadataAttribution/20230213_0000_WQSlookup.csv')
+WQSlookup <- pin_get('ejones/WQSlookup', board = 'rsconnect')#read_csv('data/metadataAttribution/20230213_0000_WQSlookup.csv')
 # find number of WQS_ID linked to each station
 WQSlookup1 <- WQSlookup %>% 
   group_by(StationID) %>%
@@ -733,4 +730,108 @@ Now time to actually join standards to stations. This is going to be available o
 pin(WQSlookup_withStandards, description = "WQS lookup table with Standards from metadata attribution application", board = "rsconnect")
 ```
 
-Lots of citizen, non agency sites without WQS info. Need to figure out a solution to these sites.
+
+
+#### Citmon version
+
+Now repeat with Citizen/Non Agency sites
+
+```{r citmon wqs pin}
+citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect")
+
+citmonWQStoDo <- filter(citmonWQS, is.na(CLASS) | CLASS == '') %>% 
+  dplyr::select(StationID:Comments)
+```
+
+
+
+
+```{r WQS information joins citmon, eval = FALSE}
+#bring in Riverine layers, valid for the assessment window
+riverine <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/riverine_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+citmonWQSWQSlookupFull <- left_join(citmonWQStoDo, riverine) %>%
+  filter(!is.na(CLASS))
+rm(riverine)
+
+lacustrine <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/lakes_reservoirs_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+citmonWQSWQSlookupFull <- left_join(citmonWQStoDo, lacustrine) %>%
+  filter(!is.na(CLASS)) %>%
+  bind_rows(citmonWQSWQSlookupFull)
+rm(lacustrine)
+
+estuarineLines <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/estuarinelines_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+citmonWQSWQSlookupFull <- left_join(citmonWQStoDo, estuarineLines) %>%
+  filter(!is.na(CLASS)) %>%
+  bind_rows(citmonWQSWQSlookupFull)
+rm(estuarineLines)
+
+estuarinePolys <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/estuarinepolygons_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+citmonWQSWQSlookupFull <- left_join(citmonWQStoDo, estuarinePolys) %>%
+  filter(!is.na(CLASS)) %>%
+  bind_rows(citmonWQSWQSlookupFull)
+rm(estuarinePolys)
+
+# # what stations are still missing info?
+# View(filter(citmonWQStoDo, !StationID %in% citmonWQSWQSlookupFull$StationID) )
+# WQMstations <- pin_get('ejones/WQM-Stations-Spatial', board = 'rsconnect')
+# filter(citmonWQStoDo, !StationID %in% citmonWQSWQSlookupFull$StationID) %>% 
+#   left_join(WQMstations, by = 'StationID') %>% 
+#     st_as_sf(coords = c("Longitude", "Latitude"), 
+#                remove = F, # don't remove these lat/lon cols from df
+#                crs = 4326) %>% # add projection, needs to be geographic for now bc entering lat/lng
+#   st_write('help.shp')
+
+
+citmonWQSlookup_withStandards_pin <- bind_rows(filter(citmonWQS, ! StationID %in% citmonWQStoDo$StationID),
+                                               citmonWQSWQSlookupFull %>% 
+                                                 mutate(GNIS_ID = as.integer(GNIS_ID)) ) # for pin
+
+
+
+# Find duplicates 
+citmonWQSlookup_withStandards_pin_issues <- citmonWQSlookup_withStandards_pin %>% 
+  group_by(StationID) %>% 
+  mutate(totCount = n()) %>% 
+  filter(totCount > 1)
+
+if(nrow(WQSlookup_withStandards_issues)>0){
+  # write out and fix
+  write_csv(WQSlookup_withStandards_issues %>% arrange(StationID), 'data/fixMe.csv')
+  fixed <- read_csv('data/fixMe.csv') %>%
+    mutate(GNIS_ID = as.factor(as.character(GNIS_ID)))
+
+  WQSlookup_withStandards <- filter(WQSlookup_withStandards_pin, ! StationID %in% fixed$StationID) %>%
+    bind_rows(fixed)
+
+# What stations still need WQS?
+z <- filter(WQSlookup, ! StationID %in% WQSlookup_withStandards_pin$StationID) 
+
+# fix user issues
+#test <- readRDS('C:/HardDriveBackup/R/GitHub/IR2022/1.preprocessData/data/WQStable.RDS')
+#y <- left_join(z, test, by = 'StationID') %>%
+#  rename("WQS_ID Saved on the server" = "WQS_ID.x",
+#         "WQS_ID Suggested To User" = "WQS_ID.y",
+#         "Buffer Distance" = "Buffer Distance.y") %>%
+#  dplyr::select(StationID, `Buffer Distance`, `WQS_ID Saved on the server`, `WQS_ID Suggested To User`, Comments)
+#write.csv(y,'missingWQSforReview.csv')
+  } else{WQSlookup_withStandards <- WQSlookup_withStandards_pin}
+```
+
+Now pin to server
+
+
+```{r pin WQS information citmon}
+# pin(citmonWQSlookup_withStandards_pin, 
+#     name = "ejones/citmonStationsWithWQSFinal",
+#     description = "WQS lookup table with Standards for Citmon/Non Agency Stations", board = "rsconnect")
+```
+
+

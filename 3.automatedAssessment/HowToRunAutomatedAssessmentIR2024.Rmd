@@ -83,7 +83,7 @@ Placeholders until data window sorted
 stations2020IR <- pin_get("stations2020IR-sf-final", board = "rsconnect")
 
 
-markPCB <- read_excel('data/oldData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ')
+markPCB <- pin_get("ejones/PCBIR2024", board = 'rsconnect')#read_excel('data/oldData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ')
 fishPCB <- pin_get("ejones/fishPCBIR2024", board = "rsconnect")#read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs')
 fishMetals <- pin_get("ejones/fishMetalsIR2024", board = "rsconnect") #read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals')
 ```

@@ -167,8 +167,8 @@ citmonStationsWithWQSFinal1 <- dplyr::select(citmonStationsWithWQSFinal, any_of(
 names(citmonStationsWithWQSFinal1) == names(WQSlookup) # okay don't match perfectly
 
 
-pin(citmonStationsWithWQSFinal1, name = 'ejones/citmonStationsWithWQSFinal', 
-    descrption = 'IR2024 citmon stations with WQS that were attributed by assessors during IR2022 and some manually attributed', board = 'rsconnect')
+# pin(citmonStationsWithWQSFinal1, name = 'ejones/citmonStationsWithWQSFinal', 
+#     descrption = 'IR2024 citmon stations with WQS that were attributed by assessors during IR2022 and some manually attributed', board = 'rsconnect')
 
 citmonStationsWithWQSFinal <- pin_get('ejones/citmonStationsWithWQSFinal', board = 'rsconnect')
 

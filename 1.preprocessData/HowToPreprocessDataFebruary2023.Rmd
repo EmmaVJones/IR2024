@@ -129,7 +129,7 @@ Create a new object called distinctSites. This will be useful for keeping track 
 
 ```{r conventionals missing WQS}
 conventionals <- conventionals %>% 
-  dplyr::select(FDT_STA_ID, STA_DESC, Data_Source, Latitude, Longitude) %>% 
+  dplyr::select(FDT_STA_ID, GROUP_STA_ID, STA_DESC, Data_Source, Latitude, Longitude) %>% 
   distinct(FDT_STA_ID, .keep_all = T)
 
 distinctSites <- conventionals
@@ -152,7 +152,7 @@ distinctSites1 <- left_join(distinctSites, WQMstations, by = c('FDT_STA_ID' = 'S
          Latitude = coalesce(Latitude.x, Latitude.y),
          Longitude = coalesce(Longitude.x, Longitude.y)) %>% 
   dplyr::select(-c(Sta_Desc, Latitude.x, Latitude.y, Longitude.x, Longitude.y)) %>%  # remove duplicate column
-  dplyr::select(FDT_STA_ID, STA_DESC, Data_Source, Latitude, Longitude, everything())
+  dplyr::select(FDT_STA_ID, GROUP_STA_ID, STA_DESC, Data_Source, Latitude, Longitude, everything())
   
 # make sure we didn't lose anyone
 distinctSites$FDT_STA_ID[! distinctSites$FDT_STA_ID %in% distinctSites1$FDT_STA_ID]
@@ -174,7 +174,7 @@ distinctSites_sf <- distinctSites %>%
             remove = F, # don't remove these lat/lon cols from df
             crs = 4326)
 # save for later just in case
-#saveRDS(distinctSites_sf, './data/distinctSites_sf03062023.RDS')
+#saveRDS(distinctSites_sf, './data/distinctSites_sf03072023.RDS')
 ```
 
 
@@ -212,8 +212,8 @@ For a lot of older citmon stations, we should have WQS info at AU level that we 
 Organize data to match distinctSites_sf format
 
 ```{r citmonNonagency spatial}
-citmonNonAgency_sf <- citmonNonAgency %>% 
-  dplyr::select(FDT_STA_ID, STA_DESC, Data_Source,
+citmonNonAgency_sf <- filter(distinctSites_sf, is.na(ASSESS_REG)| is.na(US_L3NAME)) %>%  #citmonNonAgency %>% 
+  dplyr::select(FDT_STA_ID, GROUP_STA_ID, STA_DESC, Data_Source,
                 Latitude, Longitude) %>% 
   distinct(FDT_STA_ID, .keep_all = T) %>% 
    st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
@@ -277,7 +277,8 @@ citmonNonAgency_sf2 %>% group_by(FDT_STA_ID) %>% mutate(n = n()) %>% filter(n > 
 # mapview::mapview(filter(citmonNonAgency_sf, ! FDT_STA_ID %in% citmonNonAgency_sf1$FDT_STA_ID))+
 #   mapview::mapview(ecoregion4Large)
 
-distinctSites_sf <- bind_rows(distinctSites_sf %>% st_drop_geometry(),
+distinctSites_sf <- bind_rows(distinctSites_sf %>% st_drop_geometry() %>% 
+                                 filter(!FDT_STA_ID %in% citmonNonAgency_sf2$FDT_STA_ID),
                               citmonNonAgency_sf2 %>% st_drop_geometry() %>% 
                                 dplyr::select(any_of(names(distinctSites_sf)))) %>%
   dplyr::select(names(distinctSites_sf %>% st_drop_geometry())) %>% # once you have the right column names, reorder to correct order
@@ -285,39 +286,17 @@ distinctSites_sf <- bind_rows(distinctSites_sf %>% st_drop_geometry(),
            remove = F, # don't remove these lat/lon cols from df
            crs = 4326) %>% 
   distinct(FDT_STA_ID, .keep_all = T) %>% 
-  mutate(GROUP_STA_ID = NA_character_) %>% #will need this when it comes time to do real citmon stuff
+ # mutate(GROUP_STA_ID = NA_character_) %>% #will need this when it comes time to do real citmon stuff
   dplyr::select(FDT_STA_ID, GROUP_STA_ID, everything())
 
 # make sure no duplicates
 distinctSites_sf %>% group_by(FDT_STA_ID) %>% mutate(n = n()) %>% dplyr::select(n, everything()) %>%  filter(n > 1) %>%   View()
 # duplicates are all legit. These are colocated stations with citizen monitoring. KEEP THESE
 
-# Save for use in metadata app
-#saveRDS(distinctSites_sf, 'data/distinctSites_sf_withCitmon02232023.RDS')
-
 # Clean up workspace
 rm(list = c('ecoregion4Large','county', 'vahu6','subbasinConversion','unrestrictedAssessmentRegionVAHU6Subbasin',
             'citmonNonAgency_sf1', 'citmonNonAgency_sf2', 'path', 'subbasinLayer'))
 ```
-
-for next steps just running citmon
-
-```{r}
-# distinctSites_sf <- bind_rows(distinctSites_sf %>% st_drop_geometry(),
-#                               citmonNonAgency_sf %>% st_drop_geometry()) %>% 
-#    st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
-#            remove = T, # don't remove these lat/lon cols from df
-#            crs = 4326)
-
-# for next steps just running 
-distinctSites_sf <- filter(distinctSites_sf, FDT_STA_ID %in% citmonNonAgency_sf$FDT_STA_ID)
-distinctSitesToDo <- distinctSites_sf 
-
-filter(citmonNonAgency_sf, ! FDT_STA_ID %in% distinctSites_sf$FDT_STA_ID)
-
-#View(distinctSites_sf %>% group_by(FDT_STA_ID) %>% mutate(n = n()) %>% dplyr::select(n, everything()) %>%  arrange(desc(n), FDT_STA_ID))
-```
-
 
 
 ### Remove Unwanted Stations
@@ -330,7 +309,35 @@ stationHitList <- read_csv('data/stationHitList.csv')
 distinctSites_sf <- filter(distinctSites_sf, ! FDT_STA_ID %in% stationHitList$`StationID to Remove`)
 
 
-#saveRDS(distinctSites_sf, 'data/distinctSites_sf03062023.RDS')#data/distinctSites_sf_withCitmon02232023.RDS')
+#saveRDS(distinctSites_sf, 'data/distinctSites_sf03072023.RDS')#data/distinctSites_sf_withCitmon02232023.RDS')
+```
+
+
+
+
+
+### Attach subbasin information
+
+Assessment region is already included in the attached metadata thanks to the previous join to WQMstations. This information is important for processing each region through a loop for AU connection and WQS attachment. Subbasin information is important for WQS processing.
+
+lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3. Unless you have changed any inputs prior to this point, just keep with 3.6.2 and read in data already processed.
+
+```{r assessment and subbasin join}
+#source('preprocessingModules/assessmentLayerSubbasinJoin.R') # lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3
+distinctSites_sf <- readRDS('./data/distinctSites_sf_withCitmon03072023.RDS') #distinctSites_sf_withCitmon02232023.RDS')
+distinctSitesToDo <- distinctSites_sf 
+# keep a copy of original distinct sites to check that no one was lost at the end
+``` 
+
+**Note the VAHU6 data is derived spatially, so this is a good first step, but when there is human QAed VAHU6 data available, we will use that data instead. Sometimes assessors use stations outside a VAHU6 to assess said VAHU6.**
+
+
+Save missingSites data for app. This is critical for those sites that fall out of assessment layer boundary that still need work. This will be brought in by app for assessor to use.
+
+For 2024IR draft data, we didn't have any missingSites.
+
+```{r missingSites for app}
+#saveRDS(missingSites, 'data/missingSites.RDS')
 ```
 
 
@@ -355,33 +362,8 @@ now pin to server
 
 ```{r}
 # pin(distinctSites_sf, 'ejones/conventionals2024_distinctdraft', board = 'rsconnect',
-#     description = 'Working IR2024 conventionals_distinct dataset based on 02162023 conventionals draft pull from Roger and 2019-2020 citmon/nonagency data from Reid that have FDT_STA_ID')  # see below for fix coming this way at final stage
+#     description = 'Working IR2024 conventionals_distinct dataset based on conventionals final pull from Roger and 2017-2020 citmon/nonagency data from Reid that have FDT_STA_ID')  # see below for fix coming this way at final stage
 
-```
-
-
-### Attach subbasin information
-
-Assessment region is already included in the attached metadata thanks to the previous join to WQMstations. This information is important for processing each region through a loop for AU connection and WQS attachment. Subbasin information is important for WQS processing.
-
-lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3. Unless you have changed any inputs prior to this point, just keep with 3.6.2 and read in data already processed.
-
-```{r assessment and subbasin join}
-#source('preprocessingModules/assessmentLayerSubbasinJoin.R') # lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3
-distinctSites_sf <- readRDS('./data/distinctSites_sf_withCitmon03062023.RDS') #distinctSites_sf_withCitmon02232023.RDS')
-distinctSitesToDo <- distinctSites_sf 
-# keep a copy of original distinct sites to check that no one was lost at the end
-``` 
-
-**Note the VAHU6 data is derived spatially, so this is a good first step, but when there is human QAed VAHU6 data available, we will use that data instead. Sometimes assessors use stations outside a VAHU6 to assess said VAHU6.**
-
-
-Save missingSites data for app. This is critical for those sites that fall out of assessment layer boundary that still need work. This will be brought in by app for assessor to use.
-
-For 2024IR draft data, we didn't have any missingSites.
-
-```{r missingSites for app}
-#saveRDS(missingSites, 'data/missingSites.RDS')
 ```
 
 
@@ -431,6 +413,7 @@ Identify real number of sites that need spatial joining.
 distinctSitesToDoWQS <- filter(distinctSitesToDo, ! FDT_STA_ID  %in% WQStableExisting$StationID) %>% 
   filter(! FDT_STA_ID  %in% citmonWQS$StationID)
 #write.csv(distinctSitesToDoWQS, 'needsWQS.csv')
+rm(WQStableExisting);rm(citmonWQS) # save all memory you can
 ```
 
 
@@ -441,6 +424,8 @@ Since transitioning the WQS storage from local (individual assessor files) to a 
 Here is the table used to store link information from stations to appropriate WQS.
 
 ```{r WQStable}
+# saveRDS(distinctSitesToDoWQS, 'data/distinctSitesToDoWQS.RDS')
+# distinctSitesToDoWQS <- readRDS('data/distinctSitesToDoWQS.RDS')
 WQStable <- tibble(StationID = NA, WQS_ID = NA)
 ```
 
