@@ -150,7 +150,7 @@ Pull pinned WQS info saved on server. Then perform a series of data manipulation
 
 
 ```{r pull WQS info}
-WQSlookup <- pin_get("WQSlookup-withStandards",  board = "rsconnect")
+WQSlookup <- pin_get("ejones/WQSlookup-withStandards",  board = "rsconnect")
 citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect") %>% 
   dplyr::select(StationID, `WQS Section` = SEC, `WQS Class`= CLASS,`WQS Special Standard` = SPSTDS)
 # citmonWQS <- readRDS('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/data/citmonStationsWithWQS.RDS') %>% 

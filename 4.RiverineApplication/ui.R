@@ -137,6 +137,10 @@ shinyUI(fluidPage(theme="yeti.css",
                                                      parameter modules will display data as no data is available in the current window.'),
                                             DT::dataTableOutput('carryoverStationSummary'),
                                             
+                                            h5(strong('These stations cannot be viewed in the application until the user enters a valid
+                                                     ID305B_1 for the stations in the uploaded stations table.')),
+                                            DT::dataTableOutput('stationsWithoutID305B_1Summary'),
+                                            
                                             br(), br(), br() # a bit of breathing room
                                           )
                                  ),

@@ -158,12 +158,15 @@ conventionals_HUC <- filter(conventionals, Huc6_Vahu6 %in% huc6_filter$VAHU6) %>
   left_join(dplyr::select(stationTable, STATION_ID:VAHU6,lakeStation,
                           WQS_ID:EPA_ECO_US_L3NAME),
             by = c('FDT_STA_ID' = 'STATION_ID')) %>%
-  filter(!is.na(ID305B_1)) %>%
+  #filter(!is.na(ID305B_1)) %>%
   pHSpecialStandardsCorrection() %>% #correct pH to special standards where necessary
   temperatureSpecialStandardsCorrection()  # correct temperature special standards where necessary
 
 carryoverStations <- filter(stationTable, VAHU6 %in% huc6_filter$VAHU6 & str_detect(COMMENTS, "This station has no data"))
 
+# flag these for user in app, these need ID305B_1 before you can proceed through app
+stationsWithoutID305B_1 <-  filter(stationTable, VAHU6 %in% huc6_filter$VAHU6) %>% 
+  filter(is.na(ID305B_1))
 
 # AUs from data in conventionals and carryoverStations
 AUselectionOptions <- unique(c(conventionals_HUC$ID305B_1, 

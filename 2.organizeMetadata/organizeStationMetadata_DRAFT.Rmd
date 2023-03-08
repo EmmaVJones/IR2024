@@ -727,7 +727,9 @@ Once I get that information back from assessors I can fully move on.
 Now time to actually join standards to stations. This is going to be available on the server for users to access from the assessment scripts. The thinking right now is that it is better to store this information on the server right now and show users the data (when asked) instead of having it attached to the right of existing stationsTable (like 2020 cycle) since CEDS WQA only accepts a specific template. Also, if WQS info needs to be changed, the assessor is forced to update the WQS_ID. Maybe this isn't an awesome method but going with it for now.
 
 ```{r pin WQS information}
-pin(WQSlookup_withStandards, description = "WQS lookup table with Standards from metadata attribution application", board = "rsconnect")
+pin(WQSlookup_withStandards, 
+    name = 'ejones/WQSlookup-withStandards',
+    description = "WQS lookup table with Standards from metadata attribution application", board = "rsconnect")
 ```
 
 

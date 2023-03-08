@@ -231,10 +231,24 @@ shinyServer(function(input, output, session) {
   carryoverStations <- reactive({ req(huc6_filter(), stationTable())
     filter(stationTable(), VAHU6 %in% huc6_filter()$VAHU6 & str_detect(COMMENTS, "This station has no data")) })
   
+  
+  # Flag stations that don't have ID305B_1 in uploaded stations table
+  stationsWithoutID305B_1 <-  reactive({ req(huc6_filter(), stationTable())
+    filter(stationTable(), VAHU6 %in% huc6_filter()$VAHU6) %>% 
+      filter(is.na(ID305B_1)) })
+  
+  
   output$carryoverStationSummary <- DT::renderDataTable({   req(carryoverStations())
     z <- carryoverStations() %>%  dplyr::select(STATION_ID:VAHU6, COMMENTS)
     DT::datatable(z, rownames = FALSE, 
-                  options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "300px", dom='Bti',
+                  options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "200px", dom='Bti',
+                                autoWidth = TRUE, columnDefs = list(list(width = '400px', targets = c(29)))),
+                  selection = 'none') })
+  
+  output$stationsWithoutID305B_1Summary <- DT::renderDataTable({   req(stationsWithoutID305B_1())
+    z <- stationsWithoutID305B_1() %>%  dplyr::select(STATION_ID:VAHU6, COMMENTS)
+    DT::datatable(z, rownames = FALSE, 
+                  options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "200px", dom='Bti',
                                 autoWidth = TRUE, columnDefs = list(list(width = '400px', targets = c(29)))),
                   selection = 'none') })
   
