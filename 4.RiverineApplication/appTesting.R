@@ -135,8 +135,8 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
 ## Watershed selection Tab
 # side panel arguments
 DEQregionSelection <- "BRRO"#"NRO"#"NRO"#"VRO"#"PRO"#"NRO"#'BRRO'#"PRO"#'BRRO'
-basinSelection <- "James-Upper"#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
-HUC6Selection <- "JU21"#"JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+basinSelection <- 'Roanoke'#"James-Upper"#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
+HUC6Selection <- "RU13"#"JU21"#"JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
 
 # pull together data based on user input on side panel
 # Pull AU data from server
@@ -158,7 +158,7 @@ conventionals_HUC <- filter(conventionals, Huc6_Vahu6 %in% huc6_filter$VAHU6) %>
   left_join(dplyr::select(stationTable, STATION_ID:VAHU6,lakeStation,
                           WQS_ID:EPA_ECO_US_L3NAME),
             by = c('FDT_STA_ID' = 'STATION_ID')) %>%
-  #filter(!is.na(ID305B_1)) %>%
+  filter(!is.na(ID305B_1)) %>%
   pHSpecialStandardsCorrection() %>% #correct pH to special standards where necessary
   temperatureSpecialStandardsCorrection()  # correct temperature special standards where necessary
 

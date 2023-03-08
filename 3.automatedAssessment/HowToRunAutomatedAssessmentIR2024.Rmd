@@ -47,7 +47,7 @@ Draft data created for testing
 
 ```{r pull pins}
 conventionals <- pin_get('ejones/conventionals2024final', board = 'rsconnect')#pin_get('ejones/conventionals2024draft', board = 'rsconnect')
-conventionals_distinct <- pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect')  # see below for fix coming this way at final stage
+conventionals_distinct <- pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect') 
 WCmetals <- pin_get("WCmetalsIR2024",  board = "rsconnect") 
 WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") 
 Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
@@ -66,26 +66,6 @@ VCPMI65results <- pin_get("ejones/VCPMI65results", board = "rsconnect") %>%
 assessmentWindowLowFlows <- pin_get('ejones/AssessmentWindowLowFlows', board = 'rsconnect')
 #subbasinToVAHU6 <- pin_get('ejones/subbasinToVAHU6', board = 'rsconnect')
 basins <- st_as_sf(pin_get('ejones/DEQ_VAHUSB_subbasins_EVJ', board = 'rsconnect'))
-
-
-# this will be taken care of in 1.preprocessing at the final draft stage and we can delete this out
-# conventionals_distinct <- conventionals_distinct %>% 
-#   filter(!is.na(Latitude) | !is.na(Longitude)) %>% 
-#   st_as_sf(coords = c("Longitude", "Latitude"), 
-#                remove = F, # don't remove these lat/lon cols from df
-#                crs = 4326) %>% 
-#   st_intersection(dplyr::select(basins, BASIN_CODE)) 
-# saveRDS(conventionals_distinct, 'data/conventionals_distinctDRAFT.RDS')
-#conventionals_distinct <- readRDS('data/conventionals_distinctDRAFT.RDS')
-```
-
-Placeholders until data window sorted
-
-```{r placeholders, echo=FALSE, message=F, warning=F}
-## Placeholders
-#stations2020IR <- pin_get("stations2020IR-sf-final", board = "rsconnect")
-
-
 ```
 
 
@@ -102,6 +82,13 @@ stationsTable2020 <- readRDS('../2.organizeMetadata/data/stationsTable2020.RDS')
 ```{r lake nutrient standards}
 lakeNutStandards <- read_csv('data/9VAC25-260-187lakeNutrientStandards.csv')
 ```
+## Bring in list of sites that have no "conventionals" data
+
+These sites are important to carry through into the stations table even though they don't have any conventionals data. These sites are from fish tissue, PCB, or metals datasets that didn't report any data in the conventionals data pull. These were saved in 2.organizeMetadata and will allow us to override the default behavior of largely skipping analyses if no conventionals data are present below.
+
+```{r read in local data}
+extraSites <- readRDS('data/extraSites.RDS')
+```
 
 
 
@@ -116,7 +103,7 @@ This information communicates to the scripts which stations should be assessed a
 **To Note: The AU assignments in this table are valid as of the start of the assessment process. For any AU splits/reassignments, the assessors control that through local (.csv) copies of the output of this script that is uploaded to the relevant Assessment Application on the Connect Server (and subsequently uploaded to CEDS via the bulk data upload tool).**
 
 ```{r stationTable, echo = FALSE}
-stationTable <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect')
+stationTable <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect') # pinned in 2.organizeMetadata with FT and PCB site fixes
 ```
 
 ## Bring in Station Table Bulk Upload Template
@@ -336,6 +323,8 @@ waterColumnMetalsAnalysis <- tibble()
 # time it:
 startTime <- Sys.time()
 
+# if you want to know the ith number of a particular station, use this: which(stationTable$STATION_ID == '2-JKS023.61', arr.ind=TRUE)
+
 # loop over all sites, not super efficient but get the job done in easy to follow format
 for(i in 1:nrow(stationTable)){
 #i = 1
@@ -443,9 +432,18 @@ for(i in 1:nrow(stationTable)){
   WCmetalsExceedanceSummary <- annualRollingExceedanceSummary(WCmetalsExceedanceAnalysis)  
    
   # If data exists for station, run it, otherwise just output what last cycle said and comment
-  if(nrow(stationData) > 0){
+  if(any(nrow(stationData) > 0 | stationTable$STATION_ID[i] %in% extraSites$FDT_STA_ID)){
     # Nutrients based on station type
-    # Nutrient: TP (lakes have real standards; riverine no longer uses 0.2 mg/L as an observed effect for Aquatic life use)
+    
+    # skip this for extraSites
+    if(stationTable$STATION_ID[i] %in% extraSites$FDT_STA_ID){
+      TP <- countNutrients(stationData, PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, NA) %>% quickStats('NUT_TP') %>% 
+          mutate(NUT_TP_STAT = ifelse(NUT_TP_STAT != "S", "Review", NA))
+      chla <- countNutrients(stationData, CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA) %>% quickStats('NUT_CHLA') %>%
+          mutate(NUT_CHLA_STAT = NA)
+      DO_Daily_Avg_STAT <- "DO_Daily_Avg_STAT: NA"
+    } else{
+      # Nutrient: TP (lakes have real standards; riverine no longer uses 0.2 mg/L as an observed effect for Aquatic life use)
     if(unique(stationData$lakeStation) == TRUE){
       TP <- TP_Assessment(stationData) 
       } else {
@@ -460,11 +458,16 @@ for(i in 1:nrow(stationTable)){
         chla <- countNutrients(stationData, CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA) %>% quickStats('NUT_CHLA') %>%
           mutate(NUT_CHLA_STAT = NA) } # don't show a real assessment decision
     
-    # Run DO Daily Avg for everyone!
+       # Run DO Daily Avg for everyone!
       DO_Daily_Avg_STAT <- paste0('DO_Daily_Avg_STAT: ', 
                                        DO_Assessment_DailyAvg(stationData) %>% 
                                          quickStats('DO_Daily_Avg') %>% 
-                                         dplyr::select(DO_Daily_Avg_STAT) %>% pull())#}
+                                         dplyr::select(DO_Daily_Avg_STAT) %>% pull())
+      }     
+    
+    
+    
+   
     
     results <- cbind(
       StationTableStartingData(stationData),
