@@ -46,11 +46,14 @@ Scripts to organize and pin data are in ../2.organizeMetadata/organizeStationMet
 Draft data created for testing
 
 ```{r pull pins}
-conventionals <- pin_get('ejones/conventionals2024draft', board = 'rsconnect')
+conventionals <- pin_get('ejones/conventionals2024final', board = 'rsconnect')#pin_get('ejones/conventionals2024draft', board = 'rsconnect')
 conventionals_distinct <- pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect')  # see below for fix coming this way at final stage
 WCmetals <- pin_get("WCmetalsIR2024",  board = "rsconnect") 
 WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") 
 Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
+markPCB <- pin_get("ejones/PCBIR2024", board = 'rsconnect')#read_excel('data/oldData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ')
+fishPCB <- pin_get("ejones/fishPCBIR2024", board = "rsconnect")#read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs')
+fishMetals <- pin_get("ejones/fishMetalsIR2024", board = "rsconnect") #read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals')
 
 
 WQMstationFull <- pin_get("ejones/WQM-Station-Full", board = "rsconnect")
@@ -80,12 +83,9 @@ Placeholders until data window sorted
 
 ```{r placeholders, echo=FALSE, message=F, warning=F}
 ## Placeholders
-stations2020IR <- pin_get("stations2020IR-sf-final", board = "rsconnect")
+#stations2020IR <- pin_get("stations2020IR-sf-final", board = "rsconnect")
 
 
-markPCB <- pin_get("ejones/PCBIR2024", board = 'rsconnect')#read_excel('data/oldData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ')
-fishPCB <- pin_get("ejones/fishPCBIR2024", board = "rsconnect")#read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs')
-fishMetals <- pin_get("ejones/fishMetalsIR2024", board = "rsconnect") #read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals')
 ```
 
 
@@ -316,8 +316,8 @@ conventionals <- conventionals %>%
 That dataset is money. We want to use that one in the shiny applications, so make sure you pin that to the server (and update it any time new conventionals data are processed).
 
 ```{r pin new conventionals}
-# pin(conventionals, name = "conventionals2024draft_with7Q10flag",
-#     description = "Draft Conventionals data for IR2024 with added 7Q10 flag joined at major river basin level. This is used for the shiny app versions of the automated assessment protocol to save rendering time", board = 'rsconnect')
+# pin(conventionals, name = "conventionals2024final_with7Q10flag",
+#     description = "Final Conventionals data for IR2024 with added 7Q10 flag joined at major river basin level. This is used for the shiny app versions of the automated assessment protocol to save rendering time", board = 'rsconnect')
 ```
 
 

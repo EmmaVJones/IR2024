@@ -71,7 +71,7 @@ toxicsSingleStation <- function(input,output,session, AUdata, stationData, Water
   
   ## Water Intake proximity flag for station
   output$intakeProximityFlag <- renderUI({req(stationData())
-    if(unique(stationData()$FDT_STA_ID) %in% intakeSites$FDT_STA_ID){
+    if(unique(stationData()$FDT_STA_ID) %in% IntakeSites()$FDT_STA_ID){
       wellPanel(h5(strong('This station is within 100 meters of a drinking water intake. Please review whether the station
                 should be assessed for secondary human health criteria.', style = "color:red")) ) }    })
   
