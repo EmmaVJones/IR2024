@@ -1,6 +1,3 @@
-# work through appTesting.R through the creation of stationData object
-
-
 DOPlotlySingleStationUI <- function(id){
   ns <- NS(id)
   tagList(
@@ -47,14 +44,13 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
       filter(!is.na(DO_mg_L))})
   
   # Option to change WQS used for modal
-  output$changeWQSUI <- renderUI({
-    req(oneStation_original())
+  output$changeWQSUI <- renderUI({    req(nrow(oneStation_original()) > 0)
     selectInput(ns('changeWQS'),strong('WQS For Analysis'),
                 choices= WQSvalues$CLASS_DESCRIPTION,
                 width='400px', selected = unique(oneStation_original()$CLASS_DESCRIPTION)) })
   
   # change WQS for rest of module if user chooses to do so
-  oneStation <- reactive({req(oneStation_original(), input$changeWQS)
+  oneStation <- reactive({req(nrow(oneStation_original()) > 0, input$changeWQS)
     changeWQSfunction(oneStation_original(), input$changeWQS) })
   
   
@@ -71,7 +67,7 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
       size = 'l', easyClose = TRUE))  })
   
   # modal parameter data
-  output$parameterData <- DT::renderDataTable({  req(oneStation())
+  output$parameterData <- DT::renderDataTable({  req(nrow(oneStation()) > 0)
     parameterFilter <- dplyr::select(oneStation(), FDT_STA_ID, GROUP_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_COMMENT,
                                      DO_mg_L, RMK_DO, LEVEL_DO, `7Q10 Flag Gage`, `7Q10 Flag`)
     
@@ -90,7 +86,7 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
     lowFlowData$SampleDate <- as.POSIXct(lowFlowData$FDT_DATE_TIME, format="%m/%d/%y")
     return(lowFlowData)  })
   
-  output$lowFlowFlagUI <- renderUI({  req(oneStation(), lowFlowData())
+  output$lowFlowFlagUI <- renderUI({  req(nrow(oneStation()) > 0, lowFlowData())
     if(nrow(lowFlowData()) > 0){ 
       tagList(
         fluidRow(
@@ -159,7 +155,7 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
     map1@map  })
   
   # Low flow gage information for that water year
-  output$gageLowFlowData <- renderDataTable({  req(ns(input$reviewLowFlow), oneStation(), nrow(lowFlowData()) > 0)
+  output$gageLowFlowData <- renderDataTable({  req(ns(input$reviewLowFlow), nrow(oneStation()) > 0, nrow(lowFlowData()) > 0)
     uniqueGageID <- unlist(strsplit(lowFlowData()$`7Q10 Flag Gage`, ", "))
     z <- filter(assessmentWindowLowFlowsModal(),  `Gage ID` %in% uniqueGageID)  %>% # pull all unique gages
       dplyr::select(Agency:`Site Type`, Date:BASIN_NAME, Latitude, Longitude) %>%  #reformat for easier reading
@@ -181,12 +177,12 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   
   
   # DO Station Exceedance Rate 7Q10 flagged data removed
-  output$stationExceedanceRate7Q10 <- renderDataTable({  req(ns(input$oneStationSelection), oneStation(), nrow(lowFlowData()) > 0)
+  output$stationExceedanceRate7Q10 <- renderDataTable({  req(ns(input$oneStationSelection), nrow(oneStation()) > 0, nrow(lowFlowData()) > 0)
     z <- DOExceedances_Min(oneStation()) %>% quickStats('DO', drop7Q10 = TRUE) %>% dplyr::select(-DO_STAT) 
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "100px", dom='t'),
               selection = 'none') })
   
-  output$stationDailyAverageExceedanceRate7Q10 <- renderDataTable({ req(input$oneStationSelection, oneStation(),nrow(lowFlowData()) > 0) 
+  output$stationDailyAverageExceedanceRate7Q10 <- renderDataTable({ req(input$oneStationSelection, nrow(oneStation()) > 0,nrow(lowFlowData()) > 0) 
     z <- DO_Assessment_DailyAvg(oneStation()) %>% quickStats('DO_Daily_Avg', drop7Q10 = TRUE) %>% dplyr::select(-DO_Daily_Avg_STAT)
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
               selection = 'none') })
@@ -196,7 +192,7 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   
   
   
-  output$plotly <- renderPlotly({  req(input$oneStationSelection, oneStation())
+  output$plotly <- renderPlotly({  req(input$oneStationSelection, nrow(oneStation()) > 0)
     dat <- mutate(oneStation(), bottom = `Dissolved Oxygen Min (mg/L)`)
     dat$SampleDate <- as.POSIXct(dat$FDT_DATE_TIME, format="%m/%d/%y")
     
@@ -265,7 +261,7 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                yaxis=list(title="DO (mg/L)"),
                xaxis=list(title="Sample Date",tickfont = list(size = 10)))    }  })
   
-  output$minTableSingleSite <- renderDataTable({req(oneStation())
+  output$minTableSingleSite <- renderDataTable({req(nrow(oneStation()) > 0)
     z <- DOExceedances_Min(oneStation()) %>%
       rename("DO" = 'parameter', 'Criteria' = 'limit', 'Parameter Rounded to WQS Format' = 'parameterRound') %>%
       filter(exceeds == TRUE) %>%
@@ -275,7 +271,7 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
       formatSignif(columns=c('Criteria', 'Parameter Rounded to WQS Format'), digits=2) })
   
   
-  output$dailyAverageTableSingleSite <- renderDataTable({ req(oneStation())
+  output$dailyAverageTableSingleSite <- renderDataTable({ req(nrow(oneStation()) > 0)
     z <- DO_Assessment_DailyAvg(oneStation()) %>%
       dplyr::select('Date' = date, `DO Daily Average (Rounded to WQS Format)` = DO_DailyAverage, 
                     `n Daily Samples` = n_Samples_Daily, 'Criteria' = limit )
@@ -283,13 +279,12 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
               selection = 'none')  %>%
       formatSignif(columns=c('Criteria', 'DO Daily Average (Rounded to WQS Format)'), digits=2) })
   
-  output$stationExceedanceRate <- renderDataTable({req(input$oneStationSelection, oneStation())
+  output$stationExceedanceRate <- renderDataTable({req(input$oneStationSelection, nrow(oneStation()) > 0)
     z <- DOExceedances_Min(oneStation()) %>% quickStats('DO') %>% dplyr::select(-DO_STAT)
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
               selection = 'none') })
   
-  output$stationDailyAverageExceedanceRate <- renderDataTable({
-    req(input$oneStationSelection, oneStation())
+  output$stationDailyAverageExceedanceRate <- renderDataTable({    req(input$oneStationSelection, nrow(oneStation()) > 0)
     z <- DO_Assessment_DailyAvg(oneStation()) %>% quickStats('DO_Daily_Avg') %>% dplyr::select(-DO_Daily_Avg_STAT)
     datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "200px", dom='t'),
               selection = 'none') })

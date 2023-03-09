@@ -4,17 +4,17 @@ source('global.R')
 # #regionalAUs <- st_read('userDataToUpload/AU_working/va_2020_aus_riverine_DRAFT_BRRO.shp') %>%
 # #  st_transform(4326)   # transform to WQS84 for spatial intersection
 # #pin(regionalAUs, name = 'BRROworkingAUriverine', description = "BRRO working AU riverine", board = "rsconnect")
-# 
-# 
-# 
+#
+#
+#
 # Pull data from server
 conventionals <- pin_get('ejones/conventionals2024final_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
-  #pin_get('ejones/conventionals2024draft_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
+#pin_get('ejones/conventionals2024draft_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
 vahu6 <- st_as_sf(pin_get("vahu6", board = "rsconnect")) # bring in as sf object
 WQSlookup <- pin_get("WQSlookup-withStandards",  board = "rsconnect")
 WQMstationFull <- pin_get("WQM-Station-Full", board = "rsconnect")
-stationsTemplate <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect')[0,] %>% 
-  mutate(across(matches(c("LATITUDE", "LONGITUDE", "EXC", "SAMP")), as.numeric)) 
+stationsTemplate <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect')[0,] %>%
+  mutate(across(matches(c("LATITUDE", "LONGITUDE", "EXC", "SAMP")), as.numeric))
 assessmentWindowLowFlows <- pin_get('ejones/AssessmentWindowLowFlows', board = 'rsconnect')
 
 
@@ -24,9 +24,10 @@ lastUpdated <- as.Date(file.info('userDataToUpload/stationTableResults.csv')$mti
 historicalStationsTable <- readRDS('data/stationsTable2022.RDS')# last cycle stations table (forced into new station table format)
 historicalStationsTable2 <- readRDS('data/stationsTable2020.RDS') # two cycle ago stations table
 intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
+extraSites <- readRDS('data/extraSites.RDS')
 
 
-WCmetals <- pin_get("WCmetalsIR2024",  board = "rsconnect")#pin_get("WCmetalsIR2024",  board = "rsconnect") 
+WCmetals <- pin_get("WCmetalsIR2024",  board = "rsconnect")#pin_get("WCmetalsIR2024",  board = "rsconnect")
 WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") # this is included in local data above
 WCmetalsAnalyzed <- readRDS('userDataToUpload/WCmetalsForApp.RDS')
 Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
@@ -51,7 +52,7 @@ habValues <- pin_get("ejones/habValues", board = "rsconnect")  %>%
 habObs <- pin_get("ejones/habObs", board = "rsconnect") %>%
   filter(HabSampID %in% habSamps$HabSampID)
 pinnedDecisions <- bind_rows(pin_get('ejones/CurrentIRbioassessmentDecisions', board = 'rsconnect'),
-                             pin_get('ejones/PreviousIRbioassessmentDecisions', board = 'rsconnect')) %>% 
+                             pin_get('ejones/PreviousIRbioassessmentDecisions', board = 'rsconnect')) %>%
   dplyr::select(IRYear:FinalAssessmentRating)
 
 
@@ -72,23 +73,6 @@ fishMetals <- pin_get("ejones/fishMetalsIR2024", board = "rsconnect") %>% #read_
          "Antimony" = "Sb", "Barium"=  "Ba" , "Mercury" =  "Hg", "Thallium"  = "Tl", "Lead" = "Pb"  )
 
 
-
-# markPCB <- read_excel('data/oldData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ') %>%
-#   mutate(SampleDate = as.Date(SampleDate),
-#          `Parameter Rounded to WQS Format` = as.numeric(signif(`Total Of Concentration`, digits = 2))) %>% # round to even for comparison to chronic criteria)
-#   dplyr::select(StationID: `Total Of Concentration`,`Parameter Rounded to WQS Format`, StationID_join)
-# fishPCB <- pin_get('ejones/fishPCBIR2024', board = 'rsconnect') %>%
-#   mutate(`Parameter Rounded to WQS Format` = as.numeric(signif(`Total PCBs`, digits = 2))) %>% # round to even for comparison to chronic criteria)
-#   dplyr::select(WBID:`Weight (g)`, `Water %`:`Total PCBs`, `Parameter Rounded to WQS Format`, uncorrected, `recovery corrected`, comment3, Latitude, Longitude)
-# read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs') %>%
-# mutate(`Parameter Rounded to WQS Format` = as.numeric(signif(`Total PCBs`, digits = 2))) %>% # round to even for comparison to chronic criteria)
-# dplyr::select(WBID:`Weight (g)`, `Water %`:`Total PCBs`, `Parameter Rounded to WQS Format`, uncorrected, `recovery corrected`, comment3, Latitude, Longitude)
-# fishMetals <- pin_get('ejones/fishMetalsIR2024', board = 'rsconnect') %>% 
-#   # read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals') %>%
-#   rename("Beryllium"= "Be",  "Aluminum" = "Al",  "Vanadium" = "V", "Chromium"= "Cr",
-#          "Manganese" = "Mn", "Nickel" = "Ni", "Copper" = "Cu" ,"Zinc"=  "Zn",  "Arsenic" = "As" , "Selenium" = "Se" ,
-#          "Silver" = "Ag" , "Cadmium" = "Cd",
-#          "Antimony" = "Sb", "Barium"=  "Ba" , "Mercury" =  "Hg", "Thallium"  = "Tl", "Lead" = "Pb"  )
 fishMetalsScreeningValues <- read_csv('data/FishMetalsScreeningValues.csv') %>%
   group_by(`Screening Method`) %>%
   pivot_longer(cols = -`Screening Method`, names_to = 'Metal', values_to = 'Screening Value') %>%
@@ -131,18 +115,18 @@ shinyServer(function(input, output, session) {
       
       
       
-#      # Citmon addition
-#      # Special CitMon/Non Agency step until full WQS_ID inplementation in IR2028
-#      left_join(citmonWQS, by = c('STATION_ID' = 'StationID')) %>% # (1)
+      #      # Citmon addition
+      #      # Special CitMon/Non Agency step until full WQS_ID inplementation in IR2028
+      #      left_join(citmonWQS, by = c('STATION_ID' = 'StationID')) %>% # (1)
       
       # Join to real WQS_ID's (do this second in case citmon station double listed, want proper WQS_ID if available) (1)
       left_join(WQSlookup, by = c('STATION_ID' = 'StationID')) %>%
       
-#      # coalesce these similar fields together, taking WQS_ID info before citmon method
-#      mutate(CLASS = coalesce(CLASS, `WQS Class`),
-#             SEC = coalesce(SEC, `WQS Section`),
-#             SPSTDS = coalesce(SPSTDS, `WQS Special Standard`)) %>% 
-#      dplyr::select(-c(`WQS Section`, `WQS Class`, `WQS Special Standard`)) %>% 
+      #      # coalesce these similar fields together, taking WQS_ID info before citmon method
+      #      mutate(CLASS = coalesce(CLASS, `WQS Class`),
+      #             SEC = coalesce(SEC, `WQS Section`),
+      #             SPSTDS = coalesce(SPSTDS, `WQS Special Standard`)) %>% 
+      #      dplyr::select(-c(`WQS Section`, `WQS Class`, `WQS Special Standard`)) %>% 
       
       # Fix for Class II Tidal Waters in Chesapeake (bc complicated DO/temp/etc standard)
       mutate(CLASS_BASIN = paste(CLASS,substr(BASIN, 1,1), sep="_")) %>%
@@ -331,6 +315,15 @@ shinyServer(function(input, output, session) {
   
   # Pull Conventionals data for selected AU on click
   conventionals_HUC <- reactive({ req(huc6_filter())
+    
+    # first find any sites in VAHU6 and waterbody type that may not have data in conventionals
+    missingExtraSites <- filter(stationTable(), VAHU6 %in% huc6_filter()$VAHU6) %>% 
+      filter(STATION_ID %in% extraSites$FDT_STA_ID) %>% 
+      rename('FDT_STA_ID' = 'STATION_ID') %>% 
+      dplyr::select(FDT_STA_ID:VAHU6,  WQS_ID:lakeStation) 
+    
+    
+    
     filter(conventionals, Huc6_Vahu6 %in% huc6_filter()$VAHU6) %>%
       left_join(dplyr::select(stationTable(), STATION_ID:VAHU6,lakeStation,
                               WQS_ID:EPA_ECO_US_L3NAME),
@@ -338,9 +331,10 @@ shinyServer(function(input, output, session) {
                 by = c('FDT_STA_ID' = 'STATION_ID')) %>%
       filter(!is.na(ID305B_1)) %>%
       pHSpecialStandardsCorrection() %>% #correct pH to special standards where necessary
-      temperatureSpecialStandardsCorrection() }) # correct temperature special standards where necessary
-      
-      
+      temperatureSpecialStandardsCorrection() %>%  # correct temperature special standards where necessary
+      bind_rows(missingExtraSites) })
+  
+  
   # Allow user to select from available AUs to investigate further
   output$AUselection_ <- renderUI({ req(conventionals_HUC())
     # AUs from data in conventionals and carryoverStations
@@ -463,9 +457,9 @@ shinyServer(function(input, output, session) {
     left_join(dplyr::select(stationData(), FDT_STA_ID, PWS) %>% distinct(FDT_STA_ID, .keep_all = T),
               filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID),
               by = c('FDT_STA_ID' = 'Station_Id')) })
-
-
-
+  
+  
+  
   waterToxics <- reactive({ req(stationData())
     # PWS stuff
     if(nrow(stationData()) > 0){
@@ -491,8 +485,8 @@ shinyServer(function(input, output, session) {
           assessPWSsummary(assessPWS(WCmetalsStationPWS(), ThalliumTotal, RMK_ThalliumTotal, 0.24), 'PWS_ThalliumTotal'),
           assessPWSsummary(assessPWS(WCmetalsStationPWS(), UraniumTotal, RMK_UraniumTotal, 30), 'PWS_UraniumTotal')) %>%
           dplyr::select(-ends_with('exceedanceRate')) }
-
-
+      
+      
       # chloride assessment if data exists
       if(nrow(filter(stationData(), !is.na(CHLORIDE_mg_L)))){
         chlorideFreshwater <- rollingWindowSummary(
@@ -500,7 +494,7 @@ shinyServer(function(input, output, session) {
             annualRollingExceedanceAnalysis(chlorideFreshwaterAnalysis(stationData()), yearsToRoll = 3, aquaticLifeUse = TRUE) ), "CHL")
       } else {
         chlorideFreshwater <- tibble(CHL_EXC = NA, CHL_STAT= NA)}
-
+      
       # Water toxics combination with PWS, Chloride Freshwater, and water column PCB data
       if(nrow(bind_cols(PWSconcat,
                         chlorideFreshwater,
@@ -518,62 +512,61 @@ shinyServer(function(input, output, session) {
     } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
                                 PWSinfo = list(PWSconcat))}# add in PWS information so you don't need to run this analysis again
     return(WCtoxics) })
+  
+  
+  # Create station table row for each site
+  observe({ req(nrow(ecoli()) > 0, nrow(enter()) > 0)# need to tell the app to wait for data to exist in these objects before smashing data together or will bomb out when switching between VAHU6's on the Watershed Selection Page
+    siteData$stationTableOutput <- bind_rows(stationsTemplate,
+                                             cbind(StationTableStartingData(stationData()),
+                                                   tempExceedances(stationData()) %>% quickStats('TEMP'),
+                                                   DOExceedances_Min(stationData()) %>% quickStats('DO'),
+                                                   pHExceedances(stationData()) %>% quickStats('PH'),
 
+                                                   # this runs the bacteria assessment again (unfortunately), but it suppresses
+                                                   # any unnecessary bacteria fields for the stations table to avoid unnecessary flags
+                                                   # and it only runs the 2 year analysis per IR2024 rules
+                                                   bacteriaAssessmentDecisionClass( # NEW for IR2024, bacteria only assessed in two most recent years of assessment period
+                                                     filter(stationData(), between(FDT_DATE_TIME, assessmentPeriod[1] + years(4), assessmentPeriod[2])),
+                                                     uniqueStationName = unique(stationData()$FDT_STA_ID)),
 
-# Create station table row for each site
-observe({
-  req(nrow(ecoli()) > 0, nrow(enter()) > 0)# need to tell the app to wait for data to exist in these objects before smashing data together or will bomb out when switching between VAHU6's on the Watershed Selection Page
-  siteData$stationTableOutput <- bind_rows(stationsTemplate,
-                                           cbind(StationTableStartingData(stationData()),
-                                                 tempExceedances(stationData()) %>% quickStats('TEMP'),
-                                                 DOExceedances_Min(stationData()) %>% quickStats('DO'),
-                                                 pHExceedances(stationData()) %>% quickStats('PH'),
+                                                   rollingWindowSummary(
+                                                     annualRollingExceedanceSummary(
+                                                       annualRollingExceedanceAnalysis(ammoniaAnalysisStation(), yearsToRoll = 3, aquaticLifeUse = FALSE)), parameterAbbreviation = "AMMONIA"),
 
-                                                 # this runs the bacteria assessment again (unfortunately), but it suppresses
-                                                 # any unnecessary bacteria fields for the stations table to avoid unnecessary flags
-                                                 # and it only runs the 2 year analysis per IR2024 rules
-                                                 bacteriaAssessmentDecisionClass( # NEW for IR2024, bacteria only assessed in two most recent years of assessment period
-                                                   filter(stationData(), between(FDT_DATE_TIME, assessmentPeriod[1] + years(4), assessmentPeriod[2])),
-                                                   uniqueStationName = unique(stationData()$FDT_STA_ID)),
+                                                   # Water Column Metals
+                                                   metalsAssessmentFunction(WCmetalsStationAnalysisStation()$WCmetalsExceedanceSummary),
 
-                                                 rollingWindowSummary(
-                                                   annualRollingExceedanceSummary(
-                                                     annualRollingExceedanceAnalysis(ammoniaAnalysisStation(), yearsToRoll = 3, aquaticLifeUse = FALSE)), parameterAbbreviation = "AMMONIA"),
+                                                   # takes too long to run this in app form, sourced from pre-analyzed data to expedite rendering time
+                                                   # filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID) %>%
+                                                   #   metalsAnalysis( stationData(), WER = 1) %>%
+                                                   #   rename(FDT_STA_ID = Station_Id) %>%
+                                                   #   mutate(`Criteria Type` = Criteria) %>%
+                                                   #   annualRollingExceedanceAnalysis(yearsToRoll = 3, aquaticLifeUse = TRUE) %>%
+                                                   #   annualRollingExceedanceSummary() %>%
+                                                   #   metalsAssessmentFunction(),
 
-                                                 # Water Column Metals
-                                                 metalsAssessmentFunction(WCmetalsStationAnalysisStation()$WCmetalsExceedanceSummary),
+                                                   # Water Toxics combo fields
+                                                   waterToxics(),
 
-                                                 # takes too long to run this in app form, sourced from pre-analyzed data to expedite rendering time
-                                                 # filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID) %>%
-                                                 #   metalsAnalysis( stationData(), WER = 1) %>%
-                                                 #   rename(FDT_STA_ID = Station_Id) %>%
-                                                 #   mutate(`Criteria Type` = Criteria) %>%
-                                                 #   annualRollingExceedanceAnalysis(yearsToRoll = 3, aquaticLifeUse = TRUE) %>%
-                                                 #   annualRollingExceedanceSummary() %>%
-                                                 #   metalsAssessmentFunction(),
-
-                                                 # Water Toxics combo fields
-                                                 waterToxics(),
-
-                                                 # Roger's sediment metals analysis, transcribed
-                                                 metalsData(filter(Smetals, Station_Id %in% stationData()$FDT_STA_ID), 'SED_MET'),
-                                                 # Mark's sediment PCB results, flagged
-                                                 PCBmetalsDataExists(filter(markPCB, str_detect(SampleMedia, 'Sediment')) %>%
-                                                                       filter(StationID %in%  stationData()$FDT_STA_ID), 'SED_TOX'),
-                                                 # Gabe's fish metals results, flagged
-                                                 PCBmetalsDataExists(filter(fishMetals, Station_ID %in% stationData()$FDT_STA_ID), 'FISH_MET'),
-                                                 # Gabe's fish PCB results, flagged
-                                                 PCBmetalsDataExists(filter(fishPCB, `DEQ rivermile` %in%  stationData()$FDT_STA_ID), 'FISH_TOX'),
-                                                 benthicAssessment(stationData(), VSCIresults),
-                                                 countNutrients(stationData(), PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, NA) %>% quickStats('NUT_TP') %>%
-                                                   mutate(NUT_TP_STAT = ifelse(NUT_TP_STAT != "S", "Review", NA)), # flag OE but don't show a real assessment decision
-                                                 countNutrients(stationData(), CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA) %>% quickStats('NUT_CHLA') %>%
-                                                   mutate(NUT_CHLA_STAT = NA)) %>% # don't show a real assessment decision) %>%
-                                             left_join(dplyr::select(stationTable(), STATION_ID, COMMENTS),
-                                                       by = 'STATION_ID') %>%
-                                             dplyr::select(-ends_with(c('exceedanceRate','Assessment Decision', 'VERBOSE', 'StationID', "PWSinfo",
-                                                                        'BACTERIADECISION', 'BACTERIASTATS')))) %>%
-    filter(!is.na(STATION_ID))
+                                                   # Roger's sediment metals analysis, transcribed
+                                                   metalsData(filter(Smetals, Station_Id %in% stationData()$FDT_STA_ID), 'SED_MET'),
+                                                   # Mark's sediment PCB results, flagged
+                                                   PCBmetalsDataExists(filter(markPCB, str_detect(SampleMedia, 'Sediment')) %>%
+                                                                         filter(StationID %in%  stationData()$FDT_STA_ID), 'SED_TOX'),
+                                                   # Gabe's fish metals results, flagged
+                                                   PCBmetalsDataExists(filter(fishMetals, Station_ID %in% stationData()$FDT_STA_ID), 'FISH_MET'),
+                                                   # Gabe's fish PCB results, flagged
+                                                   PCBmetalsDataExists(filter(fishPCB, `DEQ rivermile` %in%  stationData()$FDT_STA_ID), 'FISH_TOX'),
+                                                   benthicAssessment(stationData(), VSCIresults),
+                                                   countNutrients(stationData(), PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, NA) %>% quickStats('NUT_TP') %>%
+                                                     mutate(NUT_TP_STAT = ifelse(NUT_TP_STAT != "S", "Review", NA)), # flag OE but don't show a real assessment decision
+                                                   countNutrients(stationData(), CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA) %>% quickStats('NUT_CHLA') %>%
+                                                     mutate(NUT_CHLA_STAT = NA)) %>% # don't show a real assessment decision) %>%
+                                               left_join(dplyr::select(stationTable(), STATION_ID, COMMENTS),
+                                                         by = 'STATION_ID') %>%
+                                               dplyr::select(-ends_with(c('exceedanceRate','Assessment Decision', 'VERBOSE', 'StationID', "PWSinfo",
+                                                                          'BACTERIADECISION', 'BACTERIASTATS')))) %>%
+      filter(!is.na(STATION_ID))
   })
 
   # Display marked up station table row for each site
@@ -607,47 +600,55 @@ observe({
   ## Water Intake proximity flag for station
   output$intakeProximityFlag <- renderUI({req(stationData())
     if(unique(stationData()$FDT_STA_ID) %in% intakeSites$FDT_STA_ID){
-      wellPanel(h5(strong('This station is within 100 meters of a drinking water intake. Please review whether the station
+      wellPanel(h4(strong('This station is within 100 meters of a drinking water intake. Please review whether the station
                 should be assessed for secondary human health criteria.', style = "color:red")) ) }    })
 
 
+  
+  ### Flag for stations that don't have data in conventionals
+  output$nonConventionalsStationFlag <- renderUI({req(stationData())
+    if(unique(stationData()$FDT_STA_ID) %in% extraSites$FDT_STA_ID){
+      wellPanel(h4(strong('This station is does not have any data in the conventionals dataset. Proceed to the Metals Data and Toxics Data tabs
+                          to investigate data from other sources that were collected at this station.', style = "color:red")) ) }    })
+  
+  
 
-  #### Data Sub Tab ####---------------------------------------------------------------------------------------------------
+#### Data Sub Tab ####---------------------------------------------------------------------------------------------------
 
-  # Display Data
-  output$AURawData <- DT::renderDataTable({ req(AUData())
-    DT::datatable(AUData(), extensions = 'Buttons', escape=F, rownames = F,
-                  options= list(scrollX = TRUE, pageLength = nrow(AUData()), scrollY = "300px",
-                                dom='Btf', buttons=list('copy',
-                                                        list(extend='csv',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')),
-                                                        list(extend='excel',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')))),
-                  selection = 'none')})
-  # Summarize data
-  output$stationDataTableRecords <- renderText({req(AUData())
-    paste(nrow(AUData()), 'records were retrieved for',as.character(input$AUselection),sep=' ')})
-  output$uniqueStationDataTableRecords <- renderTable({req(AUData())
-    AUData() %>%
-      group_by(FDT_STA_ID) %>%
-      count() %>% dplyr::rename('Number of Records'='n') })
-  output$stationDataTableAssessmentWindow <- renderText({req(AUData())
-    withinAssessmentPeriod(AUData())})
-
-
-  # Need this as a reactive to regenerate below modules when user changes station
-  stationSelected <- reactive({input$stationSelection})
+# Display Data
+output$AURawData <- DT::renderDataTable({ req(AUData())
+  DT::datatable(AUData(), extensions = 'Buttons', escape=F, rownames = F,
+                options= list(scrollX = TRUE, pageLength = nrow(AUData()), scrollY = "300px",
+                              dom='Btf', buttons=list('copy',
+                                                      list(extend='csv',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')),
+                                                      list(extend='excel',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')))),
+                selection = 'none')})
+# Summarize data
+output$stationDataTableRecords <- renderText({req(AUData())
+  paste(nrow(AUData()), 'records were retrieved for',as.character(input$AUselection),sep=' ')})
+output$uniqueStationDataTableRecords <- renderTable({req(AUData())
+  AUData() %>%
+    group_by(FDT_STA_ID) %>%
+    count() %>% dplyr::rename('Number of Records'='n') })
+# output$stationDataTableAssessmentWindow <- renderText({req(AUData())
+#   withinAssessmentPeriod(AUData())})
 
 
-  ## Temperature Sub Tab ##------------------------------------------------------------------------------------------------------
-  callModule(temperaturePlotlySingleStation, 'temperature', AUData, stationSelected, reactive(assessmentWindowLowFlows))
+# Need this as a reactive to regenerate below modules when user changes station
+stationSelected <- reactive({input$stationSelection})
 
-  ## pH Sub Tab ##------------------------------------------------------------------------------------------------------
-  callModule(pHPlotlySingleStation,'pH', AUData, stationSelected, reactive(assessmentWindowLowFlows))
 
-  ## DO Sub Tab ##------------------------------------------------------------------------------------------------------
-  callModule(DOPlotlySingleStation,'DO', AUData, stationSelected, reactive(assessmentWindowLowFlows))
+## Temperature Sub Tab ##------------------------------------------------------------------------------------------------------
+callModule(temperaturePlotlySingleStation, 'temperature', AUData, stationSelected, reactive(assessmentWindowLowFlows))
 
-  ## Specific Conductivity Sub Tab ##------------------------------------------------------------------------------------------------------
-  callModule(SpCondPlotlySingleStation,'SpCond', AUData, stationSelected)
+## pH Sub Tab ##------------------------------------------------------------------------------------------------------
+callModule(pHPlotlySingleStation,'pH', AUData, stationSelected, reactive(assessmentWindowLowFlows))
+
+## DO Sub Tab ##------------------------------------------------------------------------------------------------------
+callModule(DOPlotlySingleStation,'DO', AUData, stationSelected, reactive(assessmentWindowLowFlows))
+
+## Specific Conductivity Sub Tab ##------------------------------------------------------------------------------------------------------
+callModule(SpCondPlotlySingleStation,'SpCond', AUData, stationSelected)
 
   ## Salinity Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(salinityPlotlySingleStation,'salinity', AUData, stationSelected)
@@ -686,100 +687,100 @@ observe({
   callModule(DSulfatePlotlySingleStation,'DSulfate', AUData, stationSelected)
 
 
-  # Other Data Sources
+# Other Data Sources
 
-  #### Benthics Sub Tab ####---------------------------------------------------------------------------------------------------
-  callModule(BenthicsPlotlySingleStation,'Benthics', AUData, stationSelected, VSCIresults, VCPMI63results, VCPMI65results)
+#### Benthics Sub Tab ####---------------------------------------------------------------------------------------------------
+callModule(BenthicsPlotlySingleStation,'Benthics', AUData, stationSelected, VSCIresults, VCPMI63results, VCPMI65results)
 
-  # Bioassessment Tab- This is included at this level because couldn't figure the download piece out inside a module
-  # empty reactive objects list
-  reactive_objects = reactiveValues()
+# Bioassessment Tab- This is included at this level because couldn't figure the download piece out inside a module
+# empty reactive objects list
+reactive_objects = reactiveValues()
 
-  assessmentDecision_UserSelection <- reactive({req(pinnedDecisions)
-    filter(pinnedDecisions, StationID %in% input$stationSelection) %>%
-      filter(IRYear == assessmentCycle) })  # only show information from current cycle here
+assessmentDecision_UserSelection <- reactive({req(pinnedDecisions)
+  filter(pinnedDecisions, StationID %in% input$stationSelection) %>%
+    filter(IRYear == assessmentCycle) })  # only show information from current cycle here
 
-  # Bioassesment information from current cycle
-  output$bioassessmentInfo <- DT::renderDataTable({req(nrow(assessmentDecision_UserSelection())> 0)
-    DT::datatable(assessmentDecision_UserSelection(),  escape=F, rownames = F,
-                  options= list(dom= 't' , pageLength = nrow(assessmentDecision_UserSelection()),scrollX = TRUE, scrollY = "250px"),
-                  selection = 'none')})
+# Bioassesment information from current cycle
+output$bioassessmentInfo <- DT::renderDataTable({req(nrow(assessmentDecision_UserSelection())> 0)
+  DT::datatable(assessmentDecision_UserSelection(),  escape=F, rownames = F,
+                options= list(dom= 't' , pageLength = nrow(assessmentDecision_UserSelection()),scrollX = TRUE, scrollY = "250px"),
+                selection = 'none')})
 
-  observe({req(nrow(assessmentDecision_UserSelection())> 0)
-    reactive_objects$SCI_UserSelection <- filter(VSCIresults, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VSCI')$StationID) %>%
-      bind_rows(
-        filter(VCPMI63results, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VCPMI63 + Chowan')$StationID)  ) %>%
-      bind_rows(
-        filter(VCPMI65results, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VCPMI65 - Chowan')$StationID)  ) %>%
-      # only Current IR data
-      filter(between(`Collection Date`,assessmentPeriod[1], assessmentPeriod[2])) %>% # limit data to assessment window
-      # only use family level rarified data
-      filter(`Target Count` == 110) %>%
-      filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
-      filter(Gradient != "Boatable") %>%  # don't assess where no SCI not validated
-      # add back in description information
-      left_join(filter(benSamps, StationID %in% input$stationSelection) %>%
-                  dplyr::select(StationID, Sta_Desc, BenSampID,US_L3CODE, US_L3NAME, HUC_12, VAHU6, Basin, Basin_Code),
-                by = c('StationID', 'BenSampID')) %>%
-      dplyr::select(StationID, Sta_Desc, BenSampID, `Collection Date`, RepNum, everything())
+observe({req(nrow(assessmentDecision_UserSelection())> 0)
+  reactive_objects$SCI_UserSelection <- filter(VSCIresults, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VSCI')$StationID) %>%
+    bind_rows(
+      filter(VCPMI63results, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VCPMI63 + Chowan')$StationID)  ) %>%
+    bind_rows(
+      filter(VCPMI65results, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VCPMI65 - Chowan')$StationID)  ) %>%
+    # only Current IR data
+    filter(between(`Collection Date`,assessmentPeriod[1], assessmentPeriod[2])) %>% # limit data to assessment window
+    # only use family level rarified data
+    filter(`Target Count` == 110) %>%
+    filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
+    filter(Gradient != "Boatable") %>%  # don't assess where no SCI not validated
+    # add back in description information
+    left_join(filter(benSamps, StationID %in% input$stationSelection) %>%
+                dplyr::select(StationID, Sta_Desc, BenSampID,US_L3CODE, US_L3NAME, HUC_12, VAHU6, Basin, Basin_Code),
+              by = c('StationID', 'BenSampID')) %>%
+    dplyr::select(StationID, Sta_Desc, BenSampID, `Collection Date`, RepNum, everything())
 
-    reactive_objects$benSampsFilter <- filter(benSamps, BenSampID %in% reactive_objects$SCI_UserSelection$BenSampID)
+  reactive_objects$benSampsFilter <- filter(benSamps, BenSampID %in% reactive_objects$SCI_UserSelection$BenSampID)
 
-    reactive_objects$habitatUserSelection <- habitatConsolidation( input$stationSelection, habSamps, habValues)  })
-
-
-  # have to make separate reactive object in order to send appropriate station name to the download title
-  fileNameForReport <- reactive({paste("IR",assessmentCycle," ", as.character(unique(input$stationSelection))," Benthic Assessment Fact Sheet.html", sep = "")})
+  reactive_objects$habitatUserSelection <- habitatConsolidation( input$stationSelection, habSamps, habValues)  })
 
 
-  output$downloadReport_ <- renderUI({req(nrow(assessmentDecision_UserSelection())> 0)
-    list(helpText('If you would like to download a copy of the Bioassessment Fact Sheet for the selected station,
-                  click the Generate Report button below.'),
-         downloadButton('downloadReport', 'Generate Report'))})
-
-  output$downloadReport <- downloadHandler(
-    filename = fileNameForReport,
-    content= function(file){
-      tempReport <- normalizePath('bioassessmentFactSheet.Rmd')
-      imageToSend1 <- normalizePath('images/riskCategories.PNG') #NEW
-      imageToSend2 <- normalizePath('images/HabitatColor.jpg') #NEW
-
-      owd <- setwd(tempdir())
-      on.exit(setwd(owd))
-
-      file.copy(tempReport, 'bioassessmentFactSheet.Rmd')
-      file.copy(imageToSend1, 'images/riskCategories.PNG') #NEW
-      file.copy(imageToSend2, 'images/HabitatColor.jpg') #NEW
-
-      params <- list(assessmentDecision =  assessmentDecision_UserSelection(),
-                     SCI = reactive_objects$SCI_UserSelection,
-                     benSampsFilter = reactive_objects$benSampsFilter,
-                     habitat = reactive_objects$habitatUserSelection,
-                     assessmentCycle = assessmentCycle)
-
-      rmarkdown::render(tempReport,output_file = file,
-                        params=params,envir=new.env(parent = globalenv()))})
+# have to make separate reactive object in order to send appropriate station name to the download title
+fileNameForReport <- reactive({paste("IR",assessmentCycle," ", as.character(unique(input$stationSelection))," Benthic Assessment Fact Sheet.html", sep = "")})
 
 
+output$downloadReport_ <- renderUI({req(nrow(assessmentDecision_UserSelection())> 0)
+  list(helpText('If you would like to download a copy of the Bioassessment Fact Sheet for the selected station,
+                click the Generate Report button below.'),
+       downloadButton('downloadReport', 'Generate Report'))})
 
-  # Bioassesment information from previous cycles
-  output$historicalBioassessmentInfo <- DT::renderDataTable({req(pinnedDecisions)
-    z <- filter(pinnedDecisions, StationID %in% input$stationSelection)   %>%  # only show information from not current cycle here
-      filter(IRYear != assessmentCycle) %>%
-      arrange(IRYear)
-    DT::datatable(z,  escape=F, rownames = F,
-                  options= list(dom= 't' , pageLength = nrow(assessmentDecision_UserSelection()),scrollX = TRUE, scrollY = "250px"),
-                  selection = 'none')})
+output$downloadReport <- downloadHandler(
+  filename = fileNameForReport,
+  content= function(file){
+    tempReport <- normalizePath('bioassessmentFactSheet.Rmd')
+    imageToSend1 <- normalizePath('images/riskCategories.PNG') #NEW
+    imageToSend2 <- normalizePath('images/HabitatColor.jpg') #NEW
+
+    owd <- setwd(tempdir())
+    on.exit(setwd(owd))
+
+    file.copy(tempReport, 'bioassessmentFactSheet.Rmd')
+    file.copy(imageToSend1, 'images/riskCategories.PNG') #NEW
+    file.copy(imageToSend2, 'images/HabitatColor.jpg') #NEW
+
+    params <- list(assessmentDecision =  assessmentDecision_UserSelection(),
+                   SCI = reactive_objects$SCI_UserSelection,
+                   benSampsFilter = reactive_objects$benSampsFilter,
+                   habitat = reactive_objects$habitatUserSelection,
+                   assessmentCycle = assessmentCycle)
+
+    rmarkdown::render(tempReport,output_file = file,
+                      params=params,envir=new.env(parent = globalenv()))})
 
 
 
+# Bioassesment information from previous cycles
+output$historicalBioassessmentInfo <- DT::renderDataTable({req(pinnedDecisions)
+  z <- filter(pinnedDecisions, StationID %in% input$stationSelection)   %>%  # only show information from not current cycle here
+    filter(IRYear != assessmentCycle) %>%
+    arrange(IRYear)
+  DT::datatable(z,  escape=F, rownames = F,
+                options= list(dom= 't' , pageLength = nrow(assessmentDecision_UserSelection()),scrollX = TRUE, scrollY = "250px"),
+                selection = 'none')})
 
 
-  ### Metals Sub Tab ####---------------------------------------------------------------------------------------------------
-  callModule(metalsTableSingleStation,'metals', AUData,  WCmetals, WCmetalsAnalyzed, Smetals, 
-             fishMetals, fishMetalsScreeningValues, stationSelected, staticLimit)
 
- ### Toxics Sub Tab ####---------------------------------------------------------------------------------------------------
- callModule(toxicsSingleStation,'PBC',  AUData,  stationData, waterToxics, WCmetalsStationPWS,  reactive(intakeSites), markPCB, fishPCB, stationSelected)
+
+
+### Metals Sub Tab ####---------------------------------------------------------------------------------------------------
+callModule(metalsTableSingleStation,'metals', AUData,  WCmetals, WCmetalsAnalyzed, Smetals,
+           fishMetals, fishMetalsScreeningValues, stationSelected, staticLimit)
+
+### Toxics Sub Tab ####---------------------------------------------------------------------------------------------------
+callModule(toxicsSingleStation,'PBC',  AUData,  stationData, waterToxics, WCmetalsStationPWS,  reactive(intakeSites), markPCB, fishPCB, stationSelected)
 
 })

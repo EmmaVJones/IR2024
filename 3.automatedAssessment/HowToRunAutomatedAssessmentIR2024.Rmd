@@ -103,7 +103,8 @@ This information communicates to the scripts which stations should be assessed a
 **To Note: The AU assignments in this table are valid as of the start of the assessment process. For any AU splits/reassignments, the assessors control that through local (.csv) copies of the output of this script that is uploaded to the relevant Assessment Application on the Connect Server (and subsequently uploaded to CEDS via the bulk data upload tool).**
 
 ```{r stationTable, echo = FALSE}
-stationTable <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect') # pinned in 2.organizeMetadata with FT and PCB site fixes
+stationTable <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect') %>% # pinned in 2.organizeMetadata with FT and PCB site fixes
+  distinct(STATION_ID, .keep_all = T)
 ```
 
 ## Bring in Station Table Bulk Upload Template
@@ -357,6 +358,9 @@ for(i in 1:nrow(stationTable)){
   # Previous station table comments
   comments <- stationTableComments(stationTable$STATION_ID[i], stationsTable2022, '2022', stationsTable2020, '2020')
   
+  # level Comment
+  levelComment <- levelCommentAnalysis(stationData)
+  
   # Date last sampled
   if(nrow(stationData) > 0){
     dateLastSampled <- as.character(max(stationData$FDT_DATE_TIME)) } else {dateLastSampled <- 'No data in conventionals data pull'}
@@ -433,16 +437,24 @@ for(i in 1:nrow(stationTable)){
    
   # If data exists for station, run it, otherwise just output what last cycle said and comment
   if(any(nrow(stationData) > 0 | stationTable$STATION_ID[i] %in% extraSites$FDT_STA_ID)){
-    # Nutrients based on station type
     
     # skip this for extraSites
     if(stationTable$STATION_ID[i] %in% extraSites$FDT_STA_ID){
+      
       TP <- countNutrients(stationData, PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, NA) %>% quickStats('NUT_TP') %>% 
           mutate(NUT_TP_STAT = ifelse(NUT_TP_STAT != "S", "Review", NA))
       chla <- countNutrients(stationData, CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA) %>% quickStats('NUT_CHLA') %>%
           mutate(NUT_CHLA_STAT = NA)
       DO_Daily_Avg_STAT <- "DO_Daily_Avg_STAT: NA"
+      
+      # make new stationData with just the info we need for stations table data organization
+      stationData <- bind_rows(stationData, 
+                               filter(stationTable, STATION_ID == stationTable$STATION_ID[i]) %>% 
+                                 mutate(FDT_STA_ID = STATION_ID,
+                                        lakeStation = ifelse(stationTable$STATION_ID[i] %in% lakeStations$STATION_ID, TRUE, FALSE))) 
+
     } else{
+      # Nutrients based on station type
       # Nutrient: TP (lakes have real standards; riverine no longer uses 0.2 mg/L as an observed effect for Aquatic life use)
     if(unique(stationData$lakeStation) == TRUE){
       TP <- TP_Assessment(stationData) 
@@ -513,18 +525,11 @@ for(i in 1:nrow(stationTable)){
       TP,
       chla) %>%
     
-      # # Nutrient: TP (lakes have real standards; riverine no longer uses 0.2 mg/L as an observed effect for Aquatic life use)
-      # # NUT_TP_EXC, NUT_TP_SAMP, NUT_TP_STAT
-      # countNutrients(stationData, PHOSPHORUS_mg_L, LEVEL_PHOSPHORUS, NA) %>% quickStats('NUT_TP') %>% 
-      #   mutate(NUT_TP_STAT = ifelse(NUT_TP_STAT != "S", "Review", NA)), # flag OE but don't show a real assessment decision
-      # 
-      # # Nutrients: Chl a (lakes)
-      # #NUT_CHLA_EXC, NUT_CHLA_SAMP, NUT_CHLA_STAT
-      # countNutrients(stationData, CHLOROPHYLL_A_ug_L, LEVEL_CHLOROPHYLL_A, NA) %>% quickStats('NUT_CHLA') %>%
-      #   mutate(NUT_CHLA_STAT = NA)) %>% # don't show a real assessment decision
     
       # COMMENTS
-      mutate(COMMENTS = paste0(DO_Daily_Avg_STAT,  WAT_MET_COMMENT) ) %>% 
+      mutate(COMMENTS = ifelse( !is.na(levelComment), #don't paste NA in front of other comments
+                                paste(c(levelComment, DO_Daily_Avg_STAT, paste0('Water Column Metals Comment:', WAT_MET_COMMENT)), collapse  = ' | '),
+                                paste(c(DO_Daily_Avg_STAT, paste0('Water Column Metals Comment:', WAT_MET_COMMENT)), collapse = ' | ') )) %>%  
       left_join(comments, by = 'STATION_ID') %>%
       left_join(lowFlowSummary, by = 'STATION_ID') %>%
       dplyr::select(-ends_with(c('exceedanceRate', 'VERBOSE', 'Assessment Decision', 'StationID', 'WAT_MET_COMMENT'))) %>%  # to match Bulk Upload template but helpful to keep visible til now for testing

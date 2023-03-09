@@ -27,6 +27,8 @@ lastUpdated <- as.Date(file.info('userDataToUpload/stationTableResults.csv')$mti
 historicalStationsTable <- readRDS('data/stationsTable2022.RDS')# last cycle stations table (forced into new station table format)
 historicalStationsTable2 <- readRDS('data/stationsTable2020.RDS') # two cycle ago stations table
 intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
+extraSites <- readRDS('data/extraSites.RDS')
+
 
 
 WCmetals <- pin_get("WCmetalsIR2024",  board = "rsconnect")#pin_get("WCmetalsIR2024",  board = "rsconnect")
@@ -135,8 +137,8 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
 ## Watershed selection Tab
 # side panel arguments
 DEQregionSelection <- "BRRO"#"NRO"#"NRO"#"VRO"#"PRO"#"NRO"#'BRRO'#"PRO"#'BRRO'
-basinSelection <- 'Roanoke'#"James-Upper"#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
-HUC6Selection <- "RU13"#"JU21"#"JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+basinSelection <- "James-Middle"#"New"#'Roanoke'#"James-Upper"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
+HUC6Selection <- "JM20"#"NE46"#"RU13"#"JU21"#"JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
 
 # pull together data based on user input on side panel
 # Pull AU data from server
@@ -153,6 +155,13 @@ huc6_filter <- filter(basin_filter, VAHU6 %in% HUC6Selection)
 AUs <- suppressWarnings(st_intersection(regionalAUs,  huc6_filter)) 
 
 ### ------- Just for testing, skip front matter and jump to picking station for module testing---------------------------------------------------------
+
+# first find any sites in VAHU6 and waterbody type that may not have data in conventionals
+missingExtraSites <- filter(stationTable, VAHU6 %in% huc6_filter$VAHU6) %>% 
+  filter(STATION_ID %in% extraSites$FDT_STA_ID) %>% 
+  rename('FDT_STA_ID' = 'STATION_ID') %>% 
+  dplyr::select(FDT_STA_ID:VAHU6,  WQS_ID:lakeStation) 
+
 # Pull Conventionals data for selected AU on click
 conventionals_HUC <- filter(conventionals, Huc6_Vahu6 %in% huc6_filter$VAHU6) %>%
   left_join(dplyr::select(stationTable, STATION_ID:VAHU6,lakeStation,
@@ -160,7 +169,11 @@ conventionals_HUC <- filter(conventionals, Huc6_Vahu6 %in% huc6_filter$VAHU6) %>
             by = c('FDT_STA_ID' = 'STATION_ID')) %>%
   filter(!is.na(ID305B_1)) %>%
   pHSpecialStandardsCorrection() %>% #correct pH to special standards where necessary
-  temperatureSpecialStandardsCorrection()  # correct temperature special standards where necessary
+  temperatureSpecialStandardsCorrection() %>%   # correct temperature special standards where necessary
+  bind_rows(missingExtraSites)
+
+
+  
 
 carryoverStations <- filter(stationTable, VAHU6 %in% huc6_filter$VAHU6 & str_detect(COMMENTS, "This station has no data"))
 
@@ -180,7 +193,7 @@ AUselectionOptions <- unique(c(conventionals_HUC$ID305B_1,
 AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))] # double check nothing wonky in there before proceeding
 
 # user selection
-AUselection <- AUselectionOptions[1]# "VAN-A15R_ACO02A00"#"VAW-I04R_JKS03A00"##"VAV-B05R_BAR03A10"#"VAP-J17R_SFT01B98"#AUselectionOptions[1]#"VAN-A27R_AUA01A00"#
+AUselection <- AUselectionOptions[2]# "VAN-A15R_ACO02A00"#"VAW-I04R_JKS03A00"##"VAV-B05R_BAR03A10"#"VAP-J17R_SFT01B98"#AUselectionOptions[1]#"VAN-A27R_AUA01A00"#
 
 # Allow user to select from available stations in chosen AU to investigate further
 stationSelection_ <- filter(conventionals_HUC, ID305B_1 %in% AUselection | ID305B_2 %in% AUselection | 
@@ -296,14 +309,20 @@ DT::datatable(huc6_filter %>% st_set_geometry(NULL) %>% select(VAHU6, VaName, Ba
             rownames = FALSE, options= list(pageLength = 1, scrollY = "35px", dom='t'),
             selection = 'none')
 
+missingExtraSites <- filter(stationTable, VAHU6 %in% huc6_filter$VAHU6) %>% 
+  filter(STATION_ID %in% extraSites$FDT_STA_ID) %>% 
+  rename('FDT_STA_ID' = 'STATION_ID') %>% 
+  dplyr::select(FDT_STA_ID:VAHU6,  WQS_ID:lakeStation) 
+
 # Pull Conventionals data for selected AU on click
 conventionals_HUC <- filter(conventionals, Huc6_Vahu6 %in% huc6_filter$VAHU6) %>%
-    left_join(dplyr::select(stationTable, STATION_ID:VAHU6,lakeStation,
-                            WQS_ID:EPA_ECO_US_L3NAME),
-              by = c('FDT_STA_ID' = 'STATION_ID')) %>%
-    filter(!is.na(ID305B_1)) %>%
-    pHSpecialStandardsCorrection() %>% #correct pH to special standards where necessary
-    temperatureSpecialStandardsCorrection()  # correct temperature special standards where necessary
+  left_join(dplyr::select(stationTable, STATION_ID:VAHU6,lakeStation,
+                          WQS_ID:EPA_ECO_US_L3NAME),
+            by = c('FDT_STA_ID' = 'STATION_ID')) %>%
+  filter(!is.na(ID305B_1)) %>%
+  pHSpecialStandardsCorrection() %>% #correct pH to special standards where necessary
+  temperatureSpecialStandardsCorrection() %>%   # correct temperature special standards where necessary
+  bind_rows(missingExtraSites)
 
 
 # Allow user to select from available AUs to investigate further
@@ -470,6 +489,18 @@ WCmetalsStationPWS <- left_join(dplyr::select(stationData, FDT_STA_ID, PWS) %>% 
                               PWSinfo = list(PWSconcat))}# add in PWS information so you don't need to run this analysis again
 
 waterToxics <- WCtoxics
+
+
+# # adjustment for sites with no data in conventionals
+# if(input$stationSelection %in% extraSites$FDT_STA_ID){
+#   stationData <- bind_rows(stationData(), 
+#                            filter(stationTable(), STATION_ID == input$stationSelection) %>% 
+#                              mutate(FDT_STA_ID = STATION_ID,
+#                                     lakeStation = ifelse(input$stationSelection %in% lakeStations$STATION_ID, TRUE, FALSE)))
+# }else{
+#   stationData <- stationData()
+# }
+
 
 # Create station table row for each site
 stationTableOutput <- bind_rows(stationsTemplate,

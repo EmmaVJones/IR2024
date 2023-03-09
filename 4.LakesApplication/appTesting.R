@@ -20,6 +20,7 @@ lastUpdated <- as.Date(file.info('userDataToUpload/stationTableResults.csv')$mti
 historicalStationsTable <- readRDS('data/stationsTable2022.RDS')# last cycle stations table (forced into new station table format)
 historicalStationsTable2 <- readRDS('data/stationsTable2020.RDS') # two cycle ago stations table
 intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
+extraSites <- readRDS('data/extraSites.RDS')
 
 WCmetals <- pin_get("WCmetalsIR2024",  board = "rsconnect")#pin_get("WCmetalsIR2024",  board = "rsconnect") 
 WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") # this is included in local data above
@@ -145,7 +146,7 @@ lakeSelection_ <- regionalAUs %>%
   distinct(Lake_Name) %>% 
   arrange(Lake_Name) %>% 
   pull()
-lakeSelection <-  "Banister Lake"#"Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
+lakeSelection <-  "Claytor Lake"#"Banister Lake"#"Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
 
 AUs <- filter(regionalAUs, Lake_Name %in% lakeSelection & ASSESS_REG %in% DEQregionSelection)
 lake_filter <- filter_at(stationTable, vars(starts_with('ID305B')), any_vars(. %in% AUs$ID305B)) 
@@ -156,6 +157,15 @@ lakeStations <- lake_filter %>%
 
 
 ### ------- Just for testing, skip front matter and jump to picking station for module testing---------------------------------------------------------
+
+# first find any sites in VAHU6 and waterbody type that may not have data in conventionals
+missingExtraSites <- filter(stationTable, STATION_ID %in% lake_filter$STATION_ID) %>% 
+  filter(STATION_ID %in% extraSites$FDT_STA_ID) %>% 
+  rename('FDT_STA_ID' = 'STATION_ID') %>% 
+  dplyr::select(FDT_STA_ID:VAHU6, WQS_ID:lakeStation) 
+
+
+
 # Pull Conventionals data for selected lake on click
 conventionalsLake <- filter(conventionals, FDT_STA_ID %in% lake_filter$STATION_ID) %>%
   left_join(dplyr::select(stationTable, STATION_ID:VAHU6, lakeStation,
@@ -166,7 +176,8 @@ conventionalsLake <- filter(conventionals, FDT_STA_ID %in% lake_filter$STATION_I
   # Special Standards Correction step. This is done on the actual data bc some special standards have temporal components
   pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
   temperatureSpecialStandardsCorrection() %>% # correct temperature special standards where necessary
-  thermoclineDepth()  # adds thermocline information and SampleDate
+  thermoclineDepth() %>%   # adds thermocline information and SampleDate
+  bind_rows(missingExtraSites)
 
 
 # Allow user to select from available AUs to investigate further
@@ -176,14 +187,14 @@ AUselectionOptions <- unique(dplyr::select(lake_filter, ID305B_1:ID305B_10) %>%
                                pull(keep) )
 AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))]
 
-inputAUselection <- AUselectionOptions[1]
+inputAUselection <- AUselectionOptions[9]
 AUselection <- filter(regionalAUs, ID305B %in% inputAUselection) %>% st_set_geometry(NULL) %>% as.data.frame()
 
 
 # Allow user to select from available stations in chosen AU to investigate further
 stationSelectionOptions <- filter_at(lake_filter, vars(starts_with("ID305B")), any_vars(. %in% inputAUselection)) %>%
   distinct(STATION_ID) %>% arrange(STATION_ID) %>%  pull()
-stationSelection <- stationSelectionOptions[1]
+stationSelection <- stationSelectionOptions[2]
 
 # Pull conventionals data for just selected AU
 AUData <- filter_at(conventionalsLake, vars(starts_with("ID305B")), any_vars(. %in% inputAUselection) ) 
@@ -259,6 +270,14 @@ z <- dplyr::select(lake_filter, Lake_Name, VAHU6, Lakes_187B) %>%
     summarise(VAHU6 = toString(sort(unique(VAHU6))),
               `Section 187` = toString(sort(unique(Lakes_187B))))
 datatable(z, rownames = FALSE, options= list(pageLength = 1, scrollY = "35px", dom='t'), selection = 'none')
+
+
+# first find any sites in VAHU6 and waterbody type that may not have data in conventionals
+missingExtraSites <- filter(stationTable, STATION_ID %in% lake_filter$STATION_ID) %>% 
+  filter(STATION_ID %in% extraSites$FDT_STA_ID) %>% 
+  rename('FDT_STA_ID' = 'STATION_ID') %>% 
+  dplyr::select(FDT_STA_ID:VAHU6, WQS_ID:lakeStation) 
+
 
 # Pull Conventionals data for selected lake on click
 conventionalsLake <- filter(conventionals, FDT_STA_ID %in% lake_filter$STATION_ID) %>%
@@ -374,7 +393,7 @@ ammoniaAnalysisStation <- z$AmmoniaAnalysis
 
 
 
-WCmetalsStationAnalysisStation <- filter(WCmetalsAnalyzed, StationID %in% unique(stationData()$FDT_STA_ID)) %>%
+WCmetalsStationAnalysisStation <- filter(WCmetalsAnalyzed, StationID %in% unique(stationData$FDT_STA_ID)) %>%
     map(1)  
 
 # for PWS WCmetals

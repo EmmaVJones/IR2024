@@ -482,7 +482,8 @@ stationsToDo <- filter(conventionals_distinct, ! FDT_STA_ID %in% stationsTable20
 
 # use the same method from above with a new station list
 stations <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
-  filter(WSD_STATION_ID %in% !! stationsToDo$FDT_STA_ID) %>% # pull all data from stations identified above
+  filter(STA_NAME %in% !! stationsToDo$FDT_STA_ID) %>% # pull all data from stations identified above, 
+  # Important: use STA_NAME and not WSD_STATION_ID bc you will lose all citmon/non agency using WSD_STATION_ID!!!
   as_tibble() %>% # get that data local before doing more complicated things than SQL wants to handle
   # keep only the most recent record for each station by grouping and then filtering
   group_by(WSD_STATION_ID) %>% 
@@ -559,7 +560,10 @@ stationsAU <- left_join(stations, AU, by = c('WXA_STATION_DETAIL_ID' = 'Station 
 
 # Smash in with the rest of the sites already organized
 stationsTable2024begin <- bind_rows(stationsTable2024begin,
-                                    stationsAU) 
+                                    stationsAU) %>% 
+  distinct(STATION_ID, .keep_all = T)
+
+#stationsTable2024begin %>% group_by(STATION_ID) %>% mutate(n = n()) %>% dplyr::select(n, everything()) %>% View()
 
 # clean up workspace
 rm(list = c('stations', 'stationDetails', 'stationsAU',
@@ -601,7 +605,10 @@ stationsLeft <- st_join(stationsToDo, vahu6) %>%
   st_join(dcr11) %>% 
   dplyr::select(STATION_ID:REGION, WATERSHED = ANCODE) %>% 
   st_drop_geometry() %>% # turn back into tibble
-  left_join(dplyr::select(AUlookup, FDT_STA_ID, ID305B_1 ), by = c('STATION_ID' = 'FDT_STA_ID')) # join in AU info from the pinned AUlookup dataset (populated by assessors in metadata attribution app)
+  left_join(dplyr::select(AUlookup, FDT_STA_ID, ID305B_1 ), by = c('STATION_ID' = 'FDT_STA_ID')) %>% # join in AU info from the pinned AUlookup dataset (populated by assessors in metadata attribution app)
+  distinct(STATION_ID, .keep_all = T)
+
+#stationsLeft %>% group_by(STATION_ID) %>% mutate(n = n()) %>% dplyr::select(n, everything()) %>% View()
 
 # smash into template
 stationsTable2024begin <- bind_rows(stationsTable2024begin,
@@ -615,7 +622,8 @@ rm(list = c('stationsLeft', 'stationsToDo', 'stationsTemplate',
 Now let's pin this to the R server so others can use the data.
 
 ```{r}
-pin(stationsTable2024begin, description = 'stationsTable2024begin for IR2024 development', board = 'rsconnect')
+pin(stationsTable2024begin, name = 'ejones/stationsTable2024begin',
+    description = 'stationsTable2024begin for IR2024 development', board = 'rsconnect')
 ```
 
 ### Pull Final Stations table from last cycle for application

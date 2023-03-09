@@ -1643,3 +1643,24 @@ lowFlowFlagColumn <- function(stationData){
 #lowFlowFlagColumn(stationData)
 
 
+
+
+# Function to analyze levels for stations and output a comment if data is only level I or level II
+levelCommentAnalysis <- function(stationData){
+  # organize levels available in dataset
+  levelSummary <- dplyr::select(stationData, FDT_STA_ID, contains('LEVEL')) %>% 
+    pivot_longer(-FDT_STA_ID, names_to = 'Parameter', values_to = 'Value') %>% 
+    filter(!is.na(Value)) 
+  
+  # comment for all level II data
+  if(length(unique(levelSummary$Value)) == 1 && unique(levelSummary$Value) %in% c('Level II')){
+    levelComment = 'Station contains all Level II data'
+  }else{
+    # comment for all Level I and level II data
+    if(length(unique(levelSummary$Value)) == 2 && all(unique(levelSummary$Value) %in% c("Level I",'Level II'))){
+      levelComment = 'Station contains all Level I and Level II data'
+      # comment for everything else
+    }else{levelComment = NA} }
+  return(levelComment)
+}
+#levelCommentAnalysis(stationData)

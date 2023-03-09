@@ -17,6 +17,7 @@ lastUpdated <- as.Date(file.info('userDataToUpload/stationTableResults.csv')$mti
 historicalStationsTable <- readRDS('data/stationsTable2022.RDS')# last cycle stations table (forced into new station table format)
 historicalStationsTable2 <- readRDS('data/stationsTable2020.RDS') # two cycle ago stations table
 intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
+extraSites <- readRDS('data/extraSites.RDS')
 
 WCmetals <- pin_get("WCmetalsIR2024",  board = "rsconnect")#pin_get("WCmetalsIR2024",  board = "rsconnect") 
 WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") # this is included in local data above
@@ -245,6 +246,13 @@ shinyServer(function(input, output, session) {
 
   # Pull Conventionals data for selected lake on click
   conventionalsLake <- reactive({ req(lake_filter())
+    
+    # first find any sites in VAHU6 and waterbody type that may not have data in conventionals
+    missingExtraSites <- filter(stationTable(),  STATION_ID %in% lake_filter()$STATION_ID) %>% 
+      filter(STATION_ID %in% extraSites$FDT_STA_ID) %>% 
+      rename('FDT_STA_ID' = 'STATION_ID') %>% 
+      dplyr::select(FDT_STA_ID:VAHU6, WQS_ID:lakeStation) 
+    
     filter(conventionals, FDT_STA_ID %in% lake_filter()$STATION_ID) %>%
       left_join(dplyr::select(stationTable(), STATION_ID:VAHU6, lakeStation,
                               WQS_ID:`Total Phosphorus (mg/L)`),
@@ -254,7 +262,8 @@ shinyServer(function(input, output, session) {
       # Special Standards Correction step. This is done on the actual data bc some special standards have temporal components
       pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
       temperatureSpecialStandardsCorrection() %>% # correct temperature special standards where necessary
-      thermoclineDepth() }) # adds thermocline information and SampleDate
+      thermoclineDepth() %>%  # adds thermocline information and SampleDate
+      bind_rows(missingExtraSites) })
 
   # Allow user to select from available AUs to investigate further
   output$AUselection_ <- renderUI({req(lake_filter())
@@ -523,6 +532,11 @@ shinyServer(function(input, output, session) {
       wellPanel(h5(strong('This station is within 100 meters of a drinking water intake. Please review whether the station
                 should be assessed for secondary human health criteria.', style = "color:red")) ) }    })
 
+  ### Flag for stations that don't have data in conventionals
+  output$nonConventionalsStationFlag <- renderUI({req(stationData())
+    if(unique(stationData()$FDT_STA_ID) %in% extraSites$FDT_STA_ID){
+      wellPanel(h4(strong('This station is does not have any data in the conventionals dataset. Proceed to the Metals Data and Toxics Data tabs
+                          to investigate data from other sources that were collected at this station.', style = "color:red")) ) }    })
   
   
   
