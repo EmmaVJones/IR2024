@@ -8,6 +8,8 @@ conventionals <- pin_get('ejones/conventionals2024final_with7Q10flag', board = '
 #pin_get('ejones/conventionals2024draft_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
 vahu6 <- st_as_sf(pin_get("vahu6", board = "rsconnect")) # bring in as sf object
 WQSlookup <- pin_get("WQSlookup-withStandards",  board = "rsconnect")
+citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect") %>% 
+  dplyr::select(StationID, `WQS Section` = SEC, `WQS Class`= CLASS,`WQS Special Standard` = SPSTDS)
 WQMstationFull <- pin_get("WQM-Station-Full", board = "rsconnect")
 stationsTemplate <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect')[0,] %>% 
   mutate(across(matches(c("LATITUDE", "LONGITUDE", "EXC", "SAMP")), as.numeric)) 
@@ -59,19 +61,22 @@ stationTable <- read_csv('userDataToUpload/stationTableResults.csv',
   #fix periods in column names from excel
   as_tibble() %>%
   
-  filter_at(vars(starts_with('TYPE')), any_vars(. == 'L')) %>% # keep only lake stations
-  #      # Citmon addition
-  #      # Special CitMon/Non Agency step until full WQS_ID inplementation in IR2028
-  #      left_join(citmonWQS, by = c('STATION_ID' = 'StationID')) %>% # (1)
+  filter(WATER_TYPE == 'RESERVOIR') %>% # keep only lake stations
+  #filter_at(vars(starts_with('TYPE')), any_vars(. == 'L')) %>% # keep only lake stations
+       
+  
+  # Citmon addition
+  # Special CitMon/Non Agency step until full WQS_ID inplementation in IR2028
+  left_join(citmonWQS, by = c('STATION_ID' = 'StationID')) %>% # (1)
   
   # Join to real WQS_ID's (do this second in case citmon station double listed, want proper WQS_ID if available) (1)
   left_join(WQSlookup, by = c('STATION_ID' = 'StationID')) %>%
   
-  #      # coalesce these similar fields together, taking WQS_ID info before citmon method
-  #      mutate(CLASS = coalesce(CLASS, `WQS Class`),
-  #             SEC = coalesce(SEC, `WQS Section`),
-  #             SPSTDS = coalesce(SPSTDS, `WQS Special Standard`)) %>% 
-  #      dplyr::select(-c(`WQS Section`, `WQS Class`, `WQS Special Standard`)) %>% 
+       # coalesce these similar fields together, taking WQS_ID info before citmon method
+       mutate(CLASS = coalesce(CLASS, `WQS Class`),
+              SEC = coalesce(SEC, `WQS Section`),
+              SPSTDS = coalesce(SPSTDS, `WQS Special Standard`)) %>%
+       dplyr::select(-c(`WQS Section`, `WQS Class`, `WQS Special Standard`)) %>%
   
   # Fix for Class II Tidal Waters in Chesapeake (bc complicated DO/temp/etc standard)
   mutate(CLASS_BASIN = paste(CLASS,substr(BASIN, 1,1), sep="_")) %>%
@@ -146,7 +151,7 @@ lakeSelection_ <- regionalAUs %>%
   distinct(Lake_Name) %>% 
   arrange(Lake_Name) %>% 
   pull()
-lakeSelection <-  "Claytor Lake"#"Banister Lake"#"Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
+lakeSelection <-  "Timber Lake"#"Claytor Lake"#"Banister Lake"#"Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
 
 AUs <- filter(regionalAUs, Lake_Name %in% lakeSelection & ASSESS_REG %in% DEQregionSelection)
 lake_filter <- filter_at(stationTable, vars(starts_with('ID305B')), any_vars(. %in% AUs$ID305B)) 

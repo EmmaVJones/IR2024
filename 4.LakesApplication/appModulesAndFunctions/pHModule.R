@@ -129,6 +129,7 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
                                                paste("pH: ",FDT_FIELD_PH," (unitless)"),
+                                               paste("pH Level: ",LEVEL_FDT_FIELD_PH),
                                                paste("LakeStratification: ",LakeStratification)))%>%
       layout(showlegend=FALSE,
              yaxis=list(title="pH (unitless)"),

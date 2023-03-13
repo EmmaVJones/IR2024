@@ -124,6 +124,7 @@ TPPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
                                                paste("Total Phosphorus: ",PHOSPHORUS_mg_L,"mg/L"),
+                                               paste("Total Phosphorus Level: ",LEVEL_PHOSPHORUS),
                                                paste("LakeStratification: ",LakeStratification)))%>%
       layout(showlegend=FALSE,
              yaxis=list(title="Total Phosphorus (mg/L)"),

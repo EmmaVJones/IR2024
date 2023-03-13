@@ -139,7 +139,8 @@ EcoliPlotlySingleStation <- function(input,output,session, AUdata, stationSelect
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
-                                               paste("E. coli: ",ECOLI,"CFU / 100 mL")))%>%
+                                               paste("E. coli: ",ECOLI,"CFU / 100 mL"),
+                                               paste("E. coli Level: ",LEVEL_ECOLI)))%>%
       add_lines(data=dat, x=~SampleDate,y=~newSTV, mode='line', line = list(color = '#484a4c',dash = 'dot'),
                 hoverinfo = "text", text= "New STV: 410 CFU / 100 mL", name="New STV: 410 CFU / 100 mL") %>%
       add_lines(data=dat, x=~SampleDate,y=~oldSTV, mode='line', line = list(color = 'black'),

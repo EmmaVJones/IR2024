@@ -118,6 +118,7 @@ chlAPlotlySingleStation <- function(input,output,session, AUdata, stationSelecte
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
                                                paste("Chlorophyll a: ",CHLOROPHYLL_A_ug_L,"ug/L"),
+                                               paste("Chlorophyll a Level: ",LEVEL_CHLOROPHYLL_A),
                                                paste("LakeStratification: ",LakeStratification)))%>%
       layout(showlegend=FALSE,
              yaxis=list(title="Chlorophyll a (ug/L)"),

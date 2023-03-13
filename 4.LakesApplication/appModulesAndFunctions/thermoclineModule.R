@@ -90,6 +90,7 @@ thermoclinePlotlySingleStation <- function(input,output,session, AUdata, station
                     color=~LakeStratification, colors=c('#BF382A', '#0C4B8E'),
                     hoverinfo="text",text=~paste(sep="<br>",paste("Depth: ",FDT_DEPTH, "m"),
                                                  paste("Temperature:",FDT_TEMP_CELCIUS,"C"),
+                                                 paste("Temperature Level: ",LEVEL_FDT_TEMP_CELCIUS),
                                                  paste("LakeStratification: ", LakeStratification)))%>%
         layout(xaxis = list(autorange = "reversed",title="Temperature (Celcius)"),
                yaxis = list(autorange = "reversed",title="Depth (m)"),

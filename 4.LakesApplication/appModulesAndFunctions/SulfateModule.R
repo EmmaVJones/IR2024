@@ -134,7 +134,7 @@ DSulfatePlotlySingleStation <- function(input,output,session, AUdata, stationSel
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
                                                    paste("Depth: ",FDT_DEPTH, "m"),
-                                                   paste("Dissolved Sulfate: ",SULFATE_DISS_mg_L,"mg/L")))%>%
+                                                   paste("Dissolved Sulfate Level: ",LEVEL_SULFATE_DISS)))%>%
           layout(showlegend=FALSE,
                  yaxis=list(title="Dissolved Sulfate (mg/L)"),
                  xaxis=list(title="Sample Date",tickfont = list(size = 10)))

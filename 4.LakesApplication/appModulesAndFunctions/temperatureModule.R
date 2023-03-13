@@ -109,6 +109,7 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
                                                  paste("Temperature: ",FDT_TEMP_CELCIUS,"C"),
+                                                 paste("Temperature Level: ",LEVEL_FDT_TEMP_CELCIUS),
                                                  paste("LakeStratification: ",LakeStratification)))%>%
         layout(showlegend=FALSE,
                yaxis=list(title="Temperature (Celsius)"),

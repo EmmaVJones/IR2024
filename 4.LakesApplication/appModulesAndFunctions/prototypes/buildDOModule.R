@@ -136,6 +136,7 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
                                                paste("DO: ",DO_mg_L," (mg/L)"),
+                                               paste("DO Level: ",LEVEL_DO),
                                                paste("LakeStratification: ",LakeStratification)))%>%
       layout(showlegend=FALSE,
              yaxis=list(title="DO (mg/L)"),
