@@ -189,7 +189,7 @@ Reid and Joe organized citizen monitoring data for 2017-2020. Here is how we sma
 ```
 
 
-
+This Rmd and my R session were having serious troubles at this point. Bringing running any of the spatial snapping processes proved impossible due to constant "C stack limit" errors. The 2021-2022 citmon/non agency data from Reid was thus organized in a separate project.
 
 
 

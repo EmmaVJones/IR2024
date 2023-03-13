@@ -314,7 +314,7 @@ That dataset is money. We want to use that one in the shiny applications, so mak
 
 Finally, we are ready to analyze some data! Go through stationTable one station at a time, join conventionals, analyze all available data by each parameter function (or nested functions), and report out results in the WQA CEDS bulk upload template format
 
-```{r Automated Assessment}
+```{r Automated Assessment, echo = F}
 # make placeholder objects to store data results
 stationTableResults <- stationsTemplate 
 # save ammonia results (based on default assessment information) for use in app to speed rendering

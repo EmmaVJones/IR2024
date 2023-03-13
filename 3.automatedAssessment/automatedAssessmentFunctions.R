@@ -136,7 +136,7 @@ quickStats <- function(parameterDataset, # dataset from one station that has bee
     return(results)
   } else {
     if(nrow(parameterDataset) == 0){
-      z <- data.frame(EXC = NA, SAMP= nrow(parameterDataset), exceedanceRate= NA, STAT= NA)
+      z <- data.frame(EXC = NA, SAMP= NA, exceedanceRate= NA, STAT= NA)
       names(z) <- paste(parameter,names(z), sep='_')
       return(z)
     } else {
