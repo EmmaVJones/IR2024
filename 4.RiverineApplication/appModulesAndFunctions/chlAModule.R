@@ -64,7 +64,8 @@ chlAPlotlySingleStation <- function(input,output,session, AUdata, stationSelecte
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
-                                               paste("Chlorophyll a: ",CHLOROPHYLL_A_ug_L,"ug/L")))%>%
+                                               paste("Chlorophyll a: ",CHLOROPHYLL_A_ug_L,"ug/L"),
+                                               paste("Chlorophyll a Level: ",LEVEL_CHLOROPHYLL_A)))%>%
       layout(showlegend=FALSE,
              yaxis=list(title="Chlorophyll a (ug/L)"),
              xaxis=list(title="Sample Date",tickfont = list(size = 10))) })

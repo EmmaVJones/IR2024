@@ -63,7 +63,8 @@ salinityPlotlySingleStation <- function(input,output,session, AUdata, stationSel
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
-                                               paste("Salinity: ",format(FDT_SALINITY,digits=2),"ppt")))%>%
+                                               paste("Salinity: ",format(FDT_SALINITY,digits=2),"ppt"),
+                                               paste("Salinity Level: ",LEVEL_FDT_SALINITY)))%>%
       layout(showlegend=FALSE,
              yaxis=list(title="Salinity (ppt)"),
              xaxis=list(title="Sample Date",tickfont = list(size = 10))) })

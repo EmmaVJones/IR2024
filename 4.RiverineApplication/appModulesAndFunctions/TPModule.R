@@ -102,7 +102,8 @@ TPPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste("Total Phosphorus: ",PHOSPHORUS_mg_L,"mg/L")))%>%
+                                                 paste("Total Phosphorus: ",PHOSPHORUS_mg_L,"mg/L"),
+                                                 paste("Total Phosphorus Level: ",LEVEL_PHOSPHORUS)))%>%
         layout(showlegend=FALSE,
                yaxis=list(title="Total Phosphorus (mg/L)"),
                xaxis=list(title="Sample Date",tickfont = list(size = 10)))
@@ -112,7 +113,8 @@ TPPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste("Total Phosphorus: ",PHOSPHORUS_mg_L,"mg/L")))%>%
+                                                 paste("Total Phosphorus: ",PHOSPHORUS_mg_L,"mg/L"),
+                                                 paste("Total Phosphorus Level: ",LEVEL_PHOSPHORUS)))%>%
         layout(showlegend=FALSE,
                yaxis=list(title="Total Phosphorus (mg/L)"),
                xaxis=list(title="Sample Date",tickfont = list(size = 10)))

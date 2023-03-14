@@ -128,7 +128,8 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
                                                    paste("Depth: ",FDT_DEPTH, "m"),
-                                                   paste("Dissolved Nitrate: ",NITRATE_mg_L,"mg/L")))%>%
+                                                   paste("Dissolved Nitrate: ",NITRATE_mg_L,"mg/L"),
+                                                   paste("Dissolved Nitrate Level: ",LEVEL_NITRATE)))%>%
           layout(showlegend=FALSE,
                  yaxis=list(title="Dissolved Nitrate (mg/L)"),
                  xaxis=list(title="Sample Date",tickfont = list(size = 10)))
@@ -149,7 +150,8 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
                                                    paste("Depth: ",FDT_DEPTH, "m"),
-                                                   paste("Dissolved Nitrate: ",NITRATE_mg_L,"mg/L")))%>%
+                                                   paste("Dissolved Nitrate: ",NITRATE_mg_L,"mg/L"),
+                                                   paste("Dissolved Nitrate Level: ",LEVEL_NITRATE)))%>%
           layout(showlegend=FALSE,
                  yaxis=list(title="Dissolved Nitrate (mg/L)"),
                  xaxis=list(title="Sample Date",tickfont = list(size = 10)))
@@ -166,7 +168,8 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
                                                    paste("Depth: ",FDT_DEPTH, "m"),
-                                                   paste("Dissolved Nitrate: ",NITRATE_mg_L,"mg/L")))%>%
+                                                   paste("Dissolved Nitrate: ",NITRATE_mg_L,"mg/L"),
+                                                   paste("Dissolved Nitrate Level: ",LEVEL_NITRATE)))%>%
           layout(showlegend=FALSE,
                  yaxis=list(title="Dissolved Nitrate (mg/L)"),
                  xaxis=list(title="Sample Date",tickfont = list(size = 10)))
@@ -179,7 +182,8 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
                                                    paste("Depth: ",FDT_DEPTH, "m"),
-                                                   paste("Dissolved Nitrate: ",NITRATE_mg_L,"mg/L")))%>%
+                                                   paste("Dissolved Nitrate: ",NITRATE_mg_L,"mg/L"),
+                                                   paste("Dissolved Nitrate Level: ",LEVEL_NITRATE)))%>%
           layout(showlegend=FALSE,
                  yaxis=list(title="Dissolved Nitrate (mg/L)"),
                  xaxis=list(title="Sample Date",tickfont = list(size = 10)))

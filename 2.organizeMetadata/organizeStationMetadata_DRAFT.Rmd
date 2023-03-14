@@ -448,6 +448,7 @@ stationsTable2024begin <- stationsFromLastCycle %>%
                 VAHU6 = STA_VA_HU6) %>% 
   mutate(REGION = case_when(REGION == 'NVRO' ~ 'NRO',
                             REGION == 'WCRO' ~ 'BRRO',
+                            REGION == 'SCRO' ~ 'BRRO',
                             TRUE~ as.character(REGION))) %>% 
   dplyr::select(any_of(names(stationsTemplate)))
 
@@ -555,6 +556,7 @@ stationsAU <- left_join(stations, AU, by = c('WXA_STATION_DETAIL_ID' = 'Station 
                 VAHU6 = STA_VA_HU6) %>% 
   mutate(REGION = case_when(REGION == 'NVRO' ~ 'NRO',
                             REGION == 'WCRO' ~ 'BRRO',
+                            REGION == 'SCRO' ~ 'BRRO',
                             TRUE~ as.character(REGION))) %>% 
   dplyr::select(any_of(names(stationsTemplate)))
 
@@ -582,9 +584,13 @@ stationsToDo <- filter(conventionals_distinct, ! FDT_STA_ID %in% stationsTable20
                 LATITUDE = Latitude,
                 LONGITUDE = Longitude) %>% 
   mutate(# throw in a flag for swamp but still need to force it to a waterbody type the assessment tools understand
-         TYPE_1 =  case_when(WATER_TYPE == 'SWAMP' ~ paste(TYPE_1, 'SWAMP', sep = ': '),
-                             TRUE~ as.character(TYPE_1)),
-         WATER_TYPE = ifelse(WATER_TYPE == 'SWAMP', NA, WATER_TYPE)) %>% 
+         WATER_TYPE = case_when(#WATER_TYPE == 'SWAMP' ~ paste(TYPE_1, 'SWAMP', sep = ': '),
+                             WATER_TYPE %in% c('STREAM', 'SWAMP', 'SPRING', 'CANAL') ~ 'RIVER',
+                             WATER_TYPE %in% c('ESTURY', 'OCEAN') ~ 'ESTUARY',
+                             WATER_TYPE %in% c('RESERV', 'LAKE') ~ 'RESERVOIR',
+                             WATER_TYPE %in% c(NA,'', 'UNK') ~ NA_character_,
+                             TRUE~ as.character(WATER_TYPE))) %>% #,
+         #WATER_TYPE = ifelse(WATER_TYPE == 'SWAMP', NA, WATER_TYPE)) %>% 
   dplyr::select(any_of(names(stationsTemplate))) %>% 
   # Spatially join info we don't trust from CEDS WQM, first turn this into a spatial object
   st_as_sf(coords = c("LONGITUDE", "LATITUDE"), 
@@ -674,7 +680,7 @@ WQSlookup1 <- WQSlookup %>%
 # 
 
 
-pin(WQSlookup, description = "WQS lookup table from metadata attribution application", board = "rsconnect")
+#pin(WQSlookup, description = "WQS lookup table from metadata attribution application", board = "rsconnect")
 ```
 
 
@@ -787,9 +793,9 @@ Once I get that information back from assessors I can fully move on.
 Now time to actually join standards to stations. This is going to be available on the server for users to access from the assessment scripts. The thinking right now is that it is better to store this information on the server right now and show users the data (when asked) instead of having it attached to the right of existing stationsTable (like 2020 cycle) since CEDS WQA only accepts a specific template. Also, if WQS info needs to be changed, the assessor is forced to update the WQS_ID. Maybe this isn't an awesome method but going with it for now.
 
 ```{r pin WQS information}
-pin(WQSlookup_withStandards, 
-    name = 'ejones/WQSlookup-withStandards',
-    description = "WQS lookup table with Standards from metadata attribution application", board = "rsconnect")
+# pin(WQSlookup_withStandards, 
+#     name = 'ejones/WQSlookup-withStandards',
+#     description = "WQS lookup table with Standards from metadata attribution application", board = "rsconnect")
 ```
 
 
@@ -884,14 +890,14 @@ z <- filter(WQSlookup, ! StationID %in% WQSlookup_withStandards_pin$StationID)
 #         "Buffer Distance" = "Buffer Distance.y") %>%
 #  dplyr::select(StationID, `Buffer Distance`, `WQS_ID Saved on the server`, `WQS_ID Suggested To User`, Comments)
 #write.csv(y,'missingWQSforReview.csv')
-  } else{WQSlookup_withStandards <- WQSlookup_withStandards_pin}
+  } else{#WQSlookup_withStandards <- WQSlookup_withStandards_pin}
 ```
 
 Now pin to server
 
 
 ```{r pin WQS information citmon}
-# pin(citmonWQSlookup_withStandards_pin, 
+# pin(citmonWQSlookup_withStandards_pin,
 #     name = "ejones/citmonStationsWithWQSFinal",
 #     description = "WQS lookup table with Standards for Citmon/Non Agency Stations", board = "rsconnect")
 ```

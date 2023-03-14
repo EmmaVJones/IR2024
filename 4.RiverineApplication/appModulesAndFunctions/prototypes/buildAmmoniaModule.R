@@ -141,6 +141,7 @@ AmmoniaPlotlySingleStation <- function(input,output,session, AUdata, stationSele
                                                    paste("Date: ",SampleDate),
                                                    paste("Depth: ",FDT_DEPTH, "m"),
                                                    paste("Ammonia: ", AMMONIA_mg_L,"mg/L as N"),
+                                                   paste("Ammonia Level: ",LEVEL_AMMONIA),
                                                    #paste('Acute Ammonia Limit: ',format(acuteNH3limit, digits=3), "mg/L as N"),
                                                    paste('Temperature: ', FDT_TEMP_CELCIUS, '(Celsius)'),
                                                    paste('pH: ', FDT_FIELD_PH, '(unitless)')))%>%

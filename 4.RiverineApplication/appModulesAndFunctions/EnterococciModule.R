@@ -134,7 +134,8 @@ EnteroPlotlySingleStation <- function(input,output,session, AUdata, stationSelec
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
-                                               paste("Enterococci: ",ENTEROCOCCI,"CFU / 100 mL")))%>%
+                                               paste("Enterococci: ",ENTEROCOCCI,"CFU / 100 mL"),
+                                               paste("Enterococci Level: ",LEVEL_ENTEROCOCCI)))%>%
       add_lines(data=dat, x=~SampleDate,y=~newSTV, mode='line', line = list(color = '#484a4c',dash = 'dot'),
                 hoverinfo = "text", text= "New STV: 130 CFU / 100 mL", name="New STV: 130 CFU / 100 mL") %>%
       add_lines(data=dat, x=~SampleDate,y=~oldSTV, mode='line', line = list(color = 'black'),
@@ -197,7 +198,8 @@ EnteroPlotlySingleStation <- function(input,output,session, AUdata, stationSelec
       add_markers(x= ~`Date Time`, y= ~Value,mode = 'scatter', name="Enterococci (CFU / 100 mL)", marker = list(color= '#535559'),
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",`Date Time`),
-                                               paste("Enterococci: ",Value,"CFU / 100 mL"))) %>%
+                                               paste("Enterococci: ",Value,"CFU / 100 mL"),
+                                               paste("Enterococci Level: ",LEVEL_ENTEROCOCCI))) %>%
       add_lines(data=windowData, x=~`Date Time`, y=~geomean, mode='line', line = list(color = 'orange', dash= 'dash'),
                 hoverinfo = "text", text= ~paste("Window Geomean: ", format(geomean,digits=3)," CFU / 100 mL", sep=''), 
                 name="Window Geomean") %>%

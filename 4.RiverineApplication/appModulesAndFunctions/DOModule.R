@@ -229,13 +229,15 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
                                                  paste("DO: ",DO_mg_L," (mg/L)"),
+                                                 paste("DO Level: ",LEVEL_DO),
                                                  paste("7Q10 Flag Gage: ",`7Q10 Flag Gage`))) %>%
         
         add_markers(., data = dat, x= ~SampleDate, y= ~DO_mg_L,mode = 'scatter', name="DO (mg/L)", marker = list(color= '#535559'),
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste("DO: ",DO_mg_L," (mg/L)")))%>%
+                                                 paste("DO: ",DO_mg_L," (mg/L)"),
+                                                 paste("DO Level: ",LEVEL_DO)))%>%
         layout(showlegend=FALSE,
                yaxis=list(title="DO (mg/L)"),
                xaxis=list(title="Sample Date",tickfont = list(size = 10)))
@@ -250,13 +252,15 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
                                                  paste("DO: ",DO_mg_L," (mg/L)"),
+                                                 paste("DO Level: ",LEVEL_DO),
                                                  paste("7Q10 Flag Gage: ",`7Q10 Flag Gage`))) %>%
         
         add_markers(., data = dat, x= ~SampleDate, y= ~DO_mg_L,mode = 'scatter', name="DO (mg/L)", marker = list(color= '#535559'),
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste("DO: ",DO_mg_L," (mg/L)")))%>%
+                                                 paste("DO: ",DO_mg_L," (mg/L)"),
+                                                 paste("DO Level: ",LEVEL_DO)))%>%
         layout(showlegend=FALSE,
                yaxis=list(title="DO (mg/L)"),
                xaxis=list(title="Sample Date",tickfont = list(size = 10)))    }  })

@@ -82,6 +82,7 @@ stationsTable2020 <- readRDS('../2.organizeMetadata/data/stationsTable2020.RDS')
 ```{r lake nutrient standards}
 lakeNutStandards <- read_csv('data/9VAC25-260-187lakeNutrientStandards.csv')
 ```
+
 ## Bring in list of sites that have no "conventionals" data
 
 These sites are important to carry through into the stations table even though they don't have any conventionals data. These sites are from fish tissue, PCB, or metals datasets that didn't report any data in the conventionals data pull. These were saved in 2.organizeMetadata and will allow us to override the default behavior of largely skipping analyses if no conventionals data are present below.
@@ -138,11 +139,14 @@ Pull pinned WQS info saved on server. Then perform a series of data manipulation
 
 
 ```{r pull WQS info}
-WQSlookup <- pin_get("ejones/WQSlookup-withStandards",  board = "rsconnect")
-citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect") %>% 
+citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect") 
+WQSlookup <- pin_get("ejones/WQSlookup-withStandards",  board = "rsconnect") %>% 
+  # add properly organized citmon site info
+  bind_rows(filter(citmonWQS, !is.na(WQS_ID) & WQS_ID !='') %>% 
+              mutate(GNIS_ID = as.factor(GNIS_ID)))
+
+citmonWQS <- filter(citmonWQS, ! StationID %in% WQSlookup$StationID) %>% 
   dplyr::select(StationID, `WQS Section` = SEC, `WQS Class`= CLASS,`WQS Special Standard` = SPSTDS)
-# citmonWQS <- readRDS('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/data/citmonStationsWithWQS.RDS') %>% 
-#   dplyr::select(StationID = `Station Id`, `WQS Section`, `WQS Class`, `WQS Special Standard`)
 
 stationTable <- stationTable %>% # (1)
   
@@ -228,10 +232,64 @@ lakeStations <- filter_at(stationTable,
                           .vars = vars(contains("ID305B")),
                           .vars_predicate = any_vars(str_detect(., 'L_')))
 
-# QA check: make sure all 187 lakes have chla and tp standards
-# lakeStationsImportant <- dplyr::select(lakeStations, STATION_ID:ID305B_3, NUT_TP_EXC:NUT_CHLA_STAT, WQS_ID, GNIS_Name, WATER_NAME, Lakes_187B, Lake_Name:`Total Phosphorus (ug/L)`) %>%
-#   filter(!is.na(WQS_ID))
+# Fix any WATER_TYPE issues 
+# for stations that did not have information in the last cycle in wqa CEDS, this information was pulled from wqm station type 1 
+# here we use the ID305B information to correct any issues
+fixWaterType <- filter(stationTable, STATION_ID %in% lakeStations$STATION_ID) %>% 
+  filter(WATER_TYPE != 'RESERVOIR')
+# we will leave the 8-GMC001.43 as River since the ID305B codes are conflicting
 
+# fix this in two spots
+lakeStations <- mutate(lakeStations, WATER_TYPE = case_when(STATION_ID %in% c("2-BRI010.58", "4ABWR019.75", "2-BRI010.78") ~ 'RESERVOIR',
+                                                            TRUE ~ as.character(WATER_TYPE)))
+
+stationTable <- mutate(stationTable, WATER_TYPE = case_when(STATION_ID %in% c("2-BRI010.58", "4ABWR019.75", "2-BRI010.78") ~ 'RESERVOIR',
+                                                            TRUE ~ as.character(WATER_TYPE)))
+
+# QA check: make sure all 187 lakes have chla and tp standards
+lakeStationsImportant <- dplyr::select(lakeStations, STATION_ID:ID305B_3, NUT_TP_EXC:NUT_CHLA_STAT, WQS_ID, GNIS_Name,
+                                       WATER_NAME, Lakes_187B, Lake_Name:`Total Phosphorus (ug/L)`) %>%
+  filter(!is.na(WQS_ID))
+
+
+
+
+lakeStationsMoreWork <- dplyr::select(lakeStations, STATION_ID:ID305B_3, TYPE_1, REGION, LATITUDE, LONGITUDE, NUT_TP_EXC:NUT_CHLA_STAT,
+                                      WQS_ID, GNIS_Name, WATER_NAME, Lakes_187B, Lake_Name:`Total Phosphorus (ug/L)`) %>%
+  filter(is.na(WQS_ID)) %>% 
+    st_as_sf(coords = c("LONGITUDE", "LATITUDE"), 
+           remove = F, # don't remove these lat/lon cols from df
+           crs = 4269) # add projection, needs to be geographic for now bc entering lat/lng
+# 
+# lakesPoly <- st_read('../GIS/draft_WQS_shapefiles_2022/lakes_reservoirs_draft2022.shp',
+#                      fid_column_name = "OBJECTID") %>%
+#   st_transform(4269)
+# 
+# # Spatially join to polygon layer and create table to store links
+# lakePolyWQS <- st_join(lakeStationsMoreWork, lakesPoly, join = st_intersects) %>%
+#     filter(!is.na(OBJECTID)) %>% 
+#   dplyr::select(StationID = STATION_ID, WQS_ID = WQS_ID.y, TYPE_1) %>% 
+#   mutate(`Buffer Distance` = 'In Polygon', 
+#          Comments = 'EVJ Addition') %>% 
+#   st_drop_geometry()
+#  
+# WQSlookup1 <- pin_get('ejones/WQSlookup', board = 'rsconnect')
+# citmonWQS1 <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect")
+# 
+# WQSlookup2 <- bind_rows(WQSlookup1, 
+#                         filter(lakePolyWQS, TYPE_1 %in% c('C', 'L')) %>% #View()
+#                           dplyr::select(-TYPE_1))
+# 
+# citmonWQ2 <- bind_rows(citmonWQS1, 
+#                         filter(lakePolyWQS, ! TYPE_1 %in% c('C', 'L')) %>% #View()
+#                           dplyr::select(-TYPE_1))
+# 
+# pin(WQSlookup2, 'ejones/WQSlookup', board = 'rsconnect', 
+#     description = 'WQS lookup table from metadata attribution application')
+# 
+# 
+# pin(citmonWQ2, 'ejones/citmonStationsWithWQSFinal', board = 'rsconnect', 
+#     description = 'WQS lookup table with Standards for Citmon/Non Agency Stations')
 
 ```
 

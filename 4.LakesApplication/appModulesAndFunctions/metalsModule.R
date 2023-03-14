@@ -195,11 +195,13 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
       dplyr::select(-contains('RMK_')) %>%
       group_by( Station_ID, Collection_Date_Time, Sample_ID, `# of Fish`, Species_Name, length, weight) %>%
       pivot_longer(cols= Beryllium:Lead, names_to = "Metal", values_to = 'Measure') %>%
-      left_join(metalsSV, by = 'Metal') %>%
+      left_join(filter(metalsSV, !str_detect(`Screening Method`, 'Practical')),
+                by = 'Metal') %>%
       filter(Measure > `Screening Value`) %>%
       arrange(Metal)
     DT::datatable(FmetalsSV, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(FmetalsSV),
-                                                             scrollY = "250px", dom='Bti', buttons=list('copy')), selection = 'none') })
+                                                             scrollY = "250px", dom='Bti', buttons=list('copy')), selection = 'none') %>%
+      formatSignif(columns=c('Screening Value'), digits=2)   })
   
   
   output$FmetalsRangeTableSingleSite <- DT::renderDataTable({ req(input$Fmetals_oneStationSelection, Fmetals_oneStation())

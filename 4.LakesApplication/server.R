@@ -4,8 +4,12 @@ source('global.R')
 conventionals <- pin_get('ejones/conventionals2024final_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
 #pin_get('ejones/conventionals2024draft_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
 vahu6 <- st_as_sf(pin_get("vahu6", board = "rsconnect")) # bring in as sf object
-WQSlookup <- pin_get("WQSlookup-withStandards",  board = "rsconnect")
-citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect") %>% 
+citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect") 
+WQSlookup <- pin_get("ejones/WQSlookup-withStandards",  board = "rsconnect") %>% 
+  # add properly organized citmon site info
+  bind_rows(filter(citmonWQS, !is.na(WQS_ID) & WQS_ID !='') %>% 
+              mutate(GNIS_ID = as.factor(GNIS_ID)))
+citmonWQS <- filter(citmonWQS, ! StationID %in% WQSlookup$StationID) %>% 
   dplyr::select(StationID, `WQS Section` = SEC, `WQS Class`= CLASS,`WQS Special Standard` = SPSTDS)
 WQMstationFull <- pin_get("WQM-Station-Full", board = "rsconnect")
 stationsTemplate <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect')[0,] %>% 
@@ -215,8 +219,12 @@ shinyServer(function(input, output, session) {
   stationSummary <- reactive({req(lake_filter())
     filter(conventionals, FDT_STA_ID %in% lake_filter()$STATION_ID) %>%
       distinct(FDT_STA_ID, .keep_all = TRUE)  %>%
+      bind_rows(missingExtraSites() %>% 
+                  mutate(Data_Source = 'Data from outside conventionals query',
+                         Latitude = LATITUDE,
+                         Longitude = LONGITUDE)) %>% 
       dplyr::select(FDT_STA_ID:FDT_SPG_CODE, STA_LV2_CODE:Data_Source, Latitude, Longitude) %>%
-      dplyr::select(-FDT_DATE_TIME) }) # drop date time bc confusing to users
+      dplyr::select(-c(FDT_DATE_TIME,FDT_DEPTH, FDT_DEPTH_DESC, FDT_PERCENT_FRB)) })# drop date time bc confusing to users 
 
   output$stationSummary <- DT::renderDataTable({req(stationSummary())
     DT::datatable(stationSummary(), rownames = FALSE,
@@ -250,14 +258,19 @@ shinyServer(function(input, output, session) {
                 `Section 187` = toString(sort(unique(Lakes_187B))))
     datatable(z, rownames = FALSE, options= list(pageLength = 1, scrollY = "35px", dom='t'), selection = 'none')})
 
+  
   # Pull Conventionals data for selected lake on click
+  
+  # first find any sites in VAHU6 and waterbody type that may not have data in conventionals
+  missingExtraSites <- reactive({ req(lake_filter())
+    filter(stationTable(),  STATION_ID %in% lake_filter()$STATION_ID) %>% 
+    filter(STATION_ID %in% extraSites$FDT_STA_ID) %>% 
+    rename('FDT_STA_ID' = 'STATION_ID') %>% 
+    dplyr::select(FDT_STA_ID:VAHU6, WQS_ID:lakeStation) })
+  
+  
+  
   conventionalsLake <- reactive({ req(lake_filter())
-    
-    # first find any sites in VAHU6 and waterbody type that may not have data in conventionals
-    missingExtraSites <- filter(stationTable(),  STATION_ID %in% lake_filter()$STATION_ID) %>% 
-      filter(STATION_ID %in% extraSites$FDT_STA_ID) %>% 
-      rename('FDT_STA_ID' = 'STATION_ID') %>% 
-      dplyr::select(FDT_STA_ID:VAHU6, WQS_ID:lakeStation) 
     
     filter(conventionals, FDT_STA_ID %in% lake_filter()$STATION_ID) %>%
       left_join(dplyr::select(stationTable(), STATION_ID:VAHU6, lakeStation,
@@ -269,7 +282,7 @@ shinyServer(function(input, output, session) {
       pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
       temperatureSpecialStandardsCorrection() %>% # correct temperature special standards where necessary
       thermoclineDepth() %>%  # adds thermocline information and SampleDate
-      bind_rows(missingExtraSites) })
+      bind_rows(missingExtraSites()) })
 
   # Allow user to select from available AUs to investigate further
   output$AUselection_ <- renderUI({req(lake_filter())

@@ -67,7 +67,8 @@ SSCPlotlySingleStation <- function(input,output,session, AUdata, stationSelected
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
-                                               paste("Suspended Sediment Concentration: ",SSC_mg_L,"units")))%>%
+                                               paste("Suspended Sediment Concentration: ",SSC_mg_L,"units"),
+                                               paste("Suspended Sediment Concentration Level: ",LEVEL_SSC)))%>%
       layout(showlegend=FALSE,
              yaxis=list(title="Suspended Sediment Concentration (units)"),
              xaxis=list(title="Sample Date",tickfont = list(size = 10)))

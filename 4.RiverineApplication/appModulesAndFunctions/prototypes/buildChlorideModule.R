@@ -153,7 +153,8 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
                                                    paste("Depth: ",FDT_DEPTH, "m"),
-                                                   paste("Dissolved Chloride: ",CHLORIDE_mg_L,"mg/L")))%>%
+                                                   paste("Dissolved Chloride: ",CHLORIDE_mg_L,"mg/L"),
+                                                   paste("Dissolved Chloride Level: ",LEVEL_CHLORIDE)))%>%
           layout(showlegend=FALSE,
                  yaxis=list(title="Dissolved Chloride (mg/L)"),
                  xaxis=list(title="Sample Date",tickfont = list(size = 10)))
@@ -174,7 +175,8 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
                                                    paste("Depth: ",FDT_DEPTH, "m"),
-                                                   paste("Dissolved Chloride: ",CHLORIDE_mg_L,"mg/L")))%>%
+                                                   paste("Dissolved Chloride: ",CHLORIDE_mg_L,"mg/L"),
+                                                   paste("Dissolved Chloride Level: ",LEVEL_CHLORIDE)))%>%
           layout(showlegend=FALSE,
                  yaxis=list(title="Dissolved Chloride (mg/L)"),
                  xaxis=list(title="Sample Date",tickfont = list(size = 10)))
@@ -205,7 +207,8 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                       hoverinfo="text",text=~paste(sep="<br>",
                                                    paste("Date: ",SampleDate),
                                                    paste("Depth: ",FDT_DEPTH, "m"),
-                                                   paste("Dissolved Chloride: ",CHLORIDE_mg_L,"mg/L")))%>%
+                                                   paste("Dissolved Chloride: ",CHLORIDE_mg_L,"mg/L"),
+                                                   paste("Dissolved Chloride Level: ",LEVEL_CHLORIDE)))%>%
           layout(showlegend=FALSE,
                  yaxis=list(title="Dissolved Chloride (mg/L)"),
                  xaxis=list(title="Sample Date",tickfont = list(size = 10)))

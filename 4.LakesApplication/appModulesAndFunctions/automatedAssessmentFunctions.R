@@ -54,6 +54,7 @@ lakeNameStandardization <- function(x){
       else .} %>% 
     mutate(Lake_Name = case_when(WATER_NAME %in% c('Abel Lake Reservoir (Long Branch)') ~ 'Abel Lake',
                                  WATER_NAME %in% c('Big Cherry Reservior') ~ 'Big Cherry Lake',
+                                 WATER_NAME %in% c('Little Stony Creek upstream to Star Branch confluence') ~ 'Bark Camp Lake',
                                  WATER_NAME %in% c('Dan River','Buffalo Creek','Bluestone Creek') ~ 'Kerr Reservoir',
                                  WATER_NAME %in% c('Smith Lake (Aquia Reservoir)') ~ 'Aquia Reservoir (Smith Lake)',
                                  WATER_NAME %in% c('Claytor Lake (New River)', 'Claytor Lake (Peak Creek)',

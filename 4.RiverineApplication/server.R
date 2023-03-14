@@ -11,7 +11,13 @@ source('global.R')
 conventionals <- pin_get('ejones/conventionals2024final_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
 #pin_get('ejones/conventionals2024draft_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
 vahu6 <- st_as_sf(pin_get("vahu6", board = "rsconnect")) # bring in as sf object
-WQSlookup <- pin_get("WQSlookup-withStandards",  board = "rsconnect")
+citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect") 
+WQSlookup <- pin_get("ejones/WQSlookup-withStandards",  board = "rsconnect") %>% 
+  # add properly organized citmon site info
+  bind_rows(filter(citmonWQS, !is.na(WQS_ID) & WQS_ID !='') %>% 
+              mutate(GNIS_ID = as.factor(GNIS_ID)))
+citmonWQS <- filter(citmonWQS, ! StationID %in% WQSlookup$StationID) %>% 
+  dplyr::select(StationID, `WQS Section` = SEC, `WQS Class`= CLASS,`WQS Special Standard` = SPSTDS)
 WQMstationFull <- pin_get("WQM-Station-Full", board = "rsconnect")
 stationsTemplate <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect')[0,] %>%
   mutate(across(matches(c("LATITUDE", "LONGITUDE", "EXC", "SAMP")), as.numeric))
@@ -106,8 +112,8 @@ shinyServer(function(input, output, session) {
                              col_types = cols(COMMENTS = col_character())) %>% # force to character bc parsing can incorrectly guess logical based on top 1000 rows
       as_tibble()
     # Remove stations that don't apply to application
-    lakeStations <- filter_at(stationTable, vars(starts_with('TYPE')), any_vars(. == 'L'))
-    estuarineStations <- filter(stationTable, str_detect(ID305B_1, 'E_'))
+    lakeStations <- filter_at(stationTable, WATER_TYPE == 'RESERVOIR')#vars(starts_with('TYPE')), any_vars(. == 'L'))
+    estuarineStations <- filter(stationTable, WATER_TYPE == 'ESTUARY')# str_detect(ID305B_1, 'E_'))
     
     
     stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %>%
@@ -115,18 +121,19 @@ shinyServer(function(input, output, session) {
       
       
       
-      #      # Citmon addition
-      #      # Special CitMon/Non Agency step until full WQS_ID inplementation in IR2028
-      #      left_join(citmonWQS, by = c('STATION_ID' = 'StationID')) %>% # (1)
+      # Citmon addition
+      # Special CitMon/Non Agency step until full WQS_ID inplementation in IR2028
+      left_join(citmonWQS, by = c('STATION_ID' = 'StationID')) %>% # (1)
       
       # Join to real WQS_ID's (do this second in case citmon station double listed, want proper WQS_ID if available) (1)
       left_join(WQSlookup, by = c('STATION_ID' = 'StationID')) %>%
       
-      #      # coalesce these similar fields together, taking WQS_ID info before citmon method
-      #      mutate(CLASS = coalesce(CLASS, `WQS Class`),
-      #             SEC = coalesce(SEC, `WQS Section`),
-      #             SPSTDS = coalesce(SPSTDS, `WQS Special Standard`)) %>% 
-      #      dplyr::select(-c(`WQS Section`, `WQS Class`, `WQS Special Standard`)) %>% 
+      # coalesce these similar fields together, taking WQS_ID info before citmon method
+      mutate(CLASS = coalesce(CLASS, `WQS Class`),
+             SEC = coalesce(SEC, `WQS Section`),
+             SPSTDS = coalesce(SPSTDS, `WQS Special Standard`)) %>%
+      dplyr::select(-c(`WQS Section`, `WQS Class`, `WQS Special Standard`)) %>%
+      
       
       # Fix for Class II Tidal Waters in Chesapeake (bc complicated DO/temp/etc standard)
       mutate(CLASS_BASIN = paste(CLASS,substr(BASIN, 1,1), sep="_")) %>%

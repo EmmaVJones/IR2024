@@ -207,13 +207,15 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
                                                paste("Temperature: ",FDT_TEMP_CELCIUS,"C"),
+                                               paste("Temperature Level: ",LEVEL_FDT_TEMP_CELCIUS),
                                                paste("7Q10 Flag Gage: ",`7Q10 Flag Gage`))) %>%
       
       add_markers(., data = dat, x= ~SampleDate, y= ~FDT_TEMP_CELCIUS,mode = 'scatter', name="Temperature (Celsius)",marker = list(color= '#535559'),
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
-                                               paste("Temperature: ",FDT_TEMP_CELCIUS,"C"))) %>%
+                                               paste("Temperature: ",FDT_TEMP_CELCIUS,"C"),
+                                               paste("Temperature Level: ",LEVEL_FDT_TEMP_CELCIUS))) %>%
       layout(showlegend=FALSE,
              yaxis=list(title="Temperature (Celsius)"),
              xaxis=list(title="Sample Date",tickfont = list(size = 10)))

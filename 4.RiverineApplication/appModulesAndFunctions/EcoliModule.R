@@ -142,7 +142,8 @@ EcoliPlotlySingleStation <- function(input,output,session, AUdata, stationSelect
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
-                                               paste("E. coli: ",ECOLI,"CFU / 100 mL")))%>%
+                                               paste("E. coli: ",ECOLI,"CFU / 100 mL"),
+                                               paste("E. coli Level: ",LEVEL_ECOLI)))%>%
       add_lines(data=dat, x=~SampleDate,y=~newSTV, mode='line', line = list(color = '#484a4c',dash = 'dot'),
                 hoverinfo = "text", text= "New STV: 410 CFU / 100 mL", name="New STV: 410 CFU / 100 mL") %>%
       add_lines(data=dat, x=~SampleDate,y=~oldSTV, mode='line', line = list(color = 'black'),
@@ -203,7 +204,8 @@ EcoliPlotlySingleStation <- function(input,output,session, AUdata, stationSelect
       add_markers(x= ~`Date Time`, y= ~Value,mode = 'scatter', name="E. coli (CFU / 100 mL)", marker = list(color= '#535559'),
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",`Date Time`),
-                                               paste("E. coli: ",Value,"CFU / 100 mL"))) %>%
+                                               paste("E. coli: ",Value,"CFU / 100 mL"),
+                                               paste("E. coli Level: ",LEVEL_ECOLI))) %>%
       add_lines(data=windowData, x=~`Date Time`, y=~geomean, mode='line', line = list(color = 'orange', dash= 'dash'),
                 hoverinfo = "text", text= ~paste("Window Geomean: ", format(geomean,digits=3)," CFU / 100 mL", sep=''), 
                 name="Window Geomean") %>%

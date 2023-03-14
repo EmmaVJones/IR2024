@@ -7,8 +7,12 @@ source('global.R')
 conventionals <- pin_get('ejones/conventionals2024final_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
 #pin_get('ejones/conventionals2024draft_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
 vahu6 <- st_as_sf(pin_get("vahu6", board = "rsconnect")) # bring in as sf object
-WQSlookup <- pin_get("WQSlookup-withStandards",  board = "rsconnect")
-citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect") %>% 
+citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect") 
+WQSlookup <- pin_get("ejones/WQSlookup-withStandards",  board = "rsconnect") %>% 
+  # add properly organized citmon site info
+  bind_rows(filter(citmonWQS, !is.na(WQS_ID) & WQS_ID !='') %>% 
+              mutate(GNIS_ID = as.factor(GNIS_ID)))
+citmonWQS <- filter(citmonWQS, ! StationID %in% WQSlookup$StationID) %>% 
   dplyr::select(StationID, `WQS Section` = SEC, `WQS Class`= CLASS,`WQS Special Standard` = SPSTDS)
 WQMstationFull <- pin_get("WQM-Station-Full", board = "rsconnect")
 stationsTemplate <- pin_get('ejones/stationsTable2024begin', board = 'rsconnect')[0,] %>% 
@@ -72,11 +76,12 @@ stationTable <- read_csv('userDataToUpload/stationTableResults.csv',
   # Join to real WQS_ID's (do this second in case citmon station double listed, want proper WQS_ID if available) (1)
   left_join(WQSlookup, by = c('STATION_ID' = 'StationID')) %>%
   
-       # coalesce these similar fields together, taking WQS_ID info before citmon method
-       mutate(CLASS = coalesce(CLASS, `WQS Class`),
-              SEC = coalesce(SEC, `WQS Section`),
-              SPSTDS = coalesce(SPSTDS, `WQS Special Standard`)) %>%
-       dplyr::select(-c(`WQS Section`, `WQS Class`, `WQS Special Standard`)) %>%
+  # coalesce these similar fields together, taking WQS_ID info before citmon method
+  mutate(CLASS = coalesce(CLASS, `WQS Class`),
+         SEC = coalesce(SEC, `WQS Section`),
+         SPSTDS = coalesce(SPSTDS, `WQS Special Standard`)) %>%
+  dplyr::select(-c(`WQS Section`, `WQS Class`, `WQS Special Standard`)) %>%
+  
   
   # Fix for Class II Tidal Waters in Chesapeake (bc complicated DO/temp/etc standard)
   mutate(CLASS_BASIN = paste(CLASS,substr(BASIN, 1,1), sep="_")) %>%
@@ -151,7 +156,7 @@ lakeSelection_ <- regionalAUs %>%
   distinct(Lake_Name) %>% 
   arrange(Lake_Name) %>% 
   pull()
-lakeSelection <-  "Timber Lake"#"Claytor Lake"#"Banister Lake"#"Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
+lakeSelection <-  "Claytor Lake"#"Timber Lake"#"Banister Lake"#"Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
 
 AUs <- filter(regionalAUs, Lake_Name %in% lakeSelection & ASSESS_REG %in% DEQregionSelection)
 lake_filter <- filter_at(stationTable, vars(starts_with('ID305B')), any_vars(. %in% AUs$ID305B)) 
@@ -245,8 +250,12 @@ DT::datatable(AUs %>% st_drop_geometry(), rownames = FALSE,
 # Table of Stations within Selected Lake
 stationSummary <- filter(conventionals, FDT_STA_ID %in% lake_filter$STATION_ID) %>%
     distinct(FDT_STA_ID, .keep_all = TRUE)  %>% 
+  bind_rows(missingExtraSites %>% 
+              mutate(Data_Source = 'Data from outside conventionals query',
+                     Latitude = LATITUDE,
+                     Longitude = LONGITUDE)) %>% 
     dplyr::select(FDT_STA_ID:FDT_SPG_CODE, STA_LV2_CODE:Data_Source, Latitude, Longitude) %>% 
-    dplyr::select(-FDT_DATE_TIME) # drop date time bc confusing to users 
+    dplyr::select(-c(FDT_DATE_TIME,FDT_DEPTH, FDT_DEPTH_DESC, FDT_PERCENT_FRB)) # drop date time bc confusing to users 
 
 DT::datatable(stationSummary, rownames = FALSE, 
                 options= list(scrollX = TRUE, pageLength = nrow(stationSummary), scrollY = "300px", dom='Bti'),

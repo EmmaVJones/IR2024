@@ -95,7 +95,8 @@ SpCondPlotlySingleStation <- function(input,output,session, AUdata, stationSelec
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste("Specific Conductivity: ",FDT_SPECIFIC_CONDUCTANCE,"uS/cm")))%>%
+                                                 paste("Specific Conductivity: ",FDT_SPECIFIC_CONDUCTANCE,"uS/cm"),
+                                                 paste("Specific Conductivity Level: ",LEVEL_FDT_SPECIFIC_CONDUCTANCE)))%>%
         layout(showlegend=FALSE,
                yaxis=list(title="Specific Conductivity (uS/cm)"),
                xaxis=list(title="Sample Date",tickfont = list(size = 10)))
@@ -105,7 +106,8 @@ SpCondPlotlySingleStation <- function(input,output,session, AUdata, stationSelec
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste("Specific Conductivity: ",FDT_SPECIFIC_CONDUCTANCE,"uS/cm")))%>%
+                                                 paste("Specific Conductivity: ",FDT_SPECIFIC_CONDUCTANCE,"uS/cm"),
+                                                 paste("Specific Conductivity Level: ",LEVEL_FDT_SPECIFIC_CONDUCTANCE)))%>%
         layout(showlegend=FALSE,
                yaxis=list(title="Specific Conductivity (uS/cm)"),
                xaxis=list(title="Sample Date",tickfont = list(size = 10)))

@@ -69,7 +69,8 @@ fecalPlotlySingleStation <- function(input,output,session, AUdata, stationSelect
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",SampleDate),
                                                paste("Depth: ",FDT_DEPTH, "m"),
-                                               paste("Fecal Coliform: ",FECAL_COLI,"CFU / 100 mL")))%>%
+                                               paste("Fecal Coliform: ",FECAL_COLI,"CFU / 100 mL"),
+                                               paste("Fecal Coliform Level: ",LEVEL_FECAL_COLI)))%>%
       layout(showlegend=FALSE,
              yaxis=list(title="Fecal Coliform (CFU / 100 mL)"),
              xaxis=list(title="Sample Date",tickfont = list(size = 10)))

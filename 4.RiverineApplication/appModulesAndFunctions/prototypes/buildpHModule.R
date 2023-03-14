@@ -232,13 +232,15 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
                                                  paste("pH: ",FDT_FIELD_PH," (unitless)"),
+                                                 paste("pH Level: ",LEVEL_FDT_FIELD_PH),
                                                  paste("7Q10 Flag Gage: ",`7Q10 Flag Gage`))) %>%
         
         add_markers(., data = dat, x= ~SampleDate, y= ~FDT_FIELD_PH,mode = 'scatter', name="pH (unitless)",  marker = list(color= '#535559'),
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste("pH: ",FDT_FIELD_PH," (unitless)")))%>%
+                                                 paste("pH: ",FDT_FIELD_PH," (unitless)"),
+                                                 paste("pH Level: ",LEVEL_FDT_FIELD_PH)))%>%
         layout(showlegend=FALSE,
                yaxis=list(title="pH (unitless)"),
                xaxis=list(title="Sample Date",tickfont = list(size = 10)))
@@ -255,13 +257,15 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
                                                  paste("pH: ",FDT_FIELD_PH," (unitless)"),
+                                                 paste("pH Level: ",LEVEL_FDT_FIELD_PH),
                                                  paste("7Q10 Flag Gage: ",`7Q10 Flag Gage`))) %>%
         
         add_markers(., data = dat, x= ~SampleDate, y= ~FDT_FIELD_PH,mode = 'scatter', name="pH (unitless)",  marker = list(color= '#535559'),
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
                                                  paste("Depth: ",FDT_DEPTH, "m"),
-                                                 paste("pH: ",FDT_FIELD_PH," (unitless)")))%>%
+                                                 paste("pH: ",FDT_FIELD_PH," (unitless)"),
+                                                 paste("pH Level: ",LEVEL_FDT_FIELD_PH)))%>%
         layout(showlegend=FALSE,
                yaxis=list(title="pH (unitless)"),
                xaxis=list(title="Sample Date",tickfont = list(size = 10)))    }  })
