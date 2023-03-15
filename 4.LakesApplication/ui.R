@@ -174,6 +174,7 @@ shinyUI(fluidPage(theme="yeti.css",
                                             tabPanel('Conventionals Data',
                                                      tabsetPanel(
                                                        tabPanel('Raw Data',br(),
+                                                                uiOutput("AURawDataFlag"),
                                                                 DT::dataTableOutput('AURawData'),
                                                                 h4('Data Summary'),
                                                                 h5('Records Retrieved in Assessment Unit:'),

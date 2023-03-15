@@ -156,7 +156,7 @@ lakeSelection_ <- regionalAUs %>%
   distinct(Lake_Name) %>% 
   arrange(Lake_Name) %>% 
   pull()
-lakeSelection <-  "Claytor Lake"#"Timber Lake"#"Banister Lake"#"Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
+lakeSelection <-  "Smith Mountain Lake" #"Claytor Lake"#"Timber Lake"#"Banister Lake"#"Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
 
 AUs <- filter(regionalAUs, Lake_Name %in% lakeSelection & ASSESS_REG %in% DEQregionSelection)
 lake_filter <- filter_at(stationTable, vars(starts_with('ID305B')), any_vars(. %in% AUs$ID305B)) 
@@ -197,14 +197,14 @@ AUselectionOptions <- unique(dplyr::select(lake_filter, ID305B_1:ID305B_10) %>%
                                pull(keep) )
 AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))]
 
-inputAUselection <- AUselectionOptions[9]
+inputAUselection <- AUselectionOptions[1]
 AUselection <- filter(regionalAUs, ID305B %in% inputAUselection) %>% st_set_geometry(NULL) %>% as.data.frame()
 
 
 # Allow user to select from available stations in chosen AU to investigate further
 stationSelectionOptions <- filter_at(lake_filter, vars(starts_with("ID305B")), any_vars(. %in% inputAUselection)) %>%
   distinct(STATION_ID) %>% arrange(STATION_ID) %>%  pull()
-stationSelection <- stationSelectionOptions[2]
+stationSelection <- stationSelectionOptions[1]
 
 # Pull conventionals data for just selected AU
 AUData <- filter_at(conventionalsLake, vars(starts_with("ID305B")), any_vars(. %in% inputAUselection) ) 

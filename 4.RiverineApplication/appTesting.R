@@ -93,8 +93,8 @@ stationTable <- read_csv('userDataToUpload/stationTableResults.csv',
                          col_types = cols(COMMENTS = col_character())) %>% # force to character bc parsing can incorrectly guess logical based on top 1000 rows
   as_tibble()
 # Remove stations that don't apply to application
-lakeStations <- filter_at(stationTable, WATER_TYPE == 'RESERVOIR') #vars(starts_with('TYPE')), any_vars(. == 'L'))
-estuarineStations <- filter(stationTable, WATER_TYPE == 'ESTUARY')# str_detect(ID305B_1, 'E_'))
+lakeStations <- filter(stationTable, WATER_TYPE == 'RESERVOIR') # filter_at(stationTable, vars(starts_with('TYPE')), any_vars(. == 'L'))
+estuarineStations <- filter(stationTable, WATER_TYPE == 'ESTUARY')#filter(stationTable, str_detect(ID305B_1, 'E_'))
 
 
 stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %>%

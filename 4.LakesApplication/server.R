@@ -561,14 +561,29 @@ shinyServer(function(input, output, session) {
   
   #### Data Sub Tab ####---------------------------------------------------------------------------------------------------
 
-  # Display Data
+  # Display Data, limit what is displayed based on nrow(inputData). Having long and wide data in a DT::datatable Takes too long to render and 
+  #  in more extreme cases crashes the app due to memory issues
   output$AURawData <- DT::renderDataTable({ req(AUData())
+  if(nrow(AUData()) < 1000){
     DT::datatable(AUData(), extensions = 'Buttons', escape=F, rownames = F,
                   options= list(scrollX = TRUE, pageLength = nrow(AUData()), scrollY = "300px",
-                                dom='Btf', buttons=list('copy',
+                                dom='Btif', buttons=list('copy',
                                                         list(extend='csv',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')),
                                                         list(extend='excel',filename=paste('AUData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')))),
-                  selection = 'none')})
+                  selection = 'none')
+  } else {
+    DT::datatable(stationData(), extensions = 'Buttons', escape=F, rownames = F,
+                  options= list(scrollX = TRUE, pageLength = nrow(stationData()), scrollY = "300px",
+                                dom='Btif', buttons=list('copy',
+                                                        list(extend='csv',filename=paste('stationData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')),
+                                                        list(extend='excel',filename=paste('stationData_',paste(input$stationSelection, collapse = "_"),Sys.Date(),sep='')))),
+                  selection = 'none')    }  })
+  
+  # highlight when only one station displayed
+  output$AURawDataFlag <- renderUI({req(nrow(AUData()) >= 1000)
+    h4(strong('This assessment unit contains too much information in the conventionals dataset to readily display as an interactive HTML table. 
+              To expedite application rendering, the table below is filtered to the selected station.'))})
+    
   # Summarize data
   output$stationDataTableRecords <- renderText({req(AUData())
     paste(nrow(AUData()), 'records were retrieved for',as.character(input$AUselection),sep=' ')})
