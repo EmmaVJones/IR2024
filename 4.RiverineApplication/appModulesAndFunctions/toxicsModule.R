@@ -53,7 +53,8 @@ toxicsSingleStationUI <- function(id){
                           column(6, DT::dataTableOutput(ns('FPBCscreeningValues')))),
                  
                  h5('All fish tissue PBC exceedances for the ',span(strong('selected site')),' are highlighted according to the 
-                    screening values listed above. If no data is presented, then the station does not have any fish tissue PBC data.'),
+                    screening values listed above. If no data is presented, then the station does not have any fish tissue PBC data.
+                    This table is organized in reverse chronological order to highlight newest data first.'),
                  DT::dataTableOutput(ns('FPBCRangeTableSingleSite')),br(), br(), br()))#,
       #h5('All fish tissue PBC data available for the ',span(strong('selected site')),' are available below. 
       #    If no data is presented, then the station does not have any fish tissue PBC data available.'),
@@ -204,7 +205,8 @@ toxicsSingleStation <- function(input,output,session, AUdata, stationData, Water
   
   
   FPBC_oneStation <- reactive({req(ns(input$FPBC_oneStationSelection))
-    filter(fishPCB, `DEQ rivermile` %in% input$FPBC_oneStationSelection) })
+    filter(fishPCB, `DEQ rivermile` %in% input$FPBC_oneStationSelection) %>% 
+      arrange(desc(Date)) })
   
   output$FPBCscreeningValues <- DT::renderDataTable({
     tibble(Description = c('DEQ screening value of 18 ppb', 'DEQ screening value of 20 ppb', 'VDH lower level of concern of 100 ppb', 'VDH upper level of concern of 500 ppb'),
