@@ -56,7 +56,8 @@ toxicsSingleStationUI <- function(id){
                           column(6, DT::dataTableOutput(ns('FPBCscreeningValues')))),
                  
                  h5('All fish tissue PBC exceedances for the ',span(strong('selected site')),' are highlighted according to the 
-                    screening values listed above. If no data is presented, then the station does not have any fish tissue PBC data.'),
+                    screening values listed above. If no data is presented, then the station does not have any fish tissue PBC data.
+                    This table is organized in reverse chronological order to highlight newest data first.'),
                  DT::dataTableOutput(ns('FPBCRangeTableSingleSite')),br(), br(), br()))#,
       #h5('All fish tissue PBC data available for the ',span(strong('selected site')),' are available below. 
       #    If no data is presented, then the station does not have any fish tissue PBC data available.'),
@@ -207,7 +208,8 @@ toxicsSingleStation <- function(input,output,session, AUdata, stationData, Water
   
   
   FPBC_oneStation <- reactive({req(ns(input$FPBC_oneStationSelection))
-    filter(fishPCB, `DEQ rivermile` %in% input$FPBC_oneStationSelection) })
+    filter(fishPCB, `DEQ rivermile` %in% input$FPBC_oneStationSelection) %>% 
+      arrange(desc(Date))})
   
   output$FPBCscreeningValues <- DT::renderDataTable({
     tibble(Description = c('DEQ screening value of 18 ppb', 'DEQ screening value of 20 ppb', 'VDH lower level of concern of 100 ppb', 'VDH upper level of concern of 500 ppb'),
@@ -247,13 +249,14 @@ server <- function(input,output,session){
     filter(AUData(), FDT_STA_ID %in% input$stationSelection) })
   stationSelected <- reactive({input$stationSelection})
   
-  AUData <- reactive({filter(conventionals, Huc6_Vahu6 %in% c("JU08", "RD65")) %>%
+  AUData <- reactive({filter(conventionals, Huc6_Vahu6 %in% c("JU08", "RD65", "RL06" )) %>%
       left_join(dplyr::select(stationTable, STATION_ID:VAHU6,
                               WQS_ID:CLASS_DESCRIPTION),
                 #WQS_ID:`Max Temperature (C)`), 
                 by = c('FDT_STA_ID' = 'STATION_ID')) %>%
       filter(!is.na(ID305B_1)) %>%
-      pHSpecialStandardsCorrection() })
+      pHSpecialStandardsCorrection() %>% 
+      bind_rows(tibble(FDT_STA_ID = '4AROA036.59'))})
   
   
   # output$uiTest <- renderPrint({WaterToxics()})

@@ -57,10 +57,12 @@ metalsTableSingleStationUI <- function(id){
                  uiOutput(ns('Fmetals_oneStationSelectionUI')),
                  #verbatimTextOutput(ns('test')),
                  h5('All fish tissue metals exceedances for the ',span(strong('selected site')),' are available below. 
-                    If no data is presented, then the station does not have any fish tissue metals exceedances.'),
+                    If no data is presented, then the station does not have any fish tissue metals exceedances.
+                    This table is organized in reverse chronological order to highlight newest data first.'),
                  DT::dataTableOutput(ns('Fmetals_exceedance')),br(),
                  h5('All fish tissue metals data available for the ',span(strong('selected site')),' are available below. 
-                    If no data is presented, then the station does not have any fish tissue metals data available.'),
+                    If no data is presented, then the station does not have any fish tissue metals data available.
+                    This table is organized in reverse chronological order to highlight newest data first.'),
                  helpText('All concentrations expressed as ppm (mg/kg), wet weight, in edible fish tissue fillet'),
                  DT::dataTableOutput(ns('FmetalsRangeTableSingleSite'))) )
       
@@ -192,7 +194,8 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
   
   
   Fmetals_oneStation <- reactive({req(ns(input$Fmetals_oneStationSelection))
-    filter(Fmetals, Station_ID %in% input$Fmetals_oneStationSelection)})
+    filter(Fmetals, Station_ID %in% input$Fmetals_oneStationSelection) %>% 
+      arrange(desc(Collection_Date_Time))})
   
   output$Fmetals_exceedance <- DT::renderDataTable({req(Fmetals_oneStation())
     FmetalsSV <- dplyr::select(Fmetals_oneStation(), Station_ID, Collection_Date_Time, Sample_ID,  `# of Fish`, Species_Name, length, weight, Beryllium:Lead) %>%
@@ -202,7 +205,7 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
       left_join(filter(metalsSV, !str_detect(`Screening Method`, 'Practical')),
                 by = 'Metal') %>%
       filter(Measure > `Screening Value`) %>%
-      arrange(Metal)
+      arrange(desc(Collection_Date_Time), Metal)
     DT::datatable(FmetalsSV, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(FmetalsSV),
                                                              scrollY = "250px", dom='Bti', buttons=list('copy')), selection = 'none') %>%
       formatSignif(columns=c('Screening Value'), digits=2) })
@@ -250,7 +253,8 @@ server <- function(input,output,session){
                 #WQS_ID:`Max Temperature (C)`), 
                 by = c('FDT_STA_ID' = 'STATION_ID')) %>%
       filter(!is.na(ID305B_1)) %>%
-      pHSpecialStandardsCorrection() })
+      pHSpecialStandardsCorrection() %>% 
+      bind_rows(tibble(FDT_STA_ID = '4AROA036.59')) })
   
   
   # output$uiTest <- renderPrint({WaterToxics()})
