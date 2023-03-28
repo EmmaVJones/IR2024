@@ -144,8 +144,8 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
 ## Watershed selection Tab
 # side panel arguments
 DEQregionSelection <- "BRRO"#"NRO"#"NRO"#"VRO"#"PRO"#"NRO"#'BRRO'#"PRO"#'BRRO'
-basinSelection <- "New"#"James-Upper"#'Roanoke'#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
-HUC6Selection <- "NE46"#"JU56"#"RU23"#"JM20"#"RU13"#"JU21"#"JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+basinSelection <- "New"#"James-Upper"#"New"#"James-Upper"#'Roanoke'#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
+HUC6Selection <- "NE74"#"JU21"#"NE46"#"JU56"#"RU23"#"JM20"#"RU13"#"JU21"#"JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
 
 # pull together data based on user input on side panel
 # Pull AU data from server
@@ -200,7 +200,7 @@ AUselectionOptions <- unique(c(conventionals_HUC$ID305B_1,
 AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))] # double check nothing wonky in there before proceeding
 
 # user selection
-AUselection <- AUselectionOptions[1]# "VAN-A15R_ACO02A00"#"VAW-I04R_JKS03A00"##"VAV-B05R_BAR03A10"#"VAP-J17R_SFT01B98"#AUselectionOptions[1]#"VAN-A27R_AUA01A00"#
+AUselection <- AUselectionOptions[4]# "VAN-A15R_ACO02A00"#"VAW-I04R_JKS03A00"##"VAV-B05R_BAR03A10"#"VAP-J17R_SFT01B98"#AUselectionOptions[1]#"VAN-A27R_AUA01A00"#
 
 # Allow user to select from available stations in chosen AU to investigate further
 stationSelection_ <- filter(conventionals_HUC, ID305B_1 %in% AUselection | ID305B_2 %in% AUselection | 
@@ -221,7 +221,7 @@ if(nrow(carryoverStations) > 0){
     stationSelection_  <- c(stationSelection_ , carryoverStationsInAU)  } }
 
 # user selection
-stationSelection <- stationSelection_[2]
+stationSelection <- stationSelection_[1]
 
 
 # Pull conventionals data for just selected AU
