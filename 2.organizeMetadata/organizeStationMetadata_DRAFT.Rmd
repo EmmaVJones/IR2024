@@ -29,6 +29,13 @@ This script combines the WQS and AU information archived by those applications (
 This script combines draft data, as opposed to final data. Future iterations use final data to  for final application testing upon data release. This version is meant to assist application rebuilding processes prior to final data release. 
 
 
+## Low Flow Analyses
+
+New for IR2024, all low flow statistics are generated using the same methods (in R) as the Water Permitting program to maintain consistency within the agency. The 7Q10/Assessment Low Flow Analysis.Rmd walks users through pulling and analyzing this data from NWIS using functions built by Connor Brogan (and modified for faster assessment output by Emma Jones).
+
+This analysis must be run after April 1 of any given year to incorporate the whole prior water year. For IR 2024, these analyses were run on April 3, 2023 by Emma Jones and made available to the assessment products.
+
+
 ## Data Organization
 
 In order to link all data in the IR window to the appropriate station information, we need to bring in a few preliminary datasets.

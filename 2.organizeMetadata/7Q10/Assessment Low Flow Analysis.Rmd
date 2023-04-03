@@ -65,8 +65,11 @@ for(i in unique(sites$site_no)){
   flowAnalysis[i] <- list(siteFlow)
 }
 # save a record of results to call up later much faster
-#saveRDS(flowAnalysis, 'flowAnalysis.RDS')
+#saveRDS(flowAnalysis, '7Q10/data/flowAnalysis.RDS')
 #flowAnalysis <- readRDS('../7Q10/data/flowAnalysis.RDS')
+# Draft data run before the end of the water year for testing purposes
+#saveRDS(flowAnalysis, '7Q10/data/flowAnalysisDRAFT.RDS')
+#flowAnalysis <- readRDS('../7Q10/data/flowAnalysisDRAFT.RDS')
 ```
 
 Using the purrr library, we can extract just the flow metric information for each gage and store in a tibble for use later.
@@ -154,7 +157,7 @@ CreateWebMap(maps = c("Topo","Imagery","Hydrography"), collapsed = TRUE,
 ```
 
 
-But this was too high res to be useful. Assessors wanted this information summarized by assessment region, but that didnt make tons of sense either. We settled on summarizing by major river subbasins. 
+But this was too high res to be useful. Assessors wanted this information summarized by assessment region, but that didn't make tons of sense either. We settled on summarizing by major river subbasins. 
 
 ```{r river basins}
 basins <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/DEQ_VAHUSB_subbasins_EVJ.shp') %>% 
@@ -219,9 +222,9 @@ conn <- config::get("connectionSettings") # get configuration settings
 board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_KEY"),
                          server = conn$CONNECT_SERVER)#Sys.getenv("CONNECT_SERVER"))
 
-pin(lowAssessmentFlows, name = 'AssessmentWindowLowFlows', 
-    description = 'IR 2024 7Q10 low flow gage information by river subbasin', 
-    board = 'rsconnect')
+# pin(lowAssessmentFlows, name = 'AssessmentWindowLowFlows', 
+#     description = 'IR 2024 7Q10 low flow gage information by river subbasin', 
+#     board = 'rsconnect')
 ```
 
 

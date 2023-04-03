@@ -1207,7 +1207,7 @@ metalsAnalysis <- function(stationMetalsData, stationData, WER){
   WER <- ifelse(is.na(WER), 1, WER)
   
   # Get WQS from stationData so correct criteria can be applied
-  stationMetalsData <- left_join(stationMetalsData, 
+  stationMetalsData1 <- left_join(stationMetalsData, 
                                  dplyr::select(stationData, FDT_STA_ID, CLASS, PWS, ZONE) %>% 
                                    distinct(FDT_STA_ID, .keep_all = TRUE), by = c('Station_Id' = 'FDT_STA_ID')) %>% 
     mutate(`Assess As` = case_when(CLASS == "I" ~ 'Saltwater',
@@ -1230,6 +1230,19 @@ metalsAnalysis <- function(stationMetalsData, stationData, WER){
                   UraniumTotal = Uranium, RMK_UraniumTotal = RMK_Uranium, ZincDissolved:RMK_HardnessDissolved,
                   HardnessTotal = Hardness, RMK_HardnessTotal = RMK_Hardness, 
                   HARDNESS:`Assess As`) # reorder to desired format and rename 
+  
+  # But there are times when there are more rows than actual data due to the structure of the original data pull. It is unnecessary
+  # to analyze these empty rows. We can't do a simple drop_na() because there are legit times when we have a lot of missing metals data 
+  # but still want to run the analysis. Below, pivot on parameter and date and filter out rows with NA, what's left are the dates (rows)
+  # that we actually care about. Most stations this step is redundant, but for some unique situations this can prevent serious issues down the line
+  desiredDates <- stationMetalsData1 %>% 
+    dplyr::select(-contains("RMK_")) %>%  # drop all lab codes bc we just care about missing data now, not lab codes
+    group_by(Station_Id, FDT_DATE_TIME, FDT_DEPTH, CLASS, PWS, ZONE, `Assess As`) %>% 
+    pivot_longer(-c(Station_Id, FDT_DATE_TIME, FDT_DEPTH, CLASS, PWS, ZONE, `Assess As`), names_to = 'parameter', values_to = 'value') %>% 
+    filter(!is.na(value))
+  
+  stationMetalsData <- filter(stationMetalsData1, FDT_DATE_TIME %in% desiredDates$FDT_DATE_TIME)
+  
   
   # make a place to store raw analysis results
   rawCriteriaResults <- tibble(Station_Id = as.character(NA), WindowDateTimeStart = as.POSIXct(NA), FDT_DEPTH = as.numeric(NA),

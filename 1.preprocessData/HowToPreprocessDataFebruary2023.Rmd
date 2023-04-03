@@ -193,7 +193,14 @@ This Rmd and my R session were having serious troubles at this point. Bringing r
 
 
 
-Stay tuned for adding in new data from 2021-2022 pulled from the CMC API.
+#### 2021-2022 CMC Site information
+
+In March 2023, Reid pulled all stations in the CMC sampled during 2021-2022. He joined all available existing DEQ StationIDs to these sites, but there were still a fair number that needed this information because they were new to this cycle. Emma took that information and ran a number of spatial joins to suggest AU and WQS information for these sites (where this information wasn't available from previous assessments). This work was given to the regional assessment staff to review the joined FDT_STA_ID (or rename the placeholder ID with a desired FDT_STA_ID), WQS_ID, and ID305B. The script sourced below picks up where we pull this reviewed information and pin the metadata to the server.
+
+```{r citmon 2021 2022 metadata additions}
+#source('preprocessingModules/citmon20212022stationMetadataOrganization.R')
+```
+
 
 
 
