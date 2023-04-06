@@ -1,0 +1,42 @@
+```{r conventionals final, echo=F, warning=F, error=FALSE}
+conventionalsRaw <- read_excel('data/finalData/CEDSWQM_2024_IR_20230302.xlsx', sheet = 'CONVENTIONALS')
+
+# before removing data from your environment, here is how to clean Roger's data up to match with schema expected by automated tools
+#source('preprocessingModules/updateConventionalsSchema.R') # version working with old names, works for Feb 16 data pull
+# pin final versions
+# pin(conventionals, name = 'ejones/conventionals2024final',
+#     description = 'Final IR2024 conventionals dataset, EVJ reorganized from Roger 3/03/2023.',
+#     board = 'rsconnect')
+
+conventionals <- pin_get('ejones/conventionals2024final', board = 'rsconnect') 
+
+
+# An object named conventionals is now in your environment following the cleanup step above
+
+```
+
+
+It is important to troubleshoot and develop as much as possible prior to the final data pull. Below is how draft data pulls were used when the final data was not yet available.
+
+```{r conventionals draft, echo=F, warning=F, error=FALSE, eval=FALSE}
+# **Draft**
+# 
+# This is the February draft data pull that will help expedite the process when the official Conventionals data pull is released in March 2023. 
+#conventionalsRaw <- read_excel('data/draftData/CEDSWQM_2024_IR_20230216.xlsx', sheet = 'CONVENTIONALS')
+  #read_excel('data/draftData/CONVENTIONALS_20230216.xlsx', sheet = 'CONVENTIONALS') 
+  #read_excel('data/draftData/CEDSWQM_2024_IR_20230209.XLSX', sheet = 'CONVENTIONALS') 
+
+# before removing data from your environment, here is how to clean Roger's data up to match with schema expected by automated tools
+#source('preprocessingModules/updateConventionalsSchema.R') # version working with old names, works for Feb 16 data pull
+#source('preprocessingModules/updateConventionalsSchemaAndPinToServer.R')  # version working with new storet names, works for Feb 9 data pull
+# pin final versions
+# pin(conventionals, name = 'ejones/conventionals2024draft',
+#     description = 'Working IR2024 conventionals dataset, EVJ reorganized from Roger 2/23/2023.',
+#     board = 'rsconnect')
+
+#conventionals <- pin_get('ejones/conventionals2024draft', board = 'rsconnect') 
+
+
+# An object named conventionals is now in your environment to following the cleanup step above
+
+```

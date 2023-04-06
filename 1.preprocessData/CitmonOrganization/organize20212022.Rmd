@@ -1,0 +1,675 @@
+---
+title: "CitMon/Non Agency 2021-2022 Data Organization"
+author: "Emma Jones"
+date: "3/10/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(sf)
+library(readxl)
+library(lubridate)
+
+library(pins)
+library(config)
+library(purrr)
+library(lubridate)
+
+# Connect to server
+conn <- config::get(file = "C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/config.yml", "connectionSettings") # get configuration settings
+
+board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_KEY"),
+                         server = conn$CONNECT_SERVER)#Sys.getenv("CONNECT_SERVER"))
+
+```
+
+This  project picks up from the IR2024/1.preprocessData/HowToPreprocessDataFebruary2023.Rmd ### Other data: Citizen Monitoring and Non Agency header. The Rmd and my R session were having serious troubles at this point. Bringing running any of the spatial snapping processes proved impossible due to constant "C stack limit" errors. The 2021-2022 citmon/non agency data from Reid was thus organized in this project to see if that worked better.
+
+
+## Citmon Data Prep
+
+Bring in the stations Reid is currently finishing the final data leveling on.
+
+```{r citmonRead in}
+
+noID <- read.csv('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/data/draftData/CM_Stations_21_22_NO_ID.csv') %>% 
+  #make a placeholder ID based on group name and station name for now
+  mutate(FDT_STA_ID = paste(Data_Source, `Station.name`, sep = '.'))
+withID <- read.csv('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/data/draftData/CM_Stations_21_22_With_ID.csv')%>% 
+  group_by(FDT_STA_ID) %>%  mutate(n = n())
+# a fair number with multiple records
+
+
+# for Reid to sort out
+problemWithID <- filter(withID, n >1) 
+# these are the real problems
+
+withID <- filter(withID, ! FDT_STA_ID %in% c('2-OTD-16-CWT', '2-SNC-6-FOCR', '2-XDA-3-CWT','2CJMC-7-CWT', '2DSFT-4-CWT')) %>% 
+  distinct(FDT_STA_ID, .keep_all = T)
+
+```
+
+
+First working with the withID stations. Find all available WQS (or WQS_ID, ideally) and AU information.
+
+
+Bring in WQS information.
+
+```{r WQS}
+WQSlookup_withStandards <- pin_get('WQSlookup-withStandards', board = "rsconnect")
+citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect")
+```
+
+
+Identify all withID sites that don't need to go through the spatial joining process.
+
+```{r withID with WQS}
+withIDwithWQScitmon <- filter(withID, FDT_STA_ID %in% citmonWQS$StationID) %>% 
+  left_join(citmonWQS, by = c('FDT_STA_ID' = 'StationID'))
+
+withIDwithWQSreal <- filter(withID, ! FDT_STA_ID %in% citmonWQS$StationID) %>% 
+  # just in case they are in the real WQSlookup
+  filter(FDT_STA_ID %in% WQSlookup_withStandards$StationID) %>% 
+   left_join(WQSlookup_withStandards, by = c('FDT_STA_ID' = 'StationID')) %>% 
+  mutate(GNIS_ID = as.numeric(GNIS_ID))
+
+withIDwithWQS <- bind_rows(withIDwithWQScitmon, withIDwithWQSreal)
+
+withIDwithWQSnoWQS_ID <- filter(withIDwithWQS, is.na(WQS_ID) | WQS_ID == '')  # 286, that's a lot to ask
+
+rm(withIDwithWQScitmon, withIDwithWQSreal)
+
+# These are the sites we need to work on
+WQStoDo <- filter(withID,!  FDT_STA_ID %in% withIDwithWQS$FDT_STA_ID)
+
+```
+
+
+Now we need to add all sites without a real DEQ FDT_STA_ID to WQStoDo and begin spatial joins.
+
+```{r full to do list WQS}
+WQStoDo <- bind_rows(WQStoDo, noID)                   
+```
+
+
+## WQS data prep
+
+
+
+Need to add spatial metadata to make next steps work more efficiently.
+
+```{r citmonNonagency spatial metadata}
+#Bring in extra large ecoregion and assessment region files. By extra large we mean that they are continuous outside the state boundary such that stations that fall outside the state are not removed when spatially intersected
+ecoregion4Large <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VA_level4ecoregion_WGS84.shp')
+vahu6 <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VA_SUBWATERSHED_6TH_ORDER_STG.shp') # this version of vahu6 layer goes outside state boundary
+subbasinConversion <- read_csv('C:/HardDriveBackup/R/GitHub/pinData/data/subbasinToVAHU6conversion.csv')
+
+subbasinLayer <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/DEQ_VAHUSB_subbasins_EVJ.shp')  %>% 
+  st_drop_geometry() %>% 
+  rename('SUBBASIN' = 'SUBBASIN_1') %>% 
+  distinct(subbasin, .keep_all = T) %>%  # don't need this by Assessment Region right now so simplify dataset to make next join cleaner
+  dplyr::select(BASIN_NAME, BASIN_CODE, SUBBASIN, subbasin)
+
+unrestrictedAssessmentRegionVAHU6Subbasin <- left_join(vahu6, subbasinConversion, by = c('VAHU6', 'VAHU5')) %>% 
+  left_join(subbasinLayer, by = c('BASIN_CODE' = 'BASIN_CODE',
+                                  'VAHUSB' = 'subbasin'))
+#View(unrestrictedAssessmentRegionVAHU6Subbasin %>% st_drop_geometry())
+
+
+# Add Level 3 and 4 Ecoregion Info to citmon and any conventionals stations taht don't have info
+citmonNonAgency_sf1 <- WQStoDo %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+                                        remove = F, # don't remove these lat/lon cols from df
+                                        crs = 4326) %>% 
+                             
+  st_intersection(unrestrictedAssessmentRegionVAHU6Subbasin) %>% 
+  st_intersection(dplyr::select(ecoregion4Large, US_L3CODE, US_L3NAME, US_L4CODE, US_L4NAME)) 
+
+# add back in sites that could have been lost in spatial joins
+citmonNonAgency_sf2 <- bind_rows(citmonNonAgency_sf1 %>% st_drop_geometry(), # drop geom so bind_rows will work instead of rbind
+                                 filter(WQStoDo, ! FDT_STA_ID %in% citmonNonAgency_sf1$FDT_STA_ID) ) %>% 
+   # change back to spatial object
+   st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = F, # don't remove these lat/lon cols from df
+           crs = 4326)
+
+# make sure no duplicates
+citmonNonAgency_sf2 %>% group_by(FDT_STA_ID) %>% mutate(n = n()) %>% filter(n > 1) %>% View()
+
+
+# QA step
+# filter(citmonNonAgency_sf, ! FDT_STA_ID %in% citmonNonAgency_sf2$FDT_STA_ID)
+# mapview::mapview(filter(citmonNonAgency_sf, ! FDT_STA_ID %in% citmonNonAgency_sf1$FDT_STA_ID))+
+#   mapview::mapview(ecoregion4Large)
+
+distinctSites_sf <- citmonNonAgency_sf2
+  dplyr::select(FDT_STA_ID, GROUP_STA_ID, everything())
+
+# make sure no duplicates
+distinctSites_sf %>% group_by(FDT_STA_ID) %>% mutate(n = n()) %>% dplyr::select(n, everything()) %>%  filter(n > 1) %>%   View()
+# duplicates are all legit. These are colocated stations with citizen monitoring. KEEP THESE
+
+# Clean up workspace
+rm(list = c('ecoregion4Large','county', 'vahu6','subbasinConversion','unrestrictedAssessmentRegionVAHU6Subbasin',
+            'citmonNonAgency_sf1', 'citmonNonAgency_sf2', 'path', 'subbasinLayer', 'citmonWQS', 'WQSlookup_withSTandards'))
+
+#saveRDS(distinctSites_sf, 'distinctSites_sf20212022.RDS')
+```
+
+
+## Quick switch session
+
+In R 4.1.2...
+
+Take from preprocessingModule/assessmentLayerSubbasinJoin.R 
+
+```{r in 4.2.1}
+library(tidyverse)
+library(sf)
+library(readxl)
+library(lubridate)
+library(lwgeom)
+
+distinctSites_sf <- readRDS('distinctSites_sf20212022.RDS')
+
+assessmentLayer <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/AssessmentRegions_VA84_basins.shp') %>%
+  st_transform( st_crs(4326)) # transform to WQS84 for spatial intersection
+
+subbasinLayer <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/DEQ_VAHUSB_subbasins_EVJ.shp')  %>%
+  rename('SUBBASIN' = 'SUBBASIN_1')
+
+ecoregion4Large <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VA_level4ecoregion_WGS84.shp')
+
+
+
+distinctSites_sfhelp <- filter(distinctSites_sf, is.na(ASSESS_REG) | is.na(US_L3NAME) | is.na(BASIN_CODE)) 
+
+distinctSites_sf1 <- distinctSites_sf #%>% 
+  # dplyr::select(-BASIN_CODE) %>% 
+  # #st_intersection(assessmentLayer ) %>% # will need this for citmon
+  # st_join(dplyr::select(subbasinLayer, BASIN_NAME, BASIN_CODE, SUBBASIN), join = st_intersects) 
+
+# if any joining issues occur, that means that there are stations that fall outside the joined polygon area
+# we need to go back in and fix them manually
+if(any(nrow(distinctSites_sf1) < nrow(distinctSites_sf) |
+       nrow(filter(distinctSites_sf1, is.na(BASIN_CODE))) > 0 )   ){
+  missingSites <- bind_rows(filter(distinctSites_sfhelp, ! FDT_STA_ID %in% distinctSites_sf1$FDT_STA_ID),
+                            filter(distinctSites_sf1, is.na(BASIN_CODE))) %>% 
+    bind_rows(filter(distinctSites_sf1, is.na(ASSESS_REG))) %>% 
+    dplyr::select(-c(VAHU6, ASSESS_REG, OFFICE_NM, VaName, Tidal, VAHUSB, FedName, HUC10 ,Basin, BASIN_CODE, BASIN_NAME, SUBBASIN))
+    
+  # ASSESSMENT REGION FIX
+  closest <- mutate(assessmentLayer[0,], FDT_STA_ID =NA) %>%
+    dplyr::select(FDT_STA_ID, everything())
+  hasVAHU6 <- filter(distinctSites_sf1, !is.na(ASSESS_REG))
+  missingSitesVAHU6 <- filter(missingSites, !FDT_STA_ID %in% hasVAHU6$FDT_STA_ID)
+  for(i in seq_len(nrow(missingSitesVAHU6))){
+    print(i)
+    closest[i,] <- assessmentLayer[which.min(st_distance(assessmentLayer, missingSitesVAHU6[i,])),] %>%
+      mutate(FDT_STA_ID = missingSitesVAHU6[i,]$FDT_STA_ID) %>%
+      dplyr::select(FDT_STA_ID, everything())
+  }
+  closest <- closest %>% distinct(FDT_STA_ID, .keep_all = T) # sometimes there can be duplicates
+  
+  
+  # SUBBASIN FIX
+  closestSUBB <- mutate(subbasinLayer[0,], FDT_STA_ID =NA) %>%
+    dplyr::select(FDT_STA_ID, everything())
+  hasSUBB <- filter(distinctSites_sf1, !is.na(BASIN_NAME))
+  missingSitesSUBB <- filter(missingSites, !FDT_STA_ID %in% hasSUBB$FDT_STA_ID)
+  for(i in seq_len(nrow(missingSitesSUBB))){
+    print(i)
+    closestSUBB[i,] <- subbasinLayer[which.min(st_distance(subbasinLayer, missingSitesSUBB[i,])),] %>%
+      mutate(FDT_STA_ID = missingSitesSUBB[i,]$FDT_STA_ID) %>%
+      dplyr::select(FDT_STA_ID, everything())
+  }
+  closestSUBB <- closestSUBB %>% distinct(FDT_STA_ID, .keep_all = T) # sometimes there can be duplicates
+  
+  
+  
+  # ECOREGION FIX
+  hasECO <- filter(distinctSites_sf1, !is.na(US_L3CODE))
+  missingSitesECO <- filter(missingSites, !FDT_STA_ID %in% hasECO$FDT_STA_ID)
+  closestECO <- mutate(ecoregion4Large[0,], FDT_STA_ID =NA) %>%
+    dplyr::select(FDT_STA_ID, everything())
+  for(i in seq_len(nrow(missingSitesECO))){
+    print(i)
+    closestECO [i,] <- ecoregion4Large[which.min(st_distance(ecoregion4Large, missingSitesECO[i,])),] %>%
+      mutate(FDT_STA_ID = missingSitesECO[i,]$FDT_STA_ID) %>%
+      dplyr::select(FDT_STA_ID, everything())
+  }
+  closestECO <- closestECO %>% distinct(FDT_STA_ID, .keep_all = T) # sometimes there can be duplicates
+  
+  
+  
+  missingSites <- left_join(missingSites, closest %>% st_drop_geometry(),
+                            by = 'FDT_STA_ID') %>%
+    left_join(dplyr::select(closestSUBB, FDT_STA_ID, BASIN_NAME, BASIN_CODE, SUBBASIN) %>% st_drop_geometry(),
+              by = 'FDT_STA_ID') %>% 
+    left_join(dplyr::select(hasSUBB, FDT_STA_ID, BASIN_NAME, BASIN_CODE, SUBBASIN) %>% st_drop_geometry(),
+              by = 'FDT_STA_ID') %>% 
+    left_join(dplyr::select(closestECO, FDT_STA_ID, US_L3CODE, US_L3NAME, US_L4CODE, US_L4NAME) %>% st_drop_geometry(),
+              by = 'FDT_STA_ID') %>% 
+    mutate(BASIN_NAME = coalesce(BASIN_NAME.x, BASIN_NAME.y),
+           BASIN_CODE = coalesce(BASIN_CODE.x, BASIN_CODE.y),
+           SUBBASIN = coalesce(SUBBASIN.x, SUBBASIN.y),
+           US_L3CODE = coalesce(US_L3CODE.x, US_L3CODE.y),
+           US_L3NAME = coalesce(US_L3NAME.x, US_L3NAME.y),
+           US_L4CODE = coalesce(US_L4CODE.x, US_L4CODE.y),
+           US_L4NAME = coalesce(US_L4NAME.x, US_L4NAME.y),
+           HUC12 = coalesce(HUC12.x, HUC12.y),
+           VAHU5 = coalesce(VAHU5.x , VAHU5.y)) %>% 
+    #st_join(dplyr::select(subbasinLayer, BASIN_NAME, BASIN_CODE, SUBBASIN), join = st_intersects) %>%
+    dplyr::select(-c(geometry), geometry) %>%
+    dplyr::select(names(distinctSites_sf1))
+  
+  # 3/26/23
+  distinctSites_sf2 <- bind_rows(filter(distinctSites_sf,! FDT_STA_ID %in% missingSites$FDT_STA_ID),
+                            missingSites) %>% 
+    dplyr::select(FDT_STA_ID, GROUP_STA_ID, STA_DESC, everything()) %>% 
+    #group_by(FDT_STA_ID) %>% mutate(n = n()) %>% dplyr::select(n, everything()) %>% arrange(desc(n)) %>% filter(n ==2) %>% 
+    distinct(FDT_STA_ID, .keep_all = T)
+  
+  
+  stillMissingBASIN <- filter(distinctSites_sf2, is.na(BASIN_NAME)) %>%
+    st_join(dplyr::select(subbasinLayer, BASIN_NAME, BASIN_CODE, SUBBASIN), join = st_intersects) %>% 
+    mutate(BASIN_NAME = coalesce(BASIN_NAME.x, BASIN_NAME.y),
+           BASIN_CODE = coalesce(BASIN_CODE.x, BASIN_CODE.y),
+           SUBBASIN = coalesce(SUBBASIN.x, SUBBASIN.y)) %>%
+    dplyr::select(names(distinctSites_sf1)) %>% 
+    st_drop_geometry() 
+  
+  distinctSites_sf3 <- bind_rows(filter(distinctSites_sf2,! FDT_STA_ID %in% stillMissingBASIN$FDT_STA_ID),
+                                 stillMissingBASIN)
+  
+  
+  # distinctSites_sf <- rbind(filter(distinctSites_sf1,! FDT_STA_ID %in% missingSites$FDT_STA_ID),
+  #                            missingSites)
+  
+  
+} else{
+  distinctSites_sf <- distinctSites_sf1
+}
+
+# distinctSites_sffixed <- rbind(distinctSites_sfold,
+#                                distinctSites_sf2) %>% 
+#   distinct(FDT_STA_ID, .keep_all = T)
+  # group_by(FDT_STA_ID) %>% 
+  # mutate(n = n()) %>% 
+  # arrange(desc(n)) %>% 
+  # dplyr::select(n, everything())
+
+distinctSites_sf <- distinctSites_sf3
+
+
+rm(closest); rm(i); rm(subbasinLayer); rm(distinctSites_sf1); rm(closestSUBB); rm(closestECO); rm(hasECO); rm(hasSUBB); rm(hasVAHU6)
+rm(missingSites); rm(missingSitesECO); rm(missingSitesSUBB); rm(missingSitesVAHU6); rm(stillMissingBASIN); rm(ecoregion4Large)
+rm(distinctSites_sf2); rm(distinctSites_sf3); rm(distinctSites_sfhelp);rm(assessmentLayer); rm(missingSites1)
+
+# # sve two ways in case c stack errors, no spatial stuff in case that makes a difference
+# saveRDS(distinctSites_sf %>% 
+#           st_drop_geometry(), 'distinctSites_sf20212022_ecobasin.RDS')
+# 
+# write.csv(distinctSites_sf %>% 
+#           st_drop_geometry(), 'distinctSites_sf20212022_ecobasin.csv', row.names = F, na = '')
+```
+
+
+## WQS spatial joins
+
+In 3.6.2
+
+apparently reading back in a csv gets around c stack issues? even the .RDS with no spatial info doesn't work!
+
+```{r restart stuff}
+
+
+#distinctSites_sf <- readRDS('distinctSites_sf20212022_ecobasin.RDS')
+distinctSites_sf <- read.csv('distinctSites_sf20212022_ecobasin.csv') %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+                                        remove = F, # don't remove these lat/lon cols from df
+                                        crs = 4326) %>% 
+  dplyr::select(-c(OBJECTID, OBJECTID_1)) %>% 
+  filter(! FDT_STA_ID %in% c('2-OTD-16-CWT', '2-SNC-6-FOCR', '2-XDA-3-CWT','2CJMC-7-CWT', '2DSFT-4-CWT'))
+  
+distinctSitesToDoWQS <- distinctSites_sf %>% 
+  mutate(FDT_STA_ID = as.character(FDT_STA_ID)) # so names don't come out funny from future functions
+```
+
+
+Since transitioning the WQS storage from local (individual assessor files) to a centralized system (on the R server for multiple program uses), the number of stations that require WQS attribution should decrease significantly each IR cycle. To attribute each station to WQS information, we first need to do all spatial joins to new WQS layer to get appropriate UID information, then we can send that information to an interactive application for humans to manually verify.
+
+Here is the table used to store link information from stations to appropriate WQS.
+
+```{r WQStable}
+WQStable <- tibble(StationID = NA, WQS_ID = NA)
+```
+
+
+Since it is much faster to look for spatial joins by polygons compared to snapping to lines, we will run spatial joins by estuarine polys and reservoir layers first.
+
+##### Estuarine Polygons
+
+Find any sites that fall into an estuary WQS polygon. This method is only applied to subbasins that intersect estuarine areas. This process also removes any estuarine sites from the data frame of unique sites that need WQS information (distinctSitesToDoWQS).
+
+We will bring in (source) a custom function that runs the analysis for us, feed it our latest WQS information, and let the function run across all input stations.
+
+```{r estuary methods}
+source('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/preprocessingModules/WQS_estuaryPoly.R')
+
+# Bring in estuary layer
+estuarinePolys <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/estuarinepolygons_draft2022.shp', 
+                          fid_column_name = "OBJECTID") %>%
+  st_transform(4326)
+  
+WQStable <- estuaryPolygonJoin(estuarinePolys, distinctSitesToDoWQS, WQStable)
+
+rm(estuarinePolys) # clean up workspace
+```
+
+Remove stations that fell inside estuarine polygons from the 'to do' list.
+
+```{r remove estuary poly sites}
+distinctSitesToDoWQS <- filter(distinctSitesToDoWQS, ! FDT_STA_ID %in% WQStable$StationID)
+```
+
+
+
+##### Lake Polygons
+
+Find any sites that fall into a lake WQS polygon. This method is applied to all subbasins at once as it is a simple spatial join. 
+The next step removes any lake sites from the data frame of unique sites that need WQS information (distinctSitesToDoWQS).
+
+
+```{r lake methods}
+source('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/preprocessingModules/WQS_lakePoly.R')
+
+lakesPoly <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/lakes_reservoirs_draft2022.shp',
+                     fid_column_name = "OBJECTID") %>%
+  st_transform(4326)
+
+WQStable <- lakePolygonJoin(lakesPoly, distinctSitesToDoWQS, WQStable)
+
+rm(lakesPoly) # clean up workspace
+```
+
+Remove stations that fell inside lake polygons from the 'to do' list.
+
+```{r remove estuary poly sites}
+distinctSitesToDoWQS <- filter(distinctSitesToDoWQS, ! FDT_STA_ID %in% WQStable$StationID)
+```
+
+
+### Spatially Join WQS Lines
+
+Now on to the more computationally heavy WQS line snapping methods. First we will try to attach riverine WQS, and where stations remain we will try the estuarine WQS snap.
+
+##### Riverine Lines
+
+To do this join, we will buffer all sites that don't fall into a polygon layer by a set sequence of distances. The output will add a field called `Buffer Distance` to the WQStable to indicate distance required for snapping. This does not get transported to the data of record, but it is useful to keep for now for QA purposes. If more than one segment is found within a set buffer distance, then many rows will be attached to the WQStable with the single identifying station name. It is up to the QA tool to help the user determine which of these UID's are correct and drop the other records.
+
+We then remove any riverine sites from the data frame of unique sites that need WQS information (distinctSitesToDoWQS).
+
+```{r riverine methods}
+source('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/snappingFunctions/snapWQS.R')
+
+riverine <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/riverine_draft2022.shp',
+                    fid_column_name = "OBJECTID") #%>% 
+  #st_transform(102003) # forcing to albers from start bc such a huge layer
+  #st_transform('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m no_defs')
+# 2/3/21 have to manually feed character proj4string bc doesn't recognize albers epsg 
+
+WQStable <- snapAndOrganizeWQS(distinctSitesToDoWQS, 'FDT_STA_ID', riverine, 
+                               bufferDistances = seq(20,80,by=20),  # buffering by 20m from 20 - 80 meters
+                               WQStable)
+saveRDS(WQStable, 'data/WQStableCitmon.RDS')
+
+rm(riverine)
+```
+
+Remove stations that attached to riverine segments from the 'to do' list.
+
+```{r remove estuary poly sites}
+distinctSitesToDoWQS <- filter(distinctSitesToDoWQS, ! FDT_STA_ID %in% WQStable$StationID)
+```
+
+
+We can use this one last opportunity to test stations that didn't connect to the riverine WQS against the estuarine lines WQS as a one last hope of attributing some WQS information. We will take all stations from the WQStable that didn't snap to any WQS segments (`Buffer Distance` =='No connections within 80 m') and add those back in to our distinctSitesToDoWQS list to try to snap them to the estuarine lines spatial data. 
+
+```{r no riverine snaps}
+distinctSitesToDoWQS <- filter(WQStable, `Buffer Distance` =='No connections within 80 m') %>%
+  left_join(dplyr::select(distinctSites_sf, FDT_STA_ID, Latitude, Longitude, SUBBASIN) %>%
+              rename('StationID'= 'FDT_STA_ID'), by='StationID') %>%
+  dplyr::select(-c(geometry)) %>%
+  st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+           remove = T, # don't remove these lat/lon cols from df
+           crs = 4326)
+                            
+```
+
+
+
+##### Estuarine Lines
+
+If a site doesn't attach to a riverine segment, our last step is to try to attach estuary line segments before throwing an empty site to the users for the wild west of manual QA. Only send sites that could be in estuarine subbasin to this function to not waste time.
+Removes any estuary lines sites from the data frame of unique sites that need WQS information.
+
+```{r estuarine lines methods}
+source('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/snappingFunctions/snapWQS.R')
+
+estuarineLines <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/estuarinelines_draft2022.shp' , fid_column_name = "OBJECTID") #%>%
+  #st_transform(102003) # forcing to albers from start bc such a huge layer
+  #st_transform(4326)
+
+# Only send sites to function that could be in estuarine environment
+WQStable <- snapAndOrganizeWQS(filter(distinctSitesToDoWQS, SUBBASIN %in% c("Potomac River",
+                                                                            "Rappahannock River", 
+                                                                            "Atlantic Ocean Coastal",
+                                                                            "Chesapeake Bay Tributaries",
+                                                                            "Chesapeake Bay - Mainstem",
+                                                                            "James River - Lower",  
+                                                                            "Appomattox River",
+                                                                            "Chowan River", 
+                                                                            "Atlantic Ocean - South" ,
+                                                                            "Dismal Swamp/Albemarle Sound")),
+                               'StationID', estuarineLines, 
+                               bufferDistances = seq(20,80,by=20),  # buffering by 20m from 20 - 80 meters
+                               WQStable)
+saveRDS(WQStable, 'WQStable2.RDS')
+rm(estuarineLines)
+```
+
+Remove stations that attached to estuarine segments from the 'to do' list.
+
+```{r remove estuary poly sites}
+distinctSitesToDoWQS <- filter(distinctSitesToDoWQS, ! StationID %in% WQStable$StationID)
+```
+
+
+Get ready to output data
+
+
+Bring in WQS information one last time
+
+```{r WQS}
+WQSlookup_withStandards <- pin_get('WQSlookup-withStandards', board = "rsconnect")
+citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect")
+
+withIDwithWQScitmon <- filter(withID, FDT_STA_ID %in% citmonWQS$StationID) %>% 
+  left_join(citmonWQS, by = c('FDT_STA_ID' = 'StationID'))
+
+withIDwithWQSreal <- filter(withID, ! FDT_STA_ID %in% citmonWQS$StationID) %>% 
+  # just in case they are in the real WQSlookup
+  filter(FDT_STA_ID %in% WQSlookup_withStandards$StationID) %>% 
+   left_join(WQSlookup_withStandards, by = c('FDT_STA_ID' = 'StationID')) %>% 
+  mutate(GNIS_ID = as.numeric(GNIS_ID))
+
+withIDwithWQS <- bind_rows(withIDwithWQScitmon, withIDwithWQSreal)
+
+rm(withIDwithWQScitmon, withIDwithWQSreal)
+```
+
+```{r}
+WQStable1 <- WQStable %>% group_by(StationID) %>% mutate(n = n()) %>% 
+  # attach real information
+  left_join(distinctSites_sf %>% st_drop_geometry(), by = c('StationID' = 'FDT_STA_ID')) %>% 
+  rename(FDT_STA_ID = StationID)
+
+# make one object with WQS information
+WQStableForReview <- bind_rows(withIDwithWQS, WQStable1) %>% 
+  dplyr::select(n, everything()) 
+
+saveRDS(WQStableForReview, 'WQStableForReview.RDS')
+```
+
+
+
+
+# Combination time
+
+Now we need to combine all the spatial metadata.
+
+These are the sites we need to account for:
+
+```{r citmonRead in}
+
+library(tidyverse)
+library(sf)
+
+noID <- read.csv('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/data/draftData/CM_Stations_21_22_NO_ID.csv') %>% 
+  #make a placeholder ID based on group name and station name for now
+  mutate(FDT_STA_ID = paste(Data_Source, `Station.name`, sep = '.'))
+withID <- read.csv('C:/HardDriveBackup/R/GitHub/IR2024/1.preprocessData/data/draftData/CM_Stations_21_22_With_ID.csv') %>% 
+  group_by(FDT_STA_ID) %>%  mutate(n = n())
+# a fair number with multiple records
+
+
+# for Reid to sort out
+problemWithID <- filter(withID, n >1)
+```
+
+
+
+First, bring in the three types of data we created.
+
+```{r bring stuff back in}
+AUinformation <- readRDS('distinctSites_AUtogether.RDS') %>%   
+  rename(`Number of AU per FDT_STA_ID` = n, `AU Buffer Distance` = `Buffer Distance`,
+         `AU Comments` = Comments)
+WQSinformation <- readRDS('WQStableForReview.RDS')%>%  
+  rename(`Number of WQS per FDT_STA_ID` = n, `WQS Buffer Distance` = `Buffer Distance`,
+         `WQS Comments` = Comments) 
+
+
+WQSinformationFix <- filter(WQSinformation, str_detect(WQS_ID, 'EL'))
+WQSinformationFix1 <- filter(WQSinformation, FDT_STA_ID %in% WQSinformationFix$FDT_STA_ID) %>% 
+  filter(`WQS Buffer Distance` != 'No connections within 80 m')
+WQSinformation <- filter(WQSinformation,!  FDT_STA_ID %in% WQSinformationFix$FDT_STA_ID) %>% 
+  bind_rows(WQSinformationFix1) %>% 
+  group_by(FDT_STA_ID) %>% 
+  mutate(`Number of WQS per FDT_STA_ID` = n())
+
+rm(WQSinformationFix, WQSinformationFix1)
+```
+
+Now combine
+
+```{r}
+together <- full_join(WQSinformation, AUinformation, 
+                      by = c("Station.name", "GROUP_STA_ID", "STA_DESC", "Latitude", "Longitude", "GroupCode", "Data_Source", "FDT_STA_ID")) %>% 
+  
+  
+  
+  # once reid fixes sites this won't be issue
+  filter(!FDT_STA_ID %in% problemWithID$FDT_STA_ID) %>% 
+  
+  mutate(VAHU6 = coalesce(VAHU6.x, VAHU6.y),
+         SUBBASIN = coalesce(SUBBASIN.x, SUBBASIN.y)) %>% 
+  dplyr::select(-c(VAHU6.x, VAHU6.y, SUBBASIN.x, SUBBASIN.y)) %>% 
+  
+  
+  group_by(FDT_STA_ID) %>% 
+  mutate(`Total n` = n()) %>% 
+  dplyr::select(`Total n`, everything()) %>% 
+  dplyr::select(ASSESS_REG, VAHU6, `Total n`:FDT_STA_ID, ID305B_1, ID305B_2, WQS_ID, everything())
+```
+
+
+fix missing assessment info
+
+```{r}
+ecoregion4Large <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VA_level4ecoregion_WGS84.shp')
+vahu6 <- st_read('C:/HardDriveBackup/R/GitHub/pinData/data/GIS/VA_SUBWATERSHED_6TH_ORDER_STG.shp') # this version of vahu6 layer goes outside state boundary
+subbasinConversion <- read_csv('C:/HardDriveBackup/R/GitHub/pinData/data/subbasinToVAHU6conversion.csv')
+
+subbasinLayer <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/DEQ_VAHUSB_subbasins_EVJ.shp')  %>% 
+  st_drop_geometry() %>% 
+  rename('SUBBASIN' = 'SUBBASIN_1') %>% 
+  distinct(subbasin, .keep_all = T) %>%  # don't need this by Assessment Region right now so simplify dataset to make next join cleaner
+  dplyr::select(BASIN_NAME, BASIN_CODE, SUBBASIN, subbasin)
+
+unrestrictedAssessmentRegionVAHU6Subbasin <- left_join(vahu6, subbasinConversion, by = c('VAHU6', 'VAHU5')) %>% 
+  left_join(subbasinLayer, by = c('BASIN_CODE' = 'BASIN_CODE',
+                                  'VAHUSB' = 'subbasin'))
+
+
+togetherFix <- filter(together, is.na(ASSESS_REG) | is.na(VAHU6) | is.na(SUBBASIN) | is.na(US_L3CODE)| ASSESS_REG == ''| VAHU6 == '') %>% 
+  ungroup() %>% 
+  dplyr::select(-c(OBJECTID, METASOURCE, LOADDATE, AREAACRES, AREASQKM, STATES, NAME, HUTYPE, HUMOD, TOHUC, HUC_12, VAHU5, VAHU6, OBJECTID_1, HU_12_DS, HU_12_NAME, HUC_10, HUC_8, HUC_8_NAME, SHAPE_Leng, SHAPE_Area, HUC12, ASSESS_REG, OFFICE_NM, VaName, Tidal, VAHUSB, FedName, HUC10, Basin, BASIN_CODE, Basin_Code, BASIN_NAME, SUBBASIN, US_L3CODE, US_L3NAME, US_L4CODE, US_L4NAME)) %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"),  # make spatial layer using these columns
+                                        remove = F, # don't remove these lat/lon cols from df
+                                        crs = 4326) %>% 
+                             
+  st_intersection(unrestrictedAssessmentRegionVAHU6Subbasin) %>% 
+  st_intersection(dplyr::select(ecoregion4Large, US_L3CODE, US_L3NAME, US_L4CODE, US_L4NAME))
+
+togetherFix1 <- togetherFix %>% 
+  rename(`AU Buffer Distance` = AU.Buffer.Distance, `AU Comments` = AU.Comments,
+         `Number of AU per FDT_STA_ID` = Number.of.AU.per.FDT_STA_ID, 
+         `WQS Buffer Distance` = WQS.Buffer.Distance, `WQS Comments` =  WQS.Comments,
+         `Number of WQS per FDT_STA_ID` = Number.of.WQS.per.FDT_STA_ID, 
+         `Total n`  = Total.n) %>% 
+  dplyr::select(names(together))
+
+togetherFinal <- filter(together , ! FDT_STA_ID %in% togetherFix1$FDT_STA_ID) %>% 
+#mutate(LOADDATE = as.Date(LOADDATE)) %>% 
+  bind_rows(togetherFix1 %>% st_drop_geometry() %>% 
+              mutate(LOADDATE = as.factor(LOADDATE),
+                     TOHUC = as.numeric(TOHUC),
+                     HUC_12 = as.numeric(HUC_12),
+                     HU_12_DS = as.numeric(HU_12_DS),
+                     HUC_10 = as.numeric(HUC_10),
+                     HUC_8 = as.numeric(HUC_8),
+                     HUC12 = as.numeric(HUC12),
+                     HUC10 = as.numeric(HUC10),
+                     US_L3CODE = as.numeric(US_L3CODE),
+                     US_L4CODE = as.factor(US_L4CODE)
+                     
+                     )) %>% 
+mutate(VAHU6 = case_when(FDT_STA_ID %in% c('2NAN-SNR007.88-SUF',
+                                           '2NAN-SNR002.86-SUF',
+                                           '2NAN-SNR001.48-SUF',
+                                           '2NAN-SNR000.20-SUF') ~ 'JL49',
+                         FDT_STA_ID %in% c('VDE -  Maryland Department of the Environment.1806011') ~ 'CB34',
+                         TRUE ~ as.character(VAHU6))) %>%
+  left_join(unrestrictedAssessmentRegionVAHU6Subbasin %>% st_drop_geometry() %>% dplyr::select(VAHU6, ASSESS_REG), by = 'VAHU6') %>% 
+  mutate(ASSESS_REG = coalesce(ASSESS_REG.x, ASSESS_REG.y) ) %>% 
+  dplyr::select(-c(ASSESS_REG.x, ASSESS_REG.y)) %>% 
+  dplyr::select(ASSESS_REG, VAHU6, `Total n`, `Number of WQS per FDT_STA_ID`, `Number of AU per FDT_STA_ID`,  
+                Station.name:FDT_STA_ID, ID305B_1, ID305B_2,Lacustrine,	TYPE_1, `AU Buffer Distance`, everything()) %>% 
+  arrange(ASSESS_REG)
+
+#togetherFinal$FDT_STA_ID [! togetherFinal$FDT_STA_ID %in% together$FDT_STA_ID]
+```
+
+
+save for review
+
+```{r}
+write.csv(togetherFinal, 'ForReview.csv', na='', row.names = F)
+
+```
+

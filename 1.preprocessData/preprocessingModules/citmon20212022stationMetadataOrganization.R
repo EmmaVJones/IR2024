@@ -235,7 +235,7 @@ AUlookup_pin <- bind_rows(
   stationsWithAUinfo)
 
 # pin to server
-# pin(AUlookup, name = 'ejones/citmonStationsWithWQSFinal',
+# pin(AUlookup_pin, name = 'ejones/AUlookup',
 #     description = 'AUlookup table, draft until data are submitted to CEDS and cycle is approved (use that data instead). Last run by EVJ on 04/03/2023',
 #     board = 'rsconnect')
 
