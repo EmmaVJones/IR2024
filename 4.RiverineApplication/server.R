@@ -15,7 +15,10 @@ citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect")
 WQSlookup <- pin_get("ejones/WQSlookup-withStandards",  board = "rsconnect") %>% 
   # add properly organized citmon site info
   bind_rows(filter(citmonWQS, !is.na(WQS_ID) & WQS_ID !='') %>% 
-              mutate(GNIS_ID = as.factor(GNIS_ID)))
+              mutate(GNIS_ID = as.factor(GNIS_ID)))  %>% 
+  # in case there are duplicates between both datasets, choose record with WQS_ID and comments first
+  arrange(StationID, WQS_ID, `Buffer Distance`) %>%
+  distinct(StationID, .keep_all = T)
 citmonWQS <- filter(citmonWQS, ! StationID %in% WQSlookup$StationID) %>% 
   dplyr::select(StationID, `WQS Section` = SEC, `WQS Class`= CLASS,`WQS Special Standard` = SPSTDS)
 WQMstationFull <- pin_get("WQM-Station-Full", board = "rsconnect")
@@ -205,7 +208,9 @@ shinyServer(function(input, output, session) {
   
   # Table of Stations within Selected VAHU6
   stationSummary <- reactive({ req(huc6_filter())
-    filter(conventionals, Huc6_Vahu6 %in% huc6_filter()$VAHU6) %>%
+    filter(conventionals, FDT_STA_ID %in% filter(stationTable(), VAHU6 %in% huc6_filter()$VAHU6 & !is.na(ID305B_1))$STATION_ID) %>% #safer way to query
+      #Huc6_Vahu6 %in% huc6_filter()$VAHU6) %>% # this used to work when only expecting clean conventionals data
+      
       distinct(FDT_STA_ID, .keep_all = TRUE)  %>% 
       dplyr::select(FDT_STA_ID:FDT_SPG_CODE, STA_LV1_CODE:Data_Source, Latitude, Longitude, Huc6_Huc_8, Huc6_Huc_8_Name, Huc6_Name) %>% 
       dplyr::select(FDT_STA_ID, GROUP_STA_ID, STA_DESC, Latitude, Longitude, everything()) %>% 
@@ -332,7 +337,9 @@ shinyServer(function(input, output, session) {
     
     
     
-    filter(conventionals, Huc6_Vahu6 %in% huc6_filter()$VAHU6) %>%
+    filter(conventionals, FDT_STA_ID %in% filter(stationTable(), VAHU6 %in% huc6_filter()$VAHU6)$STATION_ID) %>% #safer way to query
+      #Huc6_Vahu6 %in% huc6_filter()$VAHU6) %>% # this used to work when only expecting clean conventionals data
+           
       left_join(dplyr::select(stationTable(), STATION_ID:VAHU6,lakeStation,
                               WQS_ID:EPA_ECO_US_L3NAME),
                 #WQS_ID:`Max Temperature (C)`), 
@@ -355,7 +362,7 @@ shinyServer(function(input, output, session) {
                                      filter(!is.na(keep)) %>% 
                                      pull(keep) ))
     AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))] # double check nothing wonky in there before proceeding
-    selectInput('AUselection', 'Assessment Unit Selection', choices = AUselectionOptions)  })
+    selectInput('AUselection', 'Assessment Unit Selection', choices = sort(AUselectionOptions))  })
   
   output$selectedAU <- DT::renderDataTable({req(conventionals_HUC(),input$AUselection)
     z <- filter(regionalAUs(), ID305B %in% input$AUselection) %>% st_set_geometry(NULL) %>% as.data.frame()

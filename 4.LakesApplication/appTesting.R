@@ -11,7 +11,10 @@ citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect")
 WQSlookup <- pin_get("ejones/WQSlookup-withStandards",  board = "rsconnect") %>% 
   # add properly organized citmon site info
   bind_rows(filter(citmonWQS, !is.na(WQS_ID) & WQS_ID !='') %>% 
-              mutate(GNIS_ID = as.factor(GNIS_ID)))
+              mutate(GNIS_ID = as.factor(GNIS_ID))) %>% 
+  # in case there are duplicates between both datasets, choose record with WQS_ID and comments first
+  arrange(StationID, WQS_ID, `Buffer Distance`) %>%
+  distinct(StationID, .keep_all = T)
 citmonWQS <- filter(citmonWQS, ! StationID %in% WQSlookup$StationID) %>% 
   dplyr::select(StationID, `WQS Section` = SEC, `WQS Class`= CLASS,`WQS Special Standard` = SPSTDS)
 WQMstationFull <- pin_get("WQM-Station-Full", board = "rsconnect")

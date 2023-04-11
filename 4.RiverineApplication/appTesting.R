@@ -9,7 +9,7 @@ source('global.R')
 # #pin(regionalAUs, name = 'BRROworkingAUriverine', description = "BRRO working AU riverine", board = "rsconnect")
 # 
 # 
-# 
+# conventionals_distinct <- pin_get('ejones/conventionals2024_distinct', board = 'rsconnect')#pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect')
 # Pull data from server
 conventionals <- pin_get('ejones/conventionals2024final_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
 #pin_get('ejones/conventionals2024draft_with7Q10flag', board = 'rsconnect') # version with precompiled 7Q10 information to save rendering time, only used by apps
@@ -18,7 +18,10 @@ citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect")
 WQSlookup <- pin_get("ejones/WQSlookup-withStandards",  board = "rsconnect") %>% 
   # add properly organized citmon site info
   bind_rows(filter(citmonWQS, !is.na(WQS_ID) & WQS_ID !='') %>% 
-              mutate(GNIS_ID = as.factor(GNIS_ID)))
+              mutate(GNIS_ID = as.factor(GNIS_ID))) %>% 
+  # in case there are duplicates between both datasets, choose record with WQS_ID and comments first
+  arrange(StationID, WQS_ID, `Buffer Distance`) %>%
+  distinct(StationID, .keep_all = T)
 citmonWQS <- filter(citmonWQS, ! StationID %in% WQSlookup$StationID) %>% 
   dplyr::select(StationID, `WQS Section` = SEC, `WQS Class`= CLASS,`WQS Special Standard` = SPSTDS)
 WQMstationFull <- pin_get("WQM-Station-Full", board = "rsconnect")
@@ -145,8 +148,8 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
 ## Watershed selection Tab
 # side panel arguments
 DEQregionSelection <- "BRRO"#"NRO"#"NRO"#"VRO"#"PRO"#"NRO"#'BRRO'#"PRO"#'BRRO'
-basinSelection <- "New"#"James-Upper"#"New"#"James-Upper"#'Roanoke'#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
-HUC6Selection <- "NE74"#"JU21"#"NE46"#"JU56"#"RU23"#"JM20"#"RU13"#"JU21"#"JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+basinSelection <- "James-Middle"#"New"#"James-Upper"#'Roanoke'#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
+HUC6Selection <- "JM11"#"RU19"#"NE74"#"JU21"#"NE46"#"JU56"#"RU23"#"JM20"#"RU13"#"JU21"#"JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
 
 # pull together data based on user input on side panel
 # Pull AU data from server
@@ -171,7 +174,8 @@ missingExtraSites <- filter(stationTable, VAHU6 %in% huc6_filter$VAHU6) %>%
   dplyr::select(FDT_STA_ID:VAHU6,  WQS_ID:lakeStation) 
 
 # Pull Conventionals data for selected AU on click
-conventionals_HUC <- filter(conventionals, Huc6_Vahu6 %in% huc6_filter$VAHU6) %>%
+conventionals_HUC <- filter(conventionals, FDT_STA_ID %in% filter(stationTable, VAHU6 %in% huc6_filter$VAHU6)$STATION_ID) %>% #safer way to query
+                            #Huc6_Vahu6 %in% huc6_filter$VAHU6) %>% # this used to work when only expecting clean conventionals data
   left_join(dplyr::select(stationTable, STATION_ID:VAHU6,lakeStation,
                           WQS_ID:EPA_ECO_US_L3NAME),
             by = c('FDT_STA_ID' = 'STATION_ID')) %>%
@@ -201,7 +205,7 @@ AUselectionOptions <- unique(c(conventionals_HUC$ID305B_1,
 AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))] # double check nothing wonky in there before proceeding
 
 # user selection
-AUselection <- AUselectionOptions[4]# "VAN-A15R_ACO02A00"#"VAW-I04R_JKS03A00"##"VAV-B05R_BAR03A10"#"VAP-J17R_SFT01B98"#AUselectionOptions[1]#"VAN-A27R_AUA01A00"#
+AUselection <- AUselectionOptions[2]# "VAN-A15R_ACO02A00"#"VAW-I04R_JKS03A00"##"VAV-B05R_BAR03A10"#"VAP-J17R_SFT01B98"#AUselectionOptions[1]#"VAN-A27R_AUA01A00"#
 
 # Allow user to select from available stations in chosen AU to investigate further
 stationSelection_ <- filter(conventionals_HUC, ID305B_1 %in% AUselection | ID305B_2 %in% AUselection | 
@@ -222,7 +226,7 @@ if(nrow(carryoverStations) > 0){
     stationSelection_  <- c(stationSelection_ , carryoverStationsInAU)  } }
 
 # user selection
-stationSelection <- stationSelection_[1]
+stationSelection <- stationSelection_[4]
 
 
 # Pull conventionals data for just selected AU
@@ -249,7 +253,8 @@ DT::datatable(AUs %>% st_drop_geometry(), rownames = FALSE,
                 selection = 'none') 
 
 # Table of Stations within Selected VAHU6, main panel
-stationSummary <- filter(conventionals, Huc6_Vahu6 %in% huc6_filter$VAHU6) %>%
+stationSummary <- filter(conventionals, FDT_STA_ID %in% filter(stationTable, VAHU6 %in% huc6_filter$VAHU6 & !is.na(ID305B_1))$STATION_ID) %>% #safer way to query
+  #Huc6_Vahu6 %in% huc6_filter$VAHU6) %>% # this used to work when only expecting clean conventionals data
   distinct(FDT_STA_ID, .keep_all = TRUE)  %>% 
   bind_rows(missingExtraSites %>% 
               mutate(Data_Source = 'Data from outside conventionals query',

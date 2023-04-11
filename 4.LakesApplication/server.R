@@ -8,7 +8,10 @@ citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect")
 WQSlookup <- pin_get("ejones/WQSlookup-withStandards",  board = "rsconnect") %>% 
   # add properly organized citmon site info
   bind_rows(filter(citmonWQS, !is.na(WQS_ID) & WQS_ID !='') %>% 
-              mutate(GNIS_ID = as.factor(GNIS_ID)))
+              mutate(GNIS_ID = as.factor(GNIS_ID))) %>% 
+  # in case there are duplicates between both datasets, choose record with WQS_ID and comments first
+  arrange(StationID, WQS_ID, `Buffer Distance`) %>%
+  distinct(StationID, .keep_all = T)
 citmonWQS <- filter(citmonWQS, ! StationID %in% WQSlookup$StationID) %>% 
   dplyr::select(StationID, `WQS Section` = SEC, `WQS Class`= CLASS,`WQS Special Standard` = SPSTDS)
 WQMstationFull <- pin_get("WQM-Station-Full", board = "rsconnect")
@@ -293,7 +296,7 @@ shinyServer(function(input, output, session) {
                                    pivot_longer(ID305B_1:ID305B_10, names_to = 'ID305B', values_to = 'keep') %>%
                                    pull(keep) )
     AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))]
-    selectInput('AUselection', 'Assessment Unit Selection', choices = AUselectionOptions)})
+    selectInput('AUselection', 'Assessment Unit Selection', choices = sort(AUselectionOptions))})
 
   output$selectedAU <- DT::renderDataTable({req(input$AUselection)
     z <- filter(regionalAUs(), ID305B %in% input$AUselection) %>% st_set_geometry(NULL) %>% as.data.frame()
