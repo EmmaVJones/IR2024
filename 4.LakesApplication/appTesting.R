@@ -50,7 +50,9 @@ fishMetals <- pin_get("ejones/fishMetalsIR2024", board = "rsconnect") %>% #read_
 fishMetalsScreeningValues <- read_csv('data/FishMetalsScreeningValues.csv') %>%
   group_by(`Screening Method`) %>%
   pivot_longer(cols = -`Screening Method`, names_to = 'Metal', values_to = 'Screening Value') %>%
-  arrange(Metal)
+  arrange(Metal)%>% 
+  filter(!str_detect(`Screening Method`, 'VDH')) # new for IR2024, drop VDH screening values because they are not in Appendix E2 of Guidance
+
 lakeNutStandards <- read_csv('data/9VAC25-260-187lakeNutrientStandards.csv')
 
 
@@ -156,7 +158,7 @@ lakeSelection_ <- regionalAUs %>%
   distinct(Lake_Name) %>% 
   arrange(Lake_Name) %>% 
   pull()
-lakeSelection <-  "Kerr Reservoir"#"Smith Mountain Lake" #"Claytor Lake"#"Timber Lake"#"Banister Lake"#"Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
+lakeSelection <-  "Lake Gaston"#"Kerr Reservoir"#"Smith Mountain Lake" #"Claytor Lake"#"Timber Lake"#"Banister Lake"#"Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
 
 AUs <- filter(regionalAUs, Lake_Name %in% lakeSelection & ASSESS_REG %in% DEQregionSelection)
 lake_filter <- filter_at(stationTable, vars(starts_with('ID305B')), any_vars(. %in% AUs$ID305B)) 
@@ -197,7 +199,7 @@ AUselectionOptions <- unique(dplyr::select(lake_filter, ID305B_1:ID305B_10) %>%
                                pull(keep) )
 AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))]
 
-inputAUselection <- AUselectionOptions[8]
+inputAUselection <- AUselectionOptions[2]
 AUselection <- filter(regionalAUs, ID305B %in% inputAUselection) %>% st_set_geometry(NULL) %>% as.data.frame()
 
 

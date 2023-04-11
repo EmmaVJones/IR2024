@@ -58,7 +58,8 @@ metalsTableSingleStationUI <- function(id){
                  DT::dataTableOutput(ns('Fmetals_exceedance')),br(),
                  h5('All fish tissue metals data available for the ',span(strong('selected site')),' are available below. 
                     If no data is presented, then the station does not have any fish tissue metals data available.
-                    This table is organized in reverse chronological order to highlight newest data first.'),
+                    This table is organized in reverse chronological order to highlight newest data first. The "new" DEQ 
+                    screening value is highlighted in orange if exceedances of this value occur in the dataset.'),
                  helpText('All concentrations expressed as ppm (mg/kg), wet weight, in edible fish tissue fillet'),
                  DT::dataTableOutput(ns('FmetalsRangeTableSingleSite'))) )
       
@@ -204,7 +205,8 @@ metalsTableSingleStation <- function(input,output,session, AUdata, WCmetals , WC
       arrange(desc(Collection_Date_Time), Metal)
     DT::datatable(FmetalsSV, rownames = FALSE, options= list(scrollX = TRUE, pageLength = nrow(FmetalsSV),
                                                              scrollY = "250px", dom='Bti', buttons=list('copy')), selection = 'none') %>%
-      formatSignif(columns=c('Screening Value'), digits=2)      })
+      formatSignif(columns=c('Screening Value'), digits=2)  %>% 
+      formatStyle(c('Screening Method'), backgroundColor = styleEqual(c('"new" DEQ Screening Value - SV (mg/kg)'), c( '#f2a972')))})
   
   
   output$FmetalsRangeTableSingleSite <- DT::renderDataTable({ req(input$Fmetals_oneStationSelection, Fmetals_oneStation())

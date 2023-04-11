@@ -46,8 +46,9 @@ Scripts to organize and pin data are in ../2.organizeMetadata/organizeStationMet
 Draft data created for testing
 
 ```{r pull pins}
-conventionals <- pin_get('ejones/conventionals2024final', board = 'rsconnect')#pin_get('ejones/conventionals2024draft', board = 'rsconnect')
-conventionals_distinct <- pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect') 
+conventionals <- pin_get('ejones/conventionals2024final', board = 'rsconnect') %>% #pin_get('ejones/conventionals2024draft', board = 'rsconnect')
+    bind_rows(pin_get("ejones/citmonNonAgencyDataIR2024", board = "rsconnect"))
+conventionals_distinct <- pin_get('ejones/conventionals2024_distinct', board = 'rsconnect')#pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect') 
 WCmetals <- pin_get("WCmetalsIR2024",  board = "rsconnect") 
 WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") 
 Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
@@ -247,7 +248,8 @@ stationTable <- mutate(stationTable, WATER_TYPE = case_when(STATION_ID %in% c("2
                                                             TRUE ~ as.character(WATER_TYPE)))
 
 # QA check: make sure all 187 lakes have chla and tp standards
-lakeStationsImportant <- dplyr::select(lakeStations, STATION_ID:ID305B_3, NUT_TP_EXC:NUT_CHLA_STAT, WQS_ID, GNIS_Name,
+lakeStationsImportant <- dplyr::select(lakeStations, STATION_ID:ID305B_3, NUT_TP_EXC:NUT_CHLA_STAT, 
+                                       WQS_ID, GNIS_Name,
                                        WATER_NAME, Lakes_187B, Lake_Name:`Total Phosphorus (ug/L)`) %>%
   filter(!is.na(WQS_ID))
 
@@ -260,59 +262,9 @@ lakeStationsMoreWork <- dplyr::select(lakeStations, STATION_ID:ID305B_3, TYPE_1,
     st_as_sf(coords = c("LONGITUDE", "LATITUDE"), 
            remove = F, # don't remove these lat/lon cols from df
            crs = 4269) # add projection, needs to be geographic for now bc entering lat/lng
-# 
-# lakesPoly <- st_read('../GIS/draft_WQS_shapefiles_2022/lakes_reservoirs_draft2022.shp',
-#                      fid_column_name = "OBJECTID") %>%
-#   st_transform(4269)
-# 
-# # Spatially join to polygon layer and create table to store links
-# lakePolyWQS <- st_join(lakeStationsMoreWork, lakesPoly, join = st_intersects) %>%
-#     filter(!is.na(OBJECTID)) %>% 
-#   dplyr::select(StationID = STATION_ID, WQS_ID = WQS_ID.y, TYPE_1) %>% 
-#   mutate(`Buffer Distance` = 'In Polygon', 
-#          Comments = 'EVJ Addition') %>% 
-#   st_drop_geometry()
-#  
-# WQSlookup1 <- pin_get('ejones/WQSlookup', board = 'rsconnect')
-# citmonWQS1 <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect")
-# 
-# WQSlookup2 <- bind_rows(WQSlookup1, 
-#                         filter(lakePolyWQS, TYPE_1 %in% c('C', 'L')) %>% #View()
-#                           dplyr::select(-TYPE_1))
-# 
-# citmonWQ2 <- bind_rows(citmonWQS1, 
-#                         filter(lakePolyWQS, ! TYPE_1 %in% c('C', 'L')) %>% #View()
-#                           dplyr::select(-TYPE_1))
-# 
-# pin(WQSlookup2, 'ejones/WQSlookup', board = 'rsconnect', 
-#     description = 'WQS lookup table from metadata attribution application')
-# 
-# 
-# pin(citmonWQ2, 'ejones/citmonStationsWithWQSFinal', board = 'rsconnect', 
-#     description = 'WQS lookup table with Standards for Citmon/Non Agency Stations')
 
 ```
 
-<!-- And drop estuarine stations as well. -->
-
-<!-- ```{r} -->
-<!-- estuarineStations <- filter_at(stationTable, -->
-<!--                           .vars = vars(contains("ID305B")), -->
-<!--                           .vars_predicate = any_vars(str_detect(., 'E_'))) -->
-<!-- bothTypesE <- filter_at(estuarineStations, -->
-<!--                           .vars = vars(contains("ID305B")), -->
-<!--                           .vars_predicate = any_vars(str_detect(., 'R_')))  -->
-<!-- #View(dplyr::select(stationTable, STATION_ID, ID305B_1, WQS_ID, everything())) -->
-
-<!-- # filter out estuarine stations for analysis -->
-<!-- # stationTable <- filter(stationTable, ! STATION_ID %in% estuarineStations$STATION_ID) %>% -->
-<!-- #   bind_rows(bothTypesE) # add northern station back in to be safe -->
-
-
-<!-- # for running only a few select sites -->
-<!-- # stationTable1 <- stationTable -->
-<!-- # stationTable <- filter(stationTable, str_detect(STATION_ID, '7-POQ' )) -->
-<!-- ``` -->
 
 
 ## Bring in Low Flow Information
@@ -363,7 +315,7 @@ That dataset is money. We want to use that one in the shiny applications, so mak
 
 ```{r pin new conventionals}
 # pin(conventionals, name = "conventionals2024final_with7Q10flag",
-#     description = "Final Conventionals data for IR2024 with added 7Q10 flag joined at major river basin level. This is used for the shiny app versions of the automated assessment protocol to save rendering time", board = 'rsconnect')
+#     description = "Final Conventionals data (DEQ conventionals and citmon/non agency) for IR2024 with added 7Q10 flag joined at major river basin level. This is used for the shiny app versions of the automated assessment protocol to save rendering time", board = 'rsconnect')
 ```
 
 

@@ -209,18 +209,21 @@ toxicsSingleStation <- function(input,output,session, AUdata, stationData, Water
       arrange(desc(Date)) })
   
   output$FPBCscreeningValues <- DT::renderDataTable({
-    tibble(Description = c('DEQ screening value of 18 ppb', 'DEQ screening value of 20 ppb', 'VDH lower level of concern of 100 ppb', 'VDH upper level of concern of 500 ppb'),
-           `Screening Value` = c(18.001, 20.001, 100.001, 500.001)) %>% # extra digits to force colors to come in correctly
+    tibble(Description = c('DEQ screening value of 18 ppb', 'DEQ screening value of 20 ppb'), # VDH flags dropped in IR 2024 #, 'VDH lower level of concern of 100 ppb', 'VDH upper level of concern of 500 ppb'),
+           `Screening Value` = c(18.001, 20.001)) %>% # extra digits to force colors to come in correctly
+      #, 100.001, 500.001)) %>% # VDH flags dropped in IR 2024 
       datatable(rownames = FALSE, options= list(scrollX = TRUE, pageLength = 4, dom='t')) %>%
       formatRound('Screening Value',digits = 0) %>%
-      formatStyle(c('Description', 'Screening Value'), backgroundColor = styleInterval(c( 18, 20, 100, 500), c(NA, '#f2a972', '#c34eed', '#4a57e8', '#ed4242' )))})
+      formatStyle(c('Description', 'Screening Value'), backgroundColor = styleInterval(c( 18, 20), #, 100, 500), 
+                                                                                       c(NA, '#f2a972', '#c34eed')))})# , '#4a57e8', '#ed4242' )))})
   
   
   output$FPBCRangeTableSingleSite <- DT::renderDataTable({ req(input$FPBC_oneStationSelection, FPBC_oneStation())
     DT::datatable(FPBC_oneStation(), rownames = FALSE, 
                   options= list(scrollX = TRUE, pageLength = nrow(FPBC_oneStation()), scrollY = "250px", dom='Bti', buttons=list('copy')),
                   selection = 'none')  %>%
-      formatStyle('Parameter Rounded to WQS Format', backgroundColor = styleInterval(c( 18, 20, 100, 500), c(NA, '#f2a972', '#c34eed', '#4a57e8', '#ed4242' ))) }) 
+      formatStyle('Parameter Rounded to WQS Format', backgroundColor = styleInterval(c( 18, 20),#, 100, 500),
+                                                                                     c(NA, '#f2a972', '#c34eed'))) }) #, '#4a57e8', '#ed4242' ))) }) 
   #formatStyle('Total PCBs', backgroundColor = styleInterval(c( 18, 20, 100, 500), c(NA, '#f2a972', '#c34eed', '#4a57e8', '#ed4242' )))   }) 
   
   

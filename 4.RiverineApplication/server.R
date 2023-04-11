@@ -82,7 +82,8 @@ fishMetals <- pin_get("ejones/fishMetalsIR2024", board = "rsconnect") %>% #read_
 fishMetalsScreeningValues <- read_csv('data/FishMetalsScreeningValues.csv') %>%
   group_by(`Screening Method`) %>%
   pivot_longer(cols = -`Screening Method`, names_to = 'Metal', values_to = 'Screening Value') %>%
-  arrange(Metal)
+  arrange(Metal) %>% 
+  filter(!str_detect(`Screening Method`, 'VDH')) # new for IR2024, drop VDH screening values because they are not in Appendix E2 of Guidance
 
 
 

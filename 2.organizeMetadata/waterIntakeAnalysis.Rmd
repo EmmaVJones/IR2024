@@ -26,7 +26,7 @@ board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_K
 This script shows the process for identifying all unique stations in an assessment window within distances of drinking water intakes for assessment purposes. This is important to know before an assessment so we can flag the station in the assessment app for assessors to consider more deeply.
 
 ```{r unique sites}
-conventionals_distinct <- pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect') %>% 
+conventionals_distinct <- pin_get('ejones/conventionals2024_distinct', board = 'rsconnect') %>% 
   filter(!is.na(Latitude) | !is.na(Longitude)) %>% 
   st_as_sf(coords = c("Longitude", "Latitude"), 
                remove = F, # don't remove these lat/lon cols from df

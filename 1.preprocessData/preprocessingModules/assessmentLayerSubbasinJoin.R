@@ -9,16 +9,13 @@ library(readxl)
 library(lubridate)
 library(lwgeom)
 
-
-distinctSites_sf <- readRDS('./data/distinctSites_sf03072023.RDS') #distinctSites_sf_withCitmon02232023.RDS')
+distinctSites_sf <- readRDS('./data/distinctSites_sf04102023.RDS')
+#distinctSites_sf <- readRDS('./data/distinctSites_sf03072023.RDS') #distinctSites_sf_withCitmon02232023.RDS')
 # use other data if possible first
-distinctSites_sfold <- readRDS('./data/distinctSites_sf_withCitmon02232023.RDS')
+distinctSites_sfold <-  readRDS('./data/distinctSites_sf03072023.RDS') #readRDS('./data/distinctSites_sf_withCitmon02232023.RDS')
 
 # glean what we can from a previous run
 distinctSites_sfhelp <- filter(distinctSites_sf, is.na(ASSESS_REG) | is.na(US_L3NAME) | is.na(BASIN_CODE)) 
-distinctSites_sfFixed <-filter(distinctSites_sfhelp, FDT_STA_ID %in% distinctSites_sfold$FDT_STA_ID) #these are still missing the things we need so not helpful in the end
-rm(distinctSites_sfFixed); rm(distinctSites_sfold)
-
 
 
 
@@ -91,7 +88,7 @@ if(any(nrow(distinctSites_sf1) < nrow(distinctSites_sf) |
       dplyr::select(FDT_STA_ID, everything())
   }
   closestECO <- closestECO %>% distinct(FDT_STA_ID, .keep_all = T) # sometimes there can be duplicates
-  
+  #View(closestECO %>% st_drop_geometry())
   
   
   missingSites <- left_join(missingSites, closest %>% st_drop_geometry(),
@@ -112,6 +109,7 @@ if(any(nrow(distinctSites_sf1) < nrow(distinctSites_sf) |
     #st_join(dplyr::select(subbasinLayer, BASIN_NAME, BASIN_CODE, SUBBASIN), join = st_intersects) %>%
     dplyr::select(-c(geometry), geometry) %>%
     dplyr::select(names(distinctSites_sf1))
+  #View(missingSites %>% st_drop_geometry())
   
   # 3/26/23
   distinctSites_sf2 <- bind_rows(filter(distinctSites_sf,! FDT_STA_ID %in% missingSites$FDT_STA_ID),
@@ -127,7 +125,14 @@ if(any(nrow(distinctSites_sf1) < nrow(distinctSites_sf) |
            BASIN_CODE = coalesce(BASIN_CODE.x, BASIN_CODE.y),
            SUBBASIN = coalesce(SUBBASIN.x, SUBBASIN.y)) %>%
     dplyr::select(names(distinctSites_sf1)) %>% 
-    st_drop_geometry() 
+    st_drop_geometry() %>% 
+    mutate(BASIN_NAME = case_when(is.na(BASIN_NAME) & BASIN_CODE =='4A' ~ 'Roanoke River',
+                                  is.na(BASIN_NAME) & BASIN_CODE =='4B' ~ 'Roanoke River',
+                                  is.na(BASIN_NAME) & BASIN_CODE =='5A' ~ 'Chowan River/Dismal Swamp',
+                                  is.na(BASIN_NAME) & BASIN_CODE =='6A' ~ 'Tennessee and Big Sandy Rivers',
+                                  is.na(BASIN_NAME) & BASIN_CODE =='6B' ~ 'Tennessee and Big Sandy Rivers',
+                                  is.na(BASIN_NAME) & BASIN_CODE =='9' ~ 'New River',
+                                  TRUE ~ as.character(BASIN_NAME)))
   
   distinctSites_sf3 <- bind_rows(filter(distinctSites_sf2,! FDT_STA_ID %in% stillMissingBASIN$FDT_STA_ID),
                                  stillMissingBASIN)
@@ -154,4 +159,4 @@ distinctSites_sf <- distinctSites_sf3
 rm(closest); rm(i); rm(subbasinLayer); rm(distinctSites_sf1); rm(closestSUBB); rm(closestECO); rm(hasECO); rm(hasSUBB); rm(hasVAHU6)
 rm(missingSites); rm(missingSitesECO); rm(missingSitesSUBB); rm(missingSitesVAHU6); rm(stillMissingBASIN); rm(ecoregion4Large)
 rm(distinctSites_sf2); rm(distinctSites_sf3); rm(distinctSites_sfhelp);rm(assessmentLayer)
-#saveRDS(distinctSites_sf, './data/distinctSites_sf_withCitmon03072023.RDS')#'./data/distinctSites_sf_withCitmon02232023.RDS')
+#saveRDS(distinctSites_sf, './data/distinctSites_sf_postassessmentLayerSubbasinJoin04102023.RDS')#'./data/distinctSites_sf_withCitmon02232023.RDS')

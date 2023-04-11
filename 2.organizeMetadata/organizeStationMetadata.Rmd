@@ -1,0 +1,947 @@
+---
+title: "Organize Station Metadata DRAFT"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(readxl)
+library(sf)
+library(pins)
+library(config)
+library(lubridate)
+
+# Connect to server
+conn <- config::get("connectionSettings") # get configuration settings
+
+board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_KEY"),
+                         server = conn$CONNECT_SERVER)#Sys.getenv("CONNECT_SERVER"))
+
+```
+
+## Overview
+
+This project picks up after regional assessment staff attribute WQS and AU information to each station identified for inclusion in a given assessment cycle. 
+
+This script combines the WQS and AU information archived by those applications (from the R Connect server) and attaches that information to all data associated with an assessment window.
+
+This script combines draft data, as opposed to final data. Future iterations use final data to  for final application testing upon data release. This version is meant to assist application rebuilding processes prior to final data release. 
+
+
+## Low Flow Analyses
+
+New for IR2024, all low flow statistics are generated using the same methods (in R) as the Water Permitting program to maintain consistency within the agency. The 7Q10/Assessment Low Flow Analysis.Rmd walks users through pulling and analyzing this data from NWIS using functions built by Connor Brogan (and modified for faster assessment output by Emma Jones).
+
+This analysis must be run after April 1 of any given year to incorporate the whole prior water year. For IR 2024, these analyses were run on April 3, 2023 by Emma Jones and made available to the assessment products.
+
+
+## Data Organization
+
+In order to link all data in the IR window to the appropriate station information, we need to bring in a few preliminary datasets.
+
+* Conventionals (final)
+* Last cycle AU information (still draft)
+* Station Attributes (from 1.preprocessingData steps)
+    + WQS information
+    + AU information (specifically for stations that did not exist in last cycle)
+* WQA CEDS Station table template (bulk data upload template)
+    + New for 2022IR cycle, DEQ is moving from ADB to a more ATTAINS-like system comprised of a module in CEDS known as CEDS WQA. The development team has released a template for the 'bulk data upload' component where assessors may upload station information (manually or automatically assessed) to expedite the population of the CEDS module. We need to use this new data model as a starting point as it contains information for AU attribution, critical to WQA CEDS and automated assessment tools.
+* PCB Data from Mark
+* Water column and sediment metals
+* Fish Tissue data
+
+
+The following sections will detail bringing in these necessary data sources and organizing them in a format the automated scripts can digest.
+
+
+It is important to start with the ancillary data in case there are stations that were only sampled for say fish tissue but didn't have any data in CEDS for the conventionals query. We will organize the extras first, then compile a total list of stations later that incorporate any unique sites that don't have data in the conventionals dataset.
+
+
+
+### Water Column Metals Data
+
+
+We need to reorganize raw water column metals data to enable better exceedance analyses across automated scripts and applications.
+
+
+```{r WC metals}
+WCmetals <- read_excel('data/finalData/CEDSWQM_2024_IR_20230302.xlsx', sheet = 'WATER_METALS') %>% 
+  #read_excel('data/draftData/CEDSWQM_2024_IR_20230216.xlsx', sheet = 'WATER_METALS') %>% 
+  #dplyr::select(Station_Id:`RMK_7440-61-1T`) %>%  #drop "pre analyzed" fields and calculated (truncated) hardness
+  dplyr::select(Station_Id:RMK_DHARD) %>% 
+  rowwise() %>% 
+  # use total over dissolved where you have both
+  mutate(HARDNESS = coalesce(`STORET_46570_HARDNESS, CA MG CALCULATED (MG/L AS CACO3)`,
+                             `STORET_DHARD_HARDNESS, CA MG CALCULATED (MG/L AS CACO3) AS DISSOLVED`)) %>% 
+  mutate(HARDNESS = case_when(HARDNESS >= 400 ~ 400, 
+                              HARDNESS <= 25 ~ 25,
+                              TRUE ~ as.numeric(HARDNESS)))
+
+# make sure this version matches last cycle WCmetals
+WCmetals2022 <- pin_get("ejones/WCmetals-2022IRfinal", board = "rsconnect")
+
+#names(WCmetals) %in% names(WCmetals2022)
+
+
+# Separate object for analysis, tack on METALS and RMK designation to make the filtering of certain lab comment codes easier
+WCmetalsForAnalysis <- WCmetals %>%
+  # IR 2024 final data pull did not include uranium for an unknown reason. This is required for the automated process, so adding a field of nothing here
+  mutate(METAL_UraniumTotal = as.numeric(NA), RMK_UraniumTotal = NA_character_) %>% 
+  
+  
+  dplyr::select(Station_Id, FDT_DATE_TIME, FDT_DEPTH, # include depth bc a few samples taken same datetime but different depths
+                METAL_AntimonyDissolved = `STORET_01095_ANTIMONY, DISSOLVED (UG/L AS SB)`, RMK_AntimonyDissolved = RMK_01095,
+                METAL_AntimonyTotal = `STORET_01097_ANTIMONY, TOTAL (UG/L AS SB)`, RMK_AntimonyTotal = RMK_01097,
+                METAL_ArsenicDissolved = `STORET_01000_ARSENIC, DISSOLVED  (UG/L AS AS)`, RMK_ArsenicDissolved = RMK_01000,
+                METAL_ArsenicTotal = `STORET_01002_ARSENIC, TOTAL (UG/L AS AS)`, RMK_ArsenicTotal = RMK_01002,
+                METAL_BariumDissolved = `STORET_01005_BARIUM, DISSOLVED (UG/L AS BA)`, RMK_BariumDissolved = RMK_01005,
+                METAL_BariumTotal = `STORET_01007_BARIUM, TOTAL (UG/L AS BA)`, RMK_BariumTotal = RMK_01007,
+                METAL_CadmiumDissolved = `STORET_01025_CADMIUM, DISSOLVED (UG/L AS CD)`, RMK_CadmiumDissolved = RMK_01025,
+                METAL_CadmiumTotal = `STORET_01027_CADMIUM, TOTAL (UG/L AS CD)`, RMK_CadmiumTotal = RMK_01027,
+                METAL_ChromiumDissolved = `STORET_01030_CHROMIUM, DISSOLVED (UG/L AS CR)`, RMK_ChromiumDissolved = RMK_01030,
+                METAL_ChromiumTotal = `STORET_01034_CHROMIUM, TOTAL (UG/L AS CR)`, RMK_ChromiumTotal = RMK_01034,
+                # Chromium III and ChromiumVI dealt with inside metalsAnalysis()
+                METAL_CopperDissolved = `STORET_01040_COPPER, DISSOLVED (UG/L AS CU)`, RMK_CopperDissolved = RMK_01040,
+                METAL_CopperTotal = `STORET_01042_COPPER, TOTAL (UG/L AS CU)`, RMK_CopperTotal = RMK_01042,
+                METAL_IronDissolved = `STORET_01046_IRON, DISSOLVED (UG/L AS FE)`, RMK_IronDissolved = RMK_01046,
+                METAL_IronTotal = `STORET_01045_IRON, TOTAL (UG/L AS FE)`, RMK_IronTotal = RMK_01045,
+                METAL_LeadDissolved = `STORET_01049_LEAD, DISSOLVED (UG/L AS PB)`, RMK_LeadDissolved = RMK_01049,
+                METAL_LeadTotal = `STORET_01051_LEAD, TOTAL (UG/L AS PB)`, RMK_LeadTotal = RMK_01051,
+                METAL_Mercury = `STORET_50091_MERCURY-TL,FILTERED WATER,ULTRATRACE METHOD UG/L`, RMK_Mercury = RMK_50091,
+                METAL_NickelDissolved = `STORET_01065_NICKEL, DISSOLVED (UG/L AS NI)`, RMK_NickelDissolved = RMK_01065,
+                METAL_NickelTotal = `STORET_01067_NICKEL, TOTAL (UG/L AS NI)`, RMK_NickelTotal = RMK_01067,
+                
+                
+                # IR 2024 final data pull did not include uranium for an unknown reason. This is required for the automated process, so adding a field of nothing here
+                METAL_UraniumTotal, RMK_UraniumTotal ,
+#                METAL_UraniumTotal = `URANIUM_TOT`, RMK_UraniumTotal = `RMK_7440-61-1T`,
+                METAL_SeleniumDissolved = `STORET_01145_SELENIUM, DISSOLVED (UG/L AS SE)`, RMK_SeleniumDissolved = RMK_01145,
+                METAL_SeleniumTotal = `STORET_01147_SELENIUM, TOTAL (UG/L AS SE)`, RMK_SeleniumTotal = RMK_01147,
+                METAL_SilverDissolved = `STORET_01075_SILVER, DISSOLVED (UG/L AS AG)`, RMK_SilverDissolved = RMK_01075,
+                METAL_ThalliumDissolved = `STORET_01057_THALLIUM, DISSOLVED (UG/L AS TL)`, RMK_ThalliumDissolved = RMK_01057,
+                METAL_ThalliumTotal = `STORET_01059_THALLIUM, TOTAL (UG/L AS TL)`, RMK_ThalliumTotal = RMK_01059,
+                METAL_ZincDissolved = `STORET_01090_ZINC, DISSOLVED (UG/L AS ZN)`, RMK_ZincDissolved = RMK_01090,
+                METAL_ZincTotal = `STORET_01092_ZINC, TOTAL (UG/L AS ZN)`, RMK_ZincTotal = RMK_01092,
+                METAL_HardnessDissolved = `STORET_DHARD_HARDNESS, CA MG CALCULATED (MG/L AS CACO3) AS DISSOLVED`, RMK_HardnessDissolved = RMK_DHARD,
+                METAL_HardnessTotal = `STORET_46570_HARDNESS, CA MG CALCULATED (MG/L AS CACO3)`, RMK_HardnessTotal = RMK_46570,
+                METAL_HARDNESS = HARDNESS) %>%
+  group_by(Station_Id, FDT_DATE_TIME, FDT_DEPTH) %>%
+  mutate_if(is.numeric, as.character) %>% # need everyone as character so we can pivot longer in one go
+  pivot_longer(cols = METAL_AntimonyDissolved:METAL_HARDNESS, #RMK_Antimony:RMK_Hardness,
+               names_to = c('Type', 'Metal'),
+               names_sep = "_",
+               values_to = 'Value') %>%
+  ungroup() %>% group_by(Station_Id, FDT_DATE_TIME, FDT_DEPTH, Metal) %>%
+  pivot_wider(id_cols = c(Station_Id, FDT_DATE_TIME, FDT_DEPTH, Metal), names_from = Type, values_from = Value) %>% # pivot remark wider so the appropriate metal value is dropped when filtering on lab comment codes
+  filter(! RMK %in% c('IF', 'J', 'O', 'QF', 'V')) %>% # lab codes dropped from further analysis
+  pivot_longer(cols= METAL:RMK, names_to = 'Type', values_to = 'Value') %>% # get in appropriate format to flip wide again
+  pivot_wider(id_cols = c(Station_Id, FDT_DATE_TIME, FDT_DEPTH), names_from = c(Type, Metal), names_sep = "_", values_from = Value) %>%
+  mutate_at(vars(contains('METAL')), as.numeric) %>%# change metals values back to numeric
+  rename_with(~str_remove(., 'METAL_')) # drop METAL_ prefix for easier analyses
+```
+Best to pin water column metals data to the R server to expedite app rendering.
+
+```{r pin wcmetals reformatted}
+# pin(WCmetals, name = 'WCmetalsIR2024', description = "Final water column metals data for IR2024 from the 03/02/2023 conventionals pull", board = 'rsconnect')
+# pin(WCmetalsForAnalysis, name = 'WCmetalsForAnalysisIR2024', description = "Final water column metals data for IR2024. This is used for the shiny app versions of the automated assessment protocol to save rendering time", board = 'rsconnect')
+```
+
+
+### Sediment Metals Data
+
+
+**Draft Data:** working with Feb 16 conventionals metals data.
+
+```{r sediment metals}
+Smetals <- read_excel('data/finalData/CEDSWQM_2024_IR_20230302.xlsx', sheet = 'SEDIMENT') 
+#read_excel('data/draftData/CEDSWQM_2024_IR_20230216.xlsx', sheet = 'SEDIMENT') 
+Smetals2022 <- pin_get("ejones/Smetals-2022IRfinal", board = "rsconnect")
+
+names(Smetals) %in% names(Smetals2022)
+
+```
+
+
+Pin to server 
+
+```{r pin smetals}
+#pin(Smetals, name = 'SmetalsIR2024', description = "Final sediment metals data for IR2024 from the 03/02/2023 conventionals pull", board = 'rsconnect')
+```
+
+### PCB data
+
+Method in FishTissue_2024IR_EVJ.Rmd by Joe. see fish tissue section below for data organization and pin to server.
+
+these are pinned to the server as:
+pin_get("ejones/PCBIR2024", board = "rsconnect")
+
+
+scripts from last time
+
+```{r PCB data}
+# PCB <- read_excel('data/2022 IR PCBDatapull.xlsx', sheet = '2022IR Datapull')# had to manually combine date and time fields to avoid date time issues
+# source('PCBdataRework.R')
+# 
+# # be nice and save this as a sheet in dataset for others to use
+# write.csv(PCB, 'data/PCBfixed.csv', row.names = F) # dont write out a character NA in csv
+
+```
+
+
+### Fish Tissue Data
+
+Joe is a special human and he organized the fish tissue data for pinning. His scripts are available in this directory: FishTissue_2024IR_EVJ.Rmd
+
+Information from Joe about the changes across the draft to final datasets:
+"Here's a rundown of the changes to the data based on the pulls for the 2024 IR. 
+
+We started off with 1376 fish metals records, Gabe's data added 465 records, and the CEDS pull included another 558. Based on Station ID, Site #, # of fish, Species name, length, weight, Container ID, and date (not date-time), there were 235 records that were included in both Gabe's data and the CEDS pull.  These were replaced with the CEDS data. This resulted in a total of 2164 records. 
+
+For fish PCBs we start with 1067 records and Gabe's data contributes 431 records. Those 431 records are all from 2021. 
+
+For sediment and water column PCB's we start with 360 records and we added 152 records from the most recent pull (all from 2021). I retained your existing data and only added what was new from the most recent pull.  Note that 2 records did not have a match with WQM-Sta-GIS-View. "
+
+from email on 3/7/2023
+
+
+these are pinned to the server as:
+pin_get("ejones/fishPCBIR2024", board = "rsconnect") 
+pin_get("ejones/fishMetalsIR2024", board = "rsconnect")
+
+
+
+
+
+
+
+
+
+
+### Conventionals 
+
+This dataset is built using the ...\IR2024\1.preprocessData\HowToPullDraftConventionalsDataset.Rmd that combines final (March release) IR2022 conventionals data with the conventionals data pull taken from the monthly assessment analysis pinned on the R server (data in CEDS/ODS as of August 15, 2022). That dataset was then filtered to the current assessment window, 2017-2022. 
+
+This data is pulled from the R server and acts as "The" conventionals dataset for all IR2024 application testing/development.
+
+
+```{r}
+conventionals <- pin_get('ejones/conventionals2024final', board = 'rsconnect')  #pin_get('ejones/conventionals2024draft', board = 'rsconnect')
+```
+
+
+
+Secchi depth detour skipped IR2024 bc secchi depth included in conventionals pull now.
+code to query and join secchi depth available here: secchiDepthPull.Rmd
+
+
+
+#### Citmon/NonAgency Data
+
+Final citmon non agency data from 2017-2022.
+
+```{r}
+conventionals <- conventionals %>% 
+    bind_rows(pin_get("ejones/citmonNonAgencyDataIR2024", board = "rsconnect"))
+
+```
+
+
+
+#### Conventionals Distinct
+
+And now let's make a dataset of all the unique stations that we need to organize.
+
+```{r conventionals_distinct}
+# bring in extra data
+WCmetals <- pin_get("WCmetalsIR2024",  board = "rsconnect") 
+Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
+markPCB <- pin_get("ejones/PCBIR2024", board = 'rsconnect')#read_excel('data/oldData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ')
+fishPCB <- pin_get("ejones/fishPCBIR2024", board = "rsconnect")#read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs')
+fishMetals <- pin_get("ejones/fishMetalsIR2024", board = "rsconnect") #read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals')
+
+
+
+conventionals_distinct <- conventionals %>%
+  distinct(FDT_STA_ID, .keep_all = T) %>%
+  # remove any data to avoid confusion
+  dplyr::select(FDT_STA_ID:FDT_COMMENT, Latitude:Data_Source) %>%
+  filter(!is.na(FDT_STA_ID))
+
+# add any WCmetals sites?
+unique(WCmetals$Station_Id) [!unique(WCmetals$Station_Id) %in% conventionals_distinct$FDT_STA_ID]# "LE1.4"   "MCB5.1W"
+# these are fine to leave out because Roger email 2/21/2023:
+# "LE1.4 is a Chesapeake Bay Program Split Sample Site in Maryland.  This means the coordinates do not intersect our ArcGIS layer.  Same thing for MCB5.1W, Chesapeake Bay Program Mainstem Split sample alternate site. Located mid-channel between Cedar Point and Cove Point in the MD mesohaline region of the Bay.  Neither should be assessed and I should have removed these."
+
+
+# add any Smetals sites?
+unique(Smetals$Station_Id) [!unique(Smetals$Station_Id) %in% conventionals_distinct$FDT_STA_ID]# "LE1.4"   "MCB5.1W"
+# none, cool
+
+
+# add any markPCB sites?
+unique(markPCB$StationID) [!unique(markPCB$StationID) %in% conventionals_distinct$FDT_STA_ID]
+# "3-UTMTNWhPipe" "3-XIH000.03"   "2-JMS229.14"   "9-BST069.12"   "9-BST073.46"   "9-BST082.60"  
+markPCBadditions <- filter(markPCB, StationID %in%  unique(markPCB$StationID) [!unique(markPCB$StationID) %in% conventionals_distinct$FDT_STA_ID]) %>%
+  dplyr::select(FDT_STA_ID = StationID, STA_DESC = LocName, Latitude = DecimalLat, Longitude = DecimalLong) %>% 
+  distinct(FDT_STA_ID, .keep_all = T)
+
+# add any fishPCB sites?
+unique(fishPCB$`DEQ rivermile`) [!unique(fishPCB$`DEQ rivermile`) %in% conventionals_distinct$FDT_STA_ID]
+# over 100!!!
+fishPCBadditions <- filter(fishPCB, `DEQ rivermile` %in% unique(fishPCB$`DEQ rivermile`) [!unique(fishPCB$`DEQ rivermile`) %in% conventionals_distinct$FDT_STA_ID]) %>% 
+  dplyr::select(FDT_STA_ID = `DEQ rivermile`, Latitude, Longitude) %>% 
+  distinct(FDT_STA_ID, .keep_all = T) %>% 
+  mutate(Latitude = as.numeric(Latitude),
+         Longitude = as.numeric(Longitude))
+
+
+# add any fishMetals sites?
+unique(fishMetals$Station_ID) [!unique(fishMetals$Station_ID) %in% conventionals_distinct$FDT_STA_ID]
+# over 100!!!
+fishMetalsadditions <- filter(fishMetals, Station_ID %in% unique(fishMetals$Station_ID) [!unique(fishMetals$Station_ID) %in% conventionals_distinct$FDT_STA_ID]) %>% 
+  filter(! Station_ID %in% fishPCBadditions$FDT_STA_ID) %>% #dont repeat from above
+  dplyr::select(FDT_STA_ID = Station_ID, Latitude, Longitude) %>% 
+  distinct(FDT_STA_ID, .keep_all = T) %>% 
+  filter(FDT_STA_ID != 'ROUTINE STATEWIDE RESULTS') # get rid of junk row
+
+extraSites <- bind_rows(markPCBadditions, fishPCBadditions) %>% 
+  bind_rows(fishMetalsadditions)
+
+
+# now add these to the conventionals stations
+conventionals_distinct <- bind_rows(conventionals_distinct, extraSites)
+
+
+# we want conventionals_distinct to be distinct conventionals sites from 1.preprocessing so that the BASIN_CODE is attributed correctly. We also want this from just conventionals and not these extra sites so that we are being honest and can more easily track when a station isn't in the conventionals dataset. The BASIN_CODE information is critical to the 7Q10 join that happens in 3.automatedAssessment, but it's okay that non-conventionals stations dont get this join bc the 7Q10 flag is only for data that is in the conventionals dataset. Since these extraSites don't have conventionals data, we actually are fine with them not being in conventionals_distinct and having 7Q10 flags.
+
+# We do, however want these sites saved and moved to 3.automatedAssessment so that we can flag data in the stations table that have only these non-conventionals parameters, so save that dataset now
+#saveRDS(extraSites, 'data/extraSites.RDS')
+
+# when did I pin this??? Dont use. 
+# conventionals_distinct <- pin_get('ejones/conventionals2024_distinctdraft', board = 'rsconnect') %>% 
+#   filter(!is.na(Latitude) | !is.na(Longitude))
+
+
+# and make a spatial version
+conventionals_sf <- conventionals_distinct %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), 
+               remove = F, # don't remove these lat/lon cols from df
+               crs = 4326) # add projection, needs to be geographic for now bc entering lat/lng
+
+rm(fishPCB);rm(fishPCBadditions);rm(fishMetals);rm(fishMetalsadditions); rm(markPCB);rm(markPCBadditions); rm(Smetals);rm(WCmetals)
+```
+
+
+
+#### Stations Bulk Upload Template 
+
+The biggest changes from the old stations table format to this new template is the addition of the 10 ID305B and station type columns as well as the lacustrine designation. 
+
+```{r bulk upload template}
+stationsTemplate <- read_excel('data/WQA_CEDS_templates/WQA_Bulk_Station_Upload_Final.xlsx',#'WQA_CEDS_templates/WQA_Bulk_Station_Upload (3).xlsx', 
+                               sheet = 'Stations', col_types = "text")[0,] # just want structure and not the draft data, force everything to character for now
+```
+
+
+#### Last cycle AU information (draft)
+
+Let's start by populating this template with draft 2022 stations table information. This will be the first time we pull this information from ODS instead of being supplied data from Cleo.
+
+Connect to ODS prod.
+
+```{r}
+library(pool)
+library(dbplyr)
+### Production Environment
+pool <- dbPool(
+  drv = odbc::odbc(),
+  Driver = "ODBC Driver 11 for SQL Server", #"SQL Server Native Client 11.0", 
+  Server= "DEQ-SQLODS-PROD,50000",
+  dbname = "ODS",
+  trusted_connection = "yes"
+)
+```
+
+Find all stations from the last IR cycle that should be carried forward for review this cycle, either impaired last time or with the comment field containing "carr%" string (e.g. carry over, carried over, etc.). Start by querying stations in IR2022 and join in their AU information and station parameters. The key to these joins is the 'WXA_STATION_DETAIL_ID'/'Station Detail Id' field.
+
+```{r}
+# data prep
+stations <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
+  filter(WSD_CYCLE == 2022) %>% 
+  as_tibble() %>% 
+  distinct(WXA_STATION_DETAIL_ID, .keep_all = T) %>%  # distinct on this variable for AU join or duplicated rows for stations
+  filter(WSD_STATION_ID != '4AGSE013.78') # problem site OIS needs to deal with
+
+# WQA geospatial data only seems to have citmon/non agency station locations. All other stations (DEQ) need to be queried from the WQM side of ODS
+stationsGeospatial_wqa <- pool %>% tbl(in_schema('wqa', 'Wqa_Stations_Geospatial_Data_View')) %>%
+  filter(Station_Id %in% !! stations$STA_NAME) %>% #stations$WSD_STATION_ID) %>%
+  as_tibble() %>% 
+  dplyr::select(Station_Id, Latitude, Longitude) 
+
+# WQM geospatial data for DEQ stations
+stationsGeospatial_wqm <- pool %>% tbl(in_schema('wqm', 'WQM_Sta_GIS_View')) %>% 
+  filter(Station_Id %in% !! stations$WSD_STATION_ID) %>% 
+  as_tibble() %>% 
+  dplyr::select(Station_Id, Latitude, Longitude) 
+
+# combine geospatial data into one object for easier joining
+stationsGeospatial <- bind_rows(stationsGeospatial_wqa, stationsGeospatial_wqm) %>% 
+  distinct(Station_Id, .keep_all = T) %>% 
+  mutate(Station_Id = case_when(Station_Id == 'Griggs Pond' ~ toupper(Station_Id),
+                                Station_Id == 'Sims Metal 003' ~ 'SIMS METAL 003',
+                                TRUE ~ as.character(Station_Id))) # Joining problems later if we don't capitalize the names Griggs Pond and Simms Metal 003 as they are elsewhere in ODS
+
+AU <- pool %>% tbl(in_schema('wqa', '[WQA 305b]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
+  filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
+  as_tibble()
+
+stationDetails <- pool %>% tbl(in_schema('wqa', '[WQA Station Parameters Pivot]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
+  filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
+  as_tibble()
+
+stationType <- pool %>% tbl(in_schema('wqa', '[WQA Station Detail Types]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
+  filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
+  as_tibble()
+
+stationsAU <- left_join(stations, AU, by = c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) %>% 
+  left_join(stationType, by =  c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) %>% 
+  left_join(stationsGeospatial, by = c('STA_NAME' = 'Station_Id')) %>% # Make sure you join on STA_NAME and not WSD_STATION_ID here!!!
+  left_join(stationDetails,  by = c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) 
+
+# actual analysis, find all stations with impaired parameters
+impairedStations <- stationsAU %>% 
+  filter_at(.vars = vars(contains("Status Code")),
+            .vars_predicate = any_vars(str_detect(., 'IM')))
+# Cast a wide net: string search for any stations that were carried over from more previous cycles by looking for 
+#  variations of the phrase "Carry" in the station comment field
+carryoverStations <- stationsAU %>% 
+  filter(str_detect(WSD_COMMENTS, 'carr'))
+
+# combine lists and remove duplicates
+stationsFromLastCycle <- bind_rows(impairedStations, carryoverStations) %>% 
+  distinct(WXA_STATION_DETAIL_ID, .keep_all = T)
+
+# clean up workspace
+rm(list = c('stations','stationsAU', 'stationDetails', 'impairedStations', 'carryoverStations', 
+            'AU', 'stationType', 'stationsGeospatial_wqa', 'stationsGeospatial_wqm'))
+```
+
+Clean up this data to match the bulk upload data template. We will also strip out the data to not confuse anyone from cycle to cycle.
+
+```{r match bulk upload template}
+stationsTable2024begin <- stationsFromLastCycle %>% 
+  dplyr::select(STATION_ID = STA_NAME,  #### OR COULD USE WSD_STATION_ID
+                ID305B_1 = `ID305B 1`,
+                ID305B_2 = `ID305B 2`,
+                ID305B_3 = `ID305B 3`,
+                ID305B_4 = `ID305B 4`,
+                ID305B_5 = `ID305B 5`,
+                ID305B_6 = `ID305B 6`,
+                ID305B_7 = `ID305B 7`,
+                ID305B_8 = `ID305B 8`,
+                ID305B_9 = `ID305B 9`,
+                ID305B_10 = `ID305B 10`,
+                WATER_TYPE = WWT_WATER_TYPE_DESC,
+                SALINITY = WSC_DESCRIPTION,
+                LACUSTRINE = WSD_LAC_ZONE_YN,
+                REGION = STA_REGION,
+                TYPE_1 = `Station Type 1`,
+                TYPE_2 = `Station Type 2`,
+                TYPE_3 = `Station Type 3`,
+                TYPE_4 = `Station Type 4`,
+                TYPE_5 = `Station Type 5`,
+                TYPE_6 = `Station Type 6`,
+                TYPE_7 = `Station Type 7`,
+                TYPE_8 = `Station Type 8`,
+                TYPE_9 = `Station Type 9`,
+                TYPE_10 = `Station Type 10`,
+                LATITUDE = Latitude,
+                LONGITUDE = Longitude,
+                WATERSHED = STA_WATERSHED,
+                VAHU6 = STA_VA_HU6) %>% 
+  mutate(REGION = case_when(REGION == 'NVRO' ~ 'NRO',
+                            REGION == 'WCRO' ~ 'BRRO',
+                            REGION == 'SCRO' ~ 'BRRO',
+                            TRUE~ as.character(REGION))) %>% 
+  dplyr::select(any_of(names(stationsTemplate)))
+
+stationsTable2024begin <- bind_rows(stationsTemplate %>% 
+                                      mutate(LATITUDE = as.numeric(LATITUDE),
+                                             LONGITUDE = as.numeric(LONGITUDE)), 
+                                    stationsTable2024begin) # add back in missing columns
+
+```
+
+QA check for any missing geospatial data. Goose creek site that was moved still has wqa records that need to be fixed bc all other records of this site are gone from CEDS WQM.
+
+```{r}
+missingGeospatial <- filter(stationsTable2024begin, is.na(LATITUDE) | is.na(LONGITUDE))
+
+# #Goose creek issue:
+# goose <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
+#      filter(WSD_STATION_ID == '4AGSE013.78' |
+#                 WSD_STATION_ID == '4AGSE013.45') %>% 
+#      as_tibble() %>% 
+#      arrange(WSD_CYCLE, WSD_STATION_ID)
+
+# clean up workspace
+rm(list = c('stationsFromLastCycle','missingGeospatial'))
+```
+
+
+Now we need to get the same metadata for all the stations from the conventionals (and citmon/non agency) dataset from the current cycle. We can make our lives easier by only doing this work for new stations from the conventionals dataset (i.e. dropping all stations from our "to do list" that already have this information from our last step).
+
+```{r}
+stationsToDo <- filter(conventionals_distinct, ! FDT_STA_ID %in% stationsTable2024begin$STATION_ID)
+
+# use the same method from above with a new station list
+stations <- pool %>% tbl(in_schema('wqa', "Wqa_Station_Details_View")) %>%
+  filter(STA_NAME %in% !! stationsToDo$FDT_STA_ID) %>% # pull all data from stations identified above, 
+  # Important: use STA_NAME and not WSD_STATION_ID bc you will lose all citmon/non agency using WSD_STATION_ID!!!
+  as_tibble() %>% # get that data local before doing more complicated things than SQL wants to handle
+  # keep only the most recent record for each station by grouping and then filtering
+  group_by(WSD_STATION_ID) %>% 
+  filter(WSD_CYCLE == max(WSD_CYCLE )) %>% 
+  distinct(WXA_STATION_DETAIL_ID, .keep_all = T) %>%  # still need only 1 record per site
+  ungroup() # ungroup so the WSD_STATION_ID column doesn't come along for the ride to future steps where not necessary
+  
+# WQA geospatial data only seems to have citmon/non agency station locations. All other stations (DEQ) need to be queried from the WQM side of ODS
+stationsGeospatial_wqa <- pool %>% tbl(in_schema('wqa', 'Wqa_Stations_Geospatial_Data_View')) %>%
+  filter(Station_Id %in% !! stations$STA_NAME) %>% #stations$WSD_STATION_ID) %>%
+  as_tibble() %>% 
+  dplyr::select(Station_Id, Latitude, Longitude) 
+
+# WQM geospatial data for DEQ stations
+stationsGeospatial_wqm <- pool %>% tbl(in_schema('wqm', 'WQM_Sta_GIS_View')) %>% 
+  filter(Station_Id %in% !! stations$WSD_STATION_ID) %>% 
+  as_tibble() %>% 
+  dplyr::select(Station_Id, Latitude, Longitude) 
+
+# combine geospatial data into one object for easier joining
+stationsGeospatial <- bind_rows(stationsGeospatial_wqa, stationsGeospatial_wqm) %>% 
+  distinct(Station_Id, .keep_all = T)
+
+AU <- pool %>% tbl(in_schema('wqa', '[WQA 305b]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
+  filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
+  as_tibble()
+
+stationDetails <- pool %>% tbl(in_schema('wqa', '[WQA Station Parameters Pivot]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
+  filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
+  as_tibble()
+
+stationType <- pool %>% tbl(in_schema('wqa', '[WQA Station Detail Types]')) %>% # **note** need to put views with spaces in name in brackets for SQL to work
+  filter(`Station Detail Id` %in% !! stations$WXA_STATION_DETAIL_ID) %>% 
+  as_tibble()
+
+stationsAU <- left_join(stations, AU, by = c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) %>% 
+  left_join(stationType, by =  c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) %>% 
+  left_join(stationsGeospatial, by = c('STA_NAME' = 'Station_Id')) %>% # Make sure you join on STA_NAME and not WSD_STATION_ID here!!!
+  left_join(stationDetails,  by = c('WXA_STATION_DETAIL_ID' = 'Station Detail Id')) %>% 
+  # reorganize to fit the data template
+  dplyr::select(STATION_ID = STA_NAME,  #### OR COULD USE WSD_STATION_ID
+                ID305B_1 = `ID305B 1`,
+                ID305B_2 = `ID305B 2`,
+                ID305B_3 = `ID305B 3`,
+                ID305B_4 = `ID305B 4`,
+                ID305B_5 = `ID305B 5`,
+                ID305B_6 = `ID305B 6`,
+                ID305B_7 = `ID305B 7`,
+                ID305B_8 = `ID305B 8`,
+                ID305B_9 = `ID305B 9`,
+                ID305B_10 = `ID305B 10`,
+                WATER_TYPE = WWT_WATER_TYPE_DESC,
+                SALINITY = WSC_DESCRIPTION,
+                LACUSTRINE = WSD_LAC_ZONE_YN,
+                REGION = STA_REGION,
+                TYPE_1 = `Station Type 1`,
+                TYPE_2 = `Station Type 2`,
+                TYPE_3 = `Station Type 3`,
+                TYPE_4 = `Station Type 4`,
+                TYPE_5 = `Station Type 5`,
+                TYPE_6 = `Station Type 6`,
+                TYPE_7 = `Station Type 7`,
+                TYPE_8 = `Station Type 8`,
+                TYPE_9 = `Station Type 9`,
+                TYPE_10 = `Station Type 10`,
+                LATITUDE = Latitude,
+                LONGITUDE = Longitude,
+                WATERSHED = STA_WATERSHED,
+                VAHU6 = STA_VA_HU6) %>% 
+  mutate(REGION = case_when(REGION == 'NVRO' ~ 'NRO',
+                            REGION == 'WCRO' ~ 'BRRO',
+                            REGION == 'SCRO' ~ 'BRRO',
+                            TRUE~ as.character(REGION))) %>% 
+  dplyr::select(any_of(names(stationsTemplate)))
+
+# Smash in with the rest of the sites already organized
+stationsTable2024begin <- bind_rows(stationsTable2024begin,
+                                    stationsAU) %>% 
+  distinct(STATION_ID, .keep_all = T)
+
+#stationsTable2024begin %>% group_by(STATION_ID) %>% mutate(n = n()) %>% dplyr::select(n, everything()) %>% View()
+
+# clean up workspace
+rm(list = c('stations', 'stationDetails', 'stationsAU',
+            'AU', 'stationType', 'stationsGeospatial_wqa', 'stationsGeospatial_wqm'))
+
+```
+
+So what stations do we have left? These are stations that are in the conventionals dataset but don't have any historical records in CEDS WQA. We will reorganize them into the template format we that need and add AU information from the pinned data on the R server.
+
+```{r}
+stationsToDo <- filter(conventionals_distinct, ! FDT_STA_ID %in% stationsTable2024begin$STATION_ID) %>% 
+  # glean what we can to populate the data template
+  dplyr::select(STATION_ID = FDT_STA_ID,
+                WATER_TYPE = STA_LV1_CODE,
+                TYPE_1 = STA_LV2_CODE,
+                LATITUDE = Latitude,
+                LONGITUDE = Longitude) %>% 
+  mutate(# throw in a flag for swamp but still need to force it to a waterbody type the assessment tools understand
+         WATER_TYPE = case_when(#WATER_TYPE == 'SWAMP' ~ paste(TYPE_1, 'SWAMP', sep = ': '),
+                             WATER_TYPE %in% c('STREAM', 'SWAMP', 'SPRING', 'CANAL') ~ 'RIVER',
+                             WATER_TYPE %in% c('ESTURY', 'OCEAN') ~ 'ESTUARY',
+                             WATER_TYPE %in% c('RESERV', 'LAKE') ~ 'RESERVOIR',
+                             WATER_TYPE %in% c(NA,'', 'UNK') ~ NA_character_,
+                             TRUE~ as.character(WATER_TYPE))) %>% #,
+         #WATER_TYPE = ifelse(WATER_TYPE == 'SWAMP', NA, WATER_TYPE)) %>% 
+  dplyr::select(any_of(names(stationsTemplate))) %>% 
+  # Spatially join info we don't trust from CEDS WQM, first turn this into a spatial object
+  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), 
+               remove = F, # don't remove these lat/lon cols from df
+               crs = 4326) # add projection, needs to be geographic for now bc entering lat/lng
+
+# get pinned AU data from the R server
+AUlookup <- pin_get('ejones/AUlookup', board = 'rsconnect') %>% 
+  filter(CYCLE == 2024) # only get sites attributed by assessors for this cycle
+
+# get spatial data from the R server
+vahu6 <- st_as_sf(pin_get("ejones/AssessmentRegions_VA84_basins", board = "rsconnect"))
+dcr11 <- st_as_sf(pin_get("ejones/dcr11", board = "rsconnect"))
+
+# Spatially join info we don't trust from CEDS WQM
+stationsLeft <- st_join(stationsToDo, vahu6) %>% 
+  dplyr::select(STATION_ID:LONGITUDE, VAHU6, REGION = ASSESS_REG) %>% 
+  st_join(dcr11) %>% 
+  dplyr::select(STATION_ID:REGION, WATERSHED = ANCODE) %>% 
+  st_drop_geometry() %>% # turn back into tibble
+  left_join(dplyr::select(AUlookup, FDT_STA_ID, ID305B_1, ID305B_2, ID305B_3, ID305B_4, ID305B_5, ID305B_6, ID305B_7, ID305B_8, ID305B_9,  ID305B_10), 
+            by = c('STATION_ID' = 'FDT_STA_ID')) %>% # join in AU info from the pinned AUlookup dataset (populated by assessors in metadata attribution app)
+  distinct(STATION_ID, .keep_all = T)
+
+#stationsLeft %>% group_by(STATION_ID) %>% mutate(n = n()) %>% dplyr::select(n, everything()) %>% View()
+
+# smash into template
+stationsTable2024begin <- bind_rows(stationsTable2024begin,
+                                     stationsLeft)
+
+# clean up workspace
+rm(list = c('stationsLeft', 'stationsToDo', 'stationsTemplate',
+            'stationsGeospatial', 'dcr11', 'vahu6', 'AUlookup'))
+```
+
+
+For a few new stations, assessors provided Lacustrine and TYPE designation. Grab that now and add in.
+
+```{r}
+allExtra <- read_excel('C:/Users/wmu43954/OneDrive - Commonwealth of Virginia/WQA/ForReview.xlsx',
+                       sheet = 'BRRO') %>% dplyr::select(FDT_STA_ID, TYPE_1, Lacustrine) %>% 
+  bind_rows(read_excel('C:/Users/wmu43954/OneDrive - Commonwealth of Virginia/WQA/ForReview.xlsx',
+                       sheet = 'CO') %>% dplyr::select(FDT_STA_ID, TYPE_1, Lacustrine)) %>% 
+  bind_rows(read_excel('C:/Users/wmu43954/OneDrive - Commonwealth of Virginia/WQA/ForReview.xlsx',
+                       sheet = 'NRO') %>% dplyr::select(FDT_STA_ID, `NRO CORRECTED STATION ID`, TYPE_1, Lacustrine) %>% 
+              mutate(FDT_STA_ID = ifelse(!is.na(`NRO CORRECTED STATION ID`), `NRO CORRECTED STATION ID`, FDT_STA_ID)) %>% 
+              dplyr::select(-`NRO CORRECTED STATION ID`)) %>% 
+  bind_rows(read_excel('C:/Users/wmu43954/OneDrive - Commonwealth of Virginia/WQA/ForReview.xlsx',
+                       sheet = 'PRO') %>% dplyr::select(FDT_STA_ID, TYPE_1, Lacustrine)) %>% 
+  bind_rows(read_excel('C:/Users/wmu43954/OneDrive - Commonwealth of Virginia/WQA/ForReview.xlsx',
+                       sheet = 'TRO') %>% dplyr::select(FDT_STA_ID, TYPE_1, Lacustrine)) %>% 
+  bind_rows(read_excel('C:/Users/wmu43954/OneDrive - Commonwealth of Virginia/WQA/ForReview.xlsx',
+                       sheet = 'VRO') %>% dplyr::select(FDT_STA_ID, TYPE_1, Lacustrine)) 
+
+
+stationsTable2024begin <- left_join(stationsTable2024begin, allExtra, by = c("STATION_ID" = 'FDT_STA_ID')) %>% 
+  mutate(LACUSTRINE = coalesce(Lacustrine, LACUSTRINE),
+         TYPE_1 = coalesce(TYPE_1.y, TYPE_1.x)) %>% 
+  dplyr::select(names(stationsTable2024begin))
+```
+
+
+Now let's pin this to the R server so others can use the data.
+
+```{r}
+# pin(stationsTable2024begin, name = 'ejones/stationsTable2024begin',
+#     description = 'stationsTable2024begin for IR2024 development', board = 'rsconnect')
+```
+
+### Pull Final Stations table from last cycle for application
+
+Must run this in R 4.2.1 bc issues with trailing columns with friendly name views in older R versions
+
+```{r}
+stationsTable2022 <-  pool %>% tbl(in_schema('wqa', 'WQA Station Details')) %>% 
+  filter(`Assessment Cycle` == 2022) %>% 
+  as_tibble() 
+
+stationsTable2020 <-  pool %>% tbl(in_schema('wqa', 'WQA Station Details')) %>% 
+  filter(`Assessment Cycle` == 2020) %>% 
+  as_tibble() 
+
+# saveRDS(stationsTable2022, 'data/stationsTable2022.RDS')
+# saveRDS(stationsTable2020, 'data/stationsTable2020.RDS')
+
+```
+
+
+
+### WQS addition
+
+Now we need to make sure we have WQS information for each station we need to assess so that assessors only need to upload station information to the assessment applications and not bother with WQS information.
+
+First, pull and organize any WQS information from the server. These steps are detailed in 1.preprocessData/HowToPreprocessDataFebruary2023.Rmd #### Aside, how to get WQS data from the server and then cleaned in organizeMetadataFromServer.R from that directory
+
+
+
+Then, take the most recent WQSlookup table and upload to server. This should be repeated once all WQS attribution is fully completed with full assessment cycle data.
+
+```{r wqs information}
+# most recent version taken from ..\1.preprocessData\WQSlookupTable
+WQSlookup <- pin_get('ejones/WQSlookup', board = 'rsconnect')#read_csv('data/metadataAttribution/20230213_0000_WQSlookup.csv')
+# find number of WQS_ID linked to each station
+WQSlookup1 <- WQSlookup %>% 
+  group_by(StationID) %>%
+  summarise(distinctWQS = n_distinct(WQS_ID))
+
+
+# # these need to be sorted out 
+# moreThan1WQS <- filter(WQSlookup, StationID %in% filter(WQSlookup1, distinctWQS != 1)$StationID) %>%
+#   arrange(StationID)
+# write_csv(moreThan1WQS, 'multipleWQS.csv')
+# 
+# rm(moreThan1WQS); rm(WQSlookup1)
+# 
+
+
+#pin(WQSlookup, description = "WQS lookup table from metadata attribution application", board = "rsconnect")
+```
+
+
+
+
+To speed up the applications and assessment calculations, we will first join the actual WQS information to the lookup table now in the preprocessing steps and pin that information as a starting point for apps.
+
+But to speed this process up, we will first pull down the data that exists on the server as to not run spatial joins more than necessary.
+
+```{r}
+WQSlookup_withStandards <- pin_get('WQSlookup-withStandards', board = "rsconnect")
+
+# cheater step, find sites I know have issues and remove from archived version
+WQStableKnownIssues <- readRDS('./data/WQStable12072020.RDS')
+WQSlookup_withStandards <- filter(WQSlookup_withStandards, ! StationID %in% WQStableKnownIssues$StationID)
+
+
+WQSlookupToDo <- filter(WQSlookup, ! StationID %in% WQSlookup_withStandards$StationID)
+
+```
+
+
+
+
+```{r WQS information joins, eval = FALSE}
+#bring in Riverine layers, valid for the assessment window
+riverine <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/riverine_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+WQSlookupFull <- left_join(WQSlookupToDo, riverine) %>%
+  filter(!is.na(CLASS))
+rm(riverine)
+
+lacustrine <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/lakes_reservoirs_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+WQSlookupFull <- left_join(WQSlookupToDo, lacustrine) %>%
+  filter(!is.na(CLASS)) %>%
+  bind_rows(WQSlookupFull)
+rm(lacustrine)
+
+estuarineLines <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/estuarinelines_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+WQSlookupFull <- left_join(WQSlookupToDo, estuarineLines) %>%
+  filter(!is.na(CLASS)) %>%
+  bind_rows(WQSlookupFull)
+rm(estuarineLines)
+
+estuarinePolys <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/estuarinepolygons_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+WQSlookupFull <- left_join(WQSlookupToDo, estuarinePolys) %>%
+  filter(!is.na(CLASS)) %>%
+  bind_rows(WQSlookupFull)
+rm(estuarinePolys)
+
+# # what stations are still missing info?
+# View(filter(WQSlookupToDo, !StationID %in% WQSlookupFull$StationID) )
+# WQMstations <- pin_get('ejones/WQM-Stations-Spatial', board = 'rsconnect')
+# filter(WQSlookupToDo, !StationID %in% WQSlookupFull$StationID) %>% 
+#   left_join(WQMstations, by = 'StationID') %>% 
+#     st_as_sf(coords = c("Longitude", "Latitude"), 
+#                remove = F, # don't remove these lat/lon cols from df
+#                crs = 4326) %>% # add projection, needs to be geographic for now bc entering lat/lng
+#   st_write('help.shp')
+
+
+WQSlookup_withStandards_pin <- bind_rows(WQSlookup_withStandards, WQSlookupFull) # for pin
+
+
+
+# Find duplicates 
+WQSlookup_withStandards_issues <- WQSlookup_withStandards_pin %>% 
+  group_by(StationID) %>% 
+  mutate(totCount = n()) %>% 
+  filter(totCount > 1)
+
+if(nrow(WQSlookup_withStandards_issues)>0){
+  # write out and fix
+  write_csv(WQSlookup_withStandards_issues %>% arrange(StationID), 'data/fixMe.csv')
+  fixed <- read_csv('data/fixMe.csv') %>%
+    mutate(GNIS_ID = as.factor(as.character(GNIS_ID)))
+
+  WQSlookup_withStandards <- filter(WQSlookup_withStandards_pin, ! StationID %in% fixed$StationID) %>%
+    bind_rows(fixed)
+
+# What stations still need WQS?
+z <- filter(WQSlookup, ! StationID %in% WQSlookup_withStandards_pin$StationID) 
+
+# fix user issues
+#test <- readRDS('C:/HardDriveBackup/R/GitHub/IR2022/1.preprocessData/data/WQStable.RDS')
+#y <- left_join(z, test, by = 'StationID') %>%
+#  rename("WQS_ID Saved on the server" = "WQS_ID.x",
+#         "WQS_ID Suggested To User" = "WQS_ID.y",
+#         "Buffer Distance" = "Buffer Distance.y") %>%
+#  dplyr::select(StationID, `Buffer Distance`, `WQS_ID Saved on the server`, `WQS_ID Suggested To User`, Comments)
+#write.csv(y,'missingWQSforReview.csv')
+  } else{WQSlookup_withStandards <- WQSlookup_withStandards_pin}
+```
+
+
+
+
+Once I get that information back from assessors I can fully move on.
+
+
+
+
+Now time to actually join standards to stations. This is going to be available on the server for users to access from the assessment scripts. The thinking right now is that it is better to store this information on the server right now and show users the data (when asked) instead of having it attached to the right of existing stationsTable (like 2020 cycle) since CEDS WQA only accepts a specific template. Also, if WQS info needs to be changed, the assessor is forced to update the WQS_ID. Maybe this isn't an awesome method but going with it for now.
+
+```{r pin WQS information}
+# pin(WQSlookup_withStandards, 
+#     name = 'ejones/WQSlookup-withStandards',
+#     description = "WQS lookup table with Standards from metadata attribution application", board = "rsconnect")
+```
+
+
+
+#### Citmon version
+
+Now repeat with Citizen/Non Agency sites
+
+```{r citmon wqs pin}
+citmonWQS <- pin_get("ejones/citmonStationsWithWQSFinal", board = "rsconnect")
+
+citmonWQStoDo <- filter(citmonWQS, is.na(CLASS) | CLASS == '') %>% 
+  dplyr::select(StationID:Comments)
+```
+
+
+
+
+```{r WQS information joins citmon, eval = FALSE}
+#bring in Riverine layers, valid for the assessment window
+riverine <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/riverine_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+citmonWQSWQSlookupFull <- left_join(citmonWQStoDo, riverine) %>%
+  filter(!is.na(CLASS))
+rm(riverine)
+
+lacustrine <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/lakes_reservoirs_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+citmonWQSWQSlookupFull <- left_join(citmonWQStoDo, lacustrine) %>%
+  filter(!is.na(CLASS)) %>%
+  bind_rows(citmonWQSWQSlookupFull)
+rm(lacustrine)
+
+estuarineLines <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/estuarinelines_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+citmonWQSWQSlookupFull <- left_join(citmonWQStoDo, estuarineLines) %>%
+  filter(!is.na(CLASS)) %>%
+  bind_rows(citmonWQSWQSlookupFull)
+rm(estuarineLines)
+
+estuarinePolys <- st_read('C:/HardDriveBackup/R/GitHub/IR2024/GIS/draft_WQS_shapefiles_2022/estuarinepolygons_draft2022.shp') %>%
+  st_drop_geometry() # only care about data not geometry
+
+citmonWQSWQSlookupFull <- left_join(citmonWQStoDo, estuarinePolys) %>%
+  filter(!is.na(CLASS)) %>%
+  bind_rows(citmonWQSWQSlookupFull)
+rm(estuarinePolys)
+
+# # what stations are still missing info?
+# View(filter(citmonWQStoDo, !StationID %in% citmonWQSWQSlookupFull$StationID) )
+# WQMstations <- pin_get('ejones/WQM-Stations-Spatial', board = 'rsconnect')
+# filter(citmonWQStoDo, !StationID %in% citmonWQSWQSlookupFull$StationID) %>% 
+#   left_join(WQMstations, by = 'StationID') %>% 
+#     st_as_sf(coords = c("Longitude", "Latitude"), 
+#                remove = F, # don't remove these lat/lon cols from df
+#                crs = 4326) %>% # add projection, needs to be geographic for now bc entering lat/lng
+#   st_write('help.shp')
+
+
+citmonWQSlookup_withStandards_pin <- bind_rows(filter(citmonWQS, ! StationID %in% citmonWQStoDo$StationID),
+                                               citmonWQSWQSlookupFull %>% 
+                                                 mutate(GNIS_ID = as.integer(GNIS_ID)) ) # for pin
+
+
+
+# Find duplicates 
+citmonWQSlookup_withStandards_pin_issues <- citmonWQSlookup_withStandards_pin %>% 
+  group_by(StationID) %>% 
+  mutate(totCount = n()) %>% 
+  filter(totCount > 1)
+
+if(nrow(WQSlookup_withStandards_issues)>0){
+  # write out and fix
+  write_csv(WQSlookup_withStandards_issues %>% arrange(StationID), 'data/fixMe.csv')
+  fixed <- read_csv('data/fixMe.csv') %>%
+    mutate(GNIS_ID = as.factor(as.character(GNIS_ID)))
+
+  WQSlookup_withStandards <- filter(WQSlookup_withStandards_pin, ! StationID %in% fixed$StationID) %>%
+    bind_rows(fixed)
+
+# What stations still need WQS?
+z <- filter(WQSlookup, ! StationID %in% WQSlookup_withStandards_pin$StationID) 
+
+# fix user issues
+#test <- readRDS('C:/HardDriveBackup/R/GitHub/IR2022/1.preprocessData/data/WQStable.RDS')
+#y <- left_join(z, test, by = 'StationID') %>%
+#  rename("WQS_ID Saved on the server" = "WQS_ID.x",
+#         "WQS_ID Suggested To User" = "WQS_ID.y",
+#         "Buffer Distance" = "Buffer Distance.y") %>%
+#  dplyr::select(StationID, `Buffer Distance`, `WQS_ID Saved on the server`, `WQS_ID Suggested To User`, Comments)
+#write.csv(y,'missingWQSforReview.csv')
+  } else{#WQSlookup_withStandards <- WQSlookup_withStandards_pin}
+```
+
+Now pin to server
+
+
+```{r pin WQS information citmon}
+# pin(citmonWQSlookup_withStandards_pin,
+#     name = "ejones/citmonStationsWithWQSFinal",
+#     description = "WQS lookup table with Standards for Citmon/Non Agency Stations", board = "rsconnect")
+```
+
+
