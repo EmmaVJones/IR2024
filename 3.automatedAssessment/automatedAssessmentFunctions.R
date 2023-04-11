@@ -1641,7 +1641,7 @@ lowFlowFlagColumn <- function(stationData){
     if(nrow(withParameterData) > 0){
       gageFlags <- dplyr::select(withParameterData, FDT_STA_ID, FDT_DATE_TIME,  `7Q10 Flag Gage`) %>% 
         distinct(FDT_DATE_TIME, .keep_all = T) %>% 
-        summarise(STATION_ID = FDT_STA_ID, 
+        summarise(STATION_ID = unique(FDT_STA_ID), 
                   `7Q10 Flag` = paste(as.Date(FDT_DATE_TIME),  `7Q10 Flag Gage`, collapse = '; ')) %>% 
         mutate(`7Q10 Flag` = paste('USGS Gages in subbasin below 7Q10: ', `7Q10 Flag`)) 
     } else {
