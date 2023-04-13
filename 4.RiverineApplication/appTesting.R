@@ -180,6 +180,9 @@ conventionals_HUC <- filter(conventionals, FDT_STA_ID %in% filter(stationTable, 
                           WQS_ID:EPA_ECO_US_L3NAME),
             by = c('FDT_STA_ID' = 'STATION_ID')) %>%
   filter(!is.na(ID305B_1)) %>%
+  
+  arrange(FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH) %>% # make sure data are in order, citmon can be all over the place
+  
   pHSpecialStandardsCorrection() %>% #correct pH to special standards where necessary
   temperatureSpecialStandardsCorrection() %>%   # correct temperature special standards where necessary
   bind_rows(missingExtraSites)

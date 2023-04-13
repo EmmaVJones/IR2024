@@ -188,6 +188,10 @@ conventionalsLake <- filter(conventionals, FDT_STA_ID %in% lake_filter$STATION_I
             #WQS_ID:`Max Temperature (C)`), 
             by = c('FDT_STA_ID' = 'STATION_ID')) %>%
   filter(!is.na(ID305B_1)) %>%
+  
+  arrange(FDT_STA_ID, FDT_DATE_TIME, FDT_DEPTH) %>% # make sure data are in order, citmon can be all over the place
+  
+  
   # Special Standards Correction step. This is done on the actual data bc some special standards have temporal components
   pHSpecialStandardsCorrection() %>% # correct pH to special standards where necessary
   temperatureSpecialStandardsCorrection() %>% # correct temperature special standards where necessary

@@ -181,9 +181,10 @@ thermoclineDepth <- function(stationData){
     group_by(FDT_STA_ID, SampleDate) 
   
   dailyThermDepth <- dplyr::select(stationData, FDT_STA_ID, SampleDate, FDT_DEPTH, FDT_TEMP_CELCIUS) %>%
+    arrange(SampleDate, FDT_DEPTH) %>% # make sure data are in order
     mutate(DepthDiff = c(NA, diff(FDT_DEPTH)),
            TempDiff = c(NA, diff(FDT_TEMP_CELCIUS))) %>%
-    filter(DepthDiff == 1) # get rid of changes less than 1 meter depth
+    filter(DepthDiff >= 1) # get rid of changes less than 1 meter depth
   # Alt route in case shallow lake
   if(nrow(dailyThermDepth) > 0){
     dailyThermDepth <- filter(dailyThermDepth, TempDiff <= -1)
