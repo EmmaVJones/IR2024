@@ -393,8 +393,10 @@ for(i in 1:nrow(stationTable)){
   # is attributed to in the automated assessment scripts
   
   # PWS Human Health Criteria
-  if(nrow(stationData) > 0){
-    if(is.na(unique(stationData$PWS))  ){
+  if(nrow(stationData) > 0 | stationTable$STATION_ID[i] %in% extraSites$FDT_STA_ID){ 
+    # or statement allows stations with only toxics data to pass through and get flag
+    if(nrow(stationData) > 0){
+      if(is.na(unique(stationData$PWS))  ){
       PWSconcat <- tibble(PWS= NA)
    } else {
      PWSconcat <- cbind(assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_NitrateTotal'),
@@ -414,6 +416,8 @@ for(i in 1:nrow(stationTable)){
                         assessPWSsummary(assessPWS(WCmetalsStationPWS, ThalliumTotal, RMK_ThalliumTotal, 0.24), 'PWS_ThalliumTotal'),
                         assessPWSsummary(assessPWS(WCmetalsStationPWS, UraniumTotal, RMK_UraniumTotal, 30), 'PWS_UraniumTotal')) %>%
        dplyr::select(-ends_with('exceedanceRate')) }
+    } else {PWSconcat <- tibble(PWS= NA)}
+    
     
   # Freshwater Chloride Aquatic Life assessment, if data exists
     if(nrow(filter(stationData, !is.na(CHLORIDE_mg_L))) > 0){
@@ -426,7 +430,7 @@ for(i in 1:nrow(stationTable)){
   if(nrow(bind_cols(PWSconcat,
                     chlorideFreshwater,
                     PCBmetalsDataExists(filter(markPCB, str_detect(SampleMedia, 'Water')) %>%
-                                        filter(StationID %in% stationData$FDT_STA_ID), 'WAT_TOX')) %>%
+                                        filter(StationID %in% stationTable$STATION_ID[i]), 'WAT_TOX')) %>%
           dplyr::select(contains(c('_EXC','_STAT'))) %>%
           mutate(across( everything(),  as.character)) %>%
           pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) %>% 

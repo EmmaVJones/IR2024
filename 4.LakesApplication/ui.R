@@ -109,16 +109,16 @@ shinyUI(fluidPage(theme="yeti.css",
                                           mainPanel(
                                             leafletOutput('VAmap'),
                                             br(),
-                                            h5(strong('Assessment Units in Selected VAHU6')),
+                                            h5(strong('Assessment Units in Selected Lake')),
                                             DT::dataTableOutput('AUSummary'),
                                             br(),
-                                            h5(strong('Stations in Selected VAHU6 that were sampled in current window')),
+                                            h5(strong('Stations in Selected Lake that were sampled in current window')),
                                             helpText("The stations highlighted in gray can be analyzed by the application. The stations
                                                      highlighted in yellow were sampled in the current window, but cannot be analyzed by the
                                                      application because they are not in the input stations table."),
                                             DT::dataTableOutput('stationSummary'),
                                             br(),
-                                            h5(strong("Stations in Selected VAHU6 that have no data in the current window but were carried
+                                            h5(strong("Stations in Selected Lake that have no data in the current window but were carried
                                                       over from last cycle due to an IM designation in one of the 2020IR status fields or
                                                       the 2020 stations table reports the station was carried over from a previous cycle.")),
                                             helpText('These stations can be viewed in the application and stations table, but none of the
