@@ -9,10 +9,10 @@ library(readxl)
 library(lubridate)
 library(lwgeom)
 
-distinctSites_sf <- readRDS('./data/distinctSites_sf04102023.RDS')
+distinctSites_sf <- readRDS('data/distinctSites_sf04132023.RDS')
 #distinctSites_sf <- readRDS('./data/distinctSites_sf03072023.RDS') #distinctSites_sf_withCitmon02232023.RDS')
 # use other data if possible first
-distinctSites_sfold <-  readRDS('./data/distinctSites_sf03072023.RDS') #readRDS('./data/distinctSites_sf_withCitmon02232023.RDS')
+#distinctSites_sfold <-  readRDS('./data/distinctSites_sf03072023.RDS') #readRDS('./data/distinctSites_sf_withCitmon02232023.RDS')
 
 # glean what we can from a previous run
 distinctSites_sfhelp <- filter(distinctSites_sf, is.na(ASSESS_REG) | is.na(US_L3NAME) | is.na(BASIN_CODE)) 
@@ -59,7 +59,7 @@ if(any(nrow(distinctSites_sf1) < nrow(distinctSites_sf) |
       dplyr::select(FDT_STA_ID, everything())
   }
   closest <- closest %>% distinct(FDT_STA_ID, .keep_all = T) # sometimes there can be duplicates
-  
+  View(closest %>% st_drop_geometry())
   
   # SUBBASIN FIX
   closestSUBB <- mutate(subbasinLayer[0,], FDT_STA_ID =NA) %>%
@@ -159,4 +159,4 @@ distinctSites_sf <- distinctSites_sf3
 rm(closest); rm(i); rm(subbasinLayer); rm(distinctSites_sf1); rm(closestSUBB); rm(closestECO); rm(hasECO); rm(hasSUBB); rm(hasVAHU6)
 rm(missingSites); rm(missingSitesECO); rm(missingSitesSUBB); rm(missingSitesVAHU6); rm(stillMissingBASIN); rm(ecoregion4Large)
 rm(distinctSites_sf2); rm(distinctSites_sf3); rm(distinctSites_sfhelp);rm(assessmentLayer)
-#saveRDS(distinctSites_sf, './data/distinctSites_sf_postassessmentLayerSubbasinJoin04102023.RDS')#'./data/distinctSites_sf_withCitmon02232023.RDS')
+#saveRDS(distinctSites_sf, './data/distinctSites_sf_postassessmentLayerSubbasinJoin04132023.RDS')#'./data/distinctSites_sf_withCitmon02232023.RDS')

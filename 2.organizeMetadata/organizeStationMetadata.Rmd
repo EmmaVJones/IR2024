@@ -28,6 +28,10 @@ This script combines the WQS and AU information archived by those applications (
 
 This script combines draft data, as opposed to final data. Future iterations use final data to  for final application testing upon data release. This version is meant to assist application rebuilding processes prior to final data release. 
 
+## Water Intake Analyses
+
+New for IR2024, all VDH water intakes are pulled from DEQ's GIS REST service, buffered by 100m, and spatially joined to stations within the assessment cycle to identify station proximity for PWS intake assessments. All scripts can be found in waterIntakeAnalysis.Rmd in this directory.
+
 
 ## Low Flow Analyses
 
@@ -652,6 +656,9 @@ allExtra <- read_excel('C:/Users/wmu43954/OneDrive - Commonwealth of Virginia/WQ
                        sheet = 'NRO') %>% dplyr::select(FDT_STA_ID, `NRO CORRECTED STATION ID`, TYPE_1, Lacustrine) %>% 
               mutate(FDT_STA_ID = ifelse(!is.na(`NRO CORRECTED STATION ID`), `NRO CORRECTED STATION ID`, FDT_STA_ID)) %>% 
               dplyr::select(-`NRO CORRECTED STATION ID`)) %>% 
+  # bonus local data
+  bind_rows(read.csv('data/Book1.csv') %>% dplyr::select(FDT_STA_ID, TYPE_1)) %>% 
+  
   bind_rows(read_excel('C:/Users/wmu43954/OneDrive - Commonwealth of Virginia/WQA/ForReview.xlsx',
                        sheet = 'PRO') %>% dplyr::select(FDT_STA_ID, TYPE_1, Lacustrine)) %>% 
   bind_rows(read_excel('C:/Users/wmu43954/OneDrive - Commonwealth of Virginia/WQA/ForReview.xlsx',

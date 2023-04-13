@@ -99,7 +99,7 @@ conventionalsRaw <- read_excel('data/finalData/CEDSWQM_2024_IR_20230302.xlsx', s
 #     description = 'Final IR2024 conventionals dataset, EVJ reorganized from Roger 3/03/2023.',
 #     board = 'rsconnect')
 
-conventionals1 <- pin_get('ejones/conventionals2024final', board = 'rsconnect') 
+conventionals <- pin_get('ejones/conventionals2024final', board = 'rsconnect') 
 
 
 # An object named conventionals is now in your environment following the cleanup step above
@@ -116,7 +116,6 @@ conventionals <- conventionals %>%
   distinct(FDT_STA_ID, .keep_all = T)
 
 distinctSites <- conventionals
-#dplyr::select(conventionals, -c(Latitude, Longitude)) # object to save unique sites for later, use standardized other lat/lng
 ```
 
 
@@ -157,7 +156,7 @@ distinctSites_sf <- distinctSites %>%
             remove = F, # don't remove these lat/lon cols from df
             crs = 4326)
 # save for later just in case
-#saveRDS(distinctSites_sf, './data/distinctSites_sf04102023.RDS')
+#saveRDS(distinctSites_sf, './data/distinctSites_sf04132023.RDS')
 ```
 
 
@@ -165,7 +164,7 @@ distinctSites_sf <- distinctSites %>%
 ### Other data: Citizen Monitoring and Non Agency
 
 
-Reid, Joe, and Emma organized citizen monitoring data for 2017-2022. The citmon-data-management repo (a copy saved in this directory or available in GitLab/WQA) is how we smashed together the results.
+Reid, Joe, and Emma organized citizen monitoring data for 2017-2022. The citmon-data-management repo (a copy saved in GitLab/WQA) is how we smashed together the results.
 
 ```{r citmon data}
 citmon <- pin_get("ejones/citmonNonAgencyDataIR2024", board = "rsconnect") %>% 
@@ -274,7 +273,7 @@ stationHitList <- read_csv('data/stationHitList.csv')
 distinctSites_sf <- filter(distinctSites_sf, ! FDT_STA_ID %in% stationHitList$`StationID to Remove`)
 
 
-#saveRDS(distinctSites_sf, 'data/distinctSites_sf04102023.RDS')
+#saveRDS(distinctSites_sf, 'data/distinctSites_sf04132023.RDS')
 ```
 
 
@@ -289,7 +288,7 @@ lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3. Unless y
 
 ```{r assessment and subbasin join}
 #source('preprocessingModules/assessmentLayerSubbasinJoin.R') # lwgeom needs sf >= 0.9.3, so this operation needs to happen in R 4.0.3
-distinctSites_sf <- readRDS('./data/distinctSites_sf_postassessmentLayerSubbasinJoin04102023.RDS')#distinctSites_sf_withCitmon03072023.RDS') #distinctSites_sf_withCitmon02232023.RDS')
+distinctSites_sf <- readRDS('./data/distinctSites_sf_postassessmentLayerSubbasinJoin04132023.RDS')#distinctSites_sf_withCitmon03072023.RDS') #distinctSites_sf_withCitmon02232023.RDS')
 distinctSitesToDo <- distinctSites_sf 
 # keep a copy of original distinct sites to check that no one was lost at the end
 ``` 
@@ -301,18 +300,6 @@ distinctSitesToDo <- distinctSites_sf
 
 ### Pin Conventionals Distinct to server
 
-2/13/2023- so this is confusing, where did conventionals_distinct come from? distinctSites_sf data structure doesn't match what is on server. also conventionals data was removed from environment. skipping for now as to not mess more things up
-
-```{r}
-# conventionals_distinct <- conventionals_distinct %>% 
-#   filter(!is.na(Latitude) | !is.na(Longitude)) %>% 
-#   st_as_sf(coords = c("Longitude", "Latitude"), 
-#                remove = F, # don't remove these lat/lon cols from df
-#                crs = 4326) %>% 
-#   st_intersection(dplyr::select(basins, BASIN_CODE)) 
-# pin('ejones/conventionals2024_distinctdraft', board = 'rsconnect')  # see below for fix coming this way at final stage
-
-```
 
 now pin to server
 
