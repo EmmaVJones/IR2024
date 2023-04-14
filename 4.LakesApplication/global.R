@@ -29,7 +29,7 @@ board_register_rsconnect(key = conn$CONNECT_API_KEY,
                          server = conn$CONNECT_SERVER)
 
 
-modulesToReadIn <- c('thermocline','temperature','DO','pH', 'Ecoli', 'Ecoli_AU',
+modulesToReadIn <- c('thermocline','temperature','DO','pH', 'SpCond', 'Ecoli', 'Ecoli_AU',
                      'chlA','TP','TSI', 'Ammonia',  'Nitrate', 'Chloride', 'Sulfate', 
                      'metals', 'toxics')
 for (i in 1:length(modulesToReadIn)){

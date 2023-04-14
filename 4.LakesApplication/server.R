@@ -611,12 +611,15 @@ shinyServer(function(input, output, session) {
   ## Temperature Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(temperaturePlotlySingleStation,'temperature', AUData, stationSelected)
 
-  ## Dissolved Oxygen Sub Tab ##------------------------------------------------------------------------------------------------------
-  callModule(DOPlotlySingleStation,'DO', AUData, stationSelected)
-
   ## pH Sub Tab ##------------------------------------------------------------------------------------------------------
   callModule(pHPlotlySingleStation,'pH', AUData, stationSelected)
-
+  
+  ## Dissolved Oxygen Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(DOPlotlySingleStation,'DO', AUData, stationSelected)
+  
+  ## Specific Conductivity Sub Tab ##------------------------------------------------------------------------------------------------------
+  callModule(SpCondPlotlySingleStation,'SpCond', AUData, stationSelected)
+  
   ## E. coli Sub Tab ##------------------------------------------------------------------------------------------------------
   # single station tab
   callModule(EcoliPlotlySingleStation,'Ecoli', AUData, stationSelected, ecoli)
