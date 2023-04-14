@@ -321,6 +321,32 @@ That dataset is money. We want to use that one in the shiny applications, so mak
 #     description = "Final Conventionals data (DEQ conventionals and citmon/non agency) for IR2024 with added 7Q10 flag joined at major river basin level. This is used for the shiny app versions of the automated assessment protocol to save rendering time", board = 'rsconnect')
 ```
 
+## Citmon Data Level Summary
+
+To expedite the citmon level summary part of the comments, we will organize all leveled data and summarize parameter counts by level here into a tibble so we can easily call this information at the time of creating the station comments.
+
+```{r citmon level summary}
+citmonLevelSummary <- dplyr::select(conventionals, STATION_ID = FDT_STA_ID, contains("LEVEL")) %>% 
+  pivot_longer(-STATION_ID, names_to = 'parameter', values_to = 'level') %>% 
+  filter(level %in% c('Level I', 'Level II', 'Level III')) %>% 
+  group_by(STATION_ID, parameter, level) %>% 
+  count() %>% 
+  mutate(Summary = paste(level, n, sep = ': ')) %>% 
+  arrange(desc(level)) %>% 
+  mutate(parameter = str_remove(parameter, 'LEVEL_')) %>% 
+  # fix some parameter names to be more human readable
+  mutate(parameter = case_when(parameter == "70507" ~ 'PHOSPHORUS_TOTAL_ORTHOPHOSPHATE', 
+                               parameter == "00630" ~ 'NITRITE+NITRATE_TOTAL',
+                               parameter == "00615" ~ 'NITROGEN_NITRITE_TOTAL',
+                               TRUE ~ as.character(parameter))) %>% 
+  group_by(STATION_ID, parameter) %>% 
+  summarise(`Parameter Summary` = paste0(parameter, " (", paste0(Summary, collapse = ", "), ")") ) %>% 
+  distinct(`Parameter Summary`) %>% ungroup() %>% group_by(STATION_ID) %>% 
+  summarise(`NonAgency Station Data Summary`= paste0(`Parameter Summary`, collapse = ", "))
+```
+
+
+
 
 
 # Automated Assessment Steps
@@ -552,6 +578,7 @@ for(i in 1:nrow(stationTable)){
                                 paste(c(DO_Daily_Avg_STAT, paste0('Water Column Metals Comment:', WAT_MET_COMMENT)), collapse = ' | ') )) %>%  
       left_join(comments, by = 'STATION_ID') %>%
       left_join(lowFlowSummary, by = 'STATION_ID') %>%
+      left_join(citmonLevelSummary, by = 'STATION_ID') %>% 
       dplyr::select(-ends_with(c('exceedanceRate', 'VERBOSE', 'Assessment Decision', 'StationID', 'WAT_MET_COMMENT'))) %>%  # to match Bulk Upload template but helpful to keep visible til now for testing
       mutate(`Date Last Sampled` = dateLastSampled)
   } else {# pull what you can from last cycle and flag as carry over
@@ -576,8 +603,7 @@ for(i in 1:nrow(stationTable)){
 
 
 stationTableResults <- bind_rows(stationsTemplate, stationTableResults) %>%
-  # for now bc bacteria needs help still
-  dplyr::select(STATION_ID:`7Q10 Flag`)
+  dplyr::select(STATION_ID:`Date Last Sampled`, `NonAgency Station Data Summary`, `2022 IR COMMENTS`:`7Q10 Flag`)
 
 timeDiff = Sys.time()- startTime
 ```
