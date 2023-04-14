@@ -109,8 +109,8 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
   output$plotly <- renderPlotly({
     req(input$oneStationSelection, oneStation())
     dat <- mutate(oneStation(),top = `pH Max`, bottom = `pH Min`,
-                  LakeStratification = replace_na(LakeStratification,"NA")) %>%
-      mutate(LakeStratification = factor(LakeStratification,levels=c("Epilimnion",'NA',"Hypolimnion")))#,ordered=T)
+                  LakeStratification = replace_na(LakeStratification,"Unstratified")) %>%# replace_na(LakeStratification,"NA")) %>%
+      mutate(LakeStratification = factor(LakeStratification,levels=c("Epilimnion",'Unstratified',"Hypolimnion")))#,ordered=T)
     
     # Fix look of single measure
     if(nrow(dat) == 1){
@@ -123,7 +123,7 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                 hoverinfo = "text",text="pH Standard", name="pH Standard") %>%
       add_lines(data=dat, x=~SampleDate,y=~bottom, mode='line',line = list(color = 'black'),
                 hoverinfo = "text", text="pH Standard", name="pH Standard") %>%
-      add_markers(data=dat, x= ~SampleDate, y= ~FDT_FIELD_PH,mode = 'scatter', name="pH (unitless)",  
+      add_markers(data=dat, x= ~SampleDate, y= ~FDT_FIELD_PH,mode = 'scatter', #name="pH (unitless)",  
                   color=~LakeStratification, #marker = list(color= '#535559'),
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",SampleDate),
@@ -131,7 +131,7 @@ pHPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                                                paste("pH: ",FDT_FIELD_PH," (unitless)"),
                                                paste("pH Level: ",LEVEL_FDT_FIELD_PH),
                                                paste("LakeStratification: ",LakeStratification)))%>%
-      layout(showlegend=FALSE,
+      layout(showlegend=TRUE,
              yaxis=list(title="pH (unitless)"),
              xaxis=list(title="Sample Date",tickfont = list(size = 10)))     })
   

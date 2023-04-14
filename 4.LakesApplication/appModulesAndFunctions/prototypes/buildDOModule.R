@@ -130,7 +130,7 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
     plot_ly(data=dat)%>%
       add_lines(data=dat, x=~SampleDate,y=~bottom, mode='line', line = list(color = 'black'),
                 hoverinfo = "text", text="DO Standard", name="DO Standard") %>%
-      add_markers(data=dat, x= ~SampleDate, y= ~DO_mg_L,mode = 'scatter', name="DO (mg/L)", 
+      add_markers(data=dat, x= ~SampleDate, y= ~DO_mg_L,mode = 'scatter', #name="DO (mg/L)", 
                   color=~LakeStratification,#marker = list(color= '#535559'),
                   hoverinfo="text",text=~paste(sep="<br>",
                                                paste("Date: ",SampleDate),
@@ -138,7 +138,7 @@ DOPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                                                paste("DO: ",DO_mg_L," (mg/L)"),
                                                paste("DO Level: ",LEVEL_DO),
                                                paste("LakeStratification: ",LakeStratification)))%>%
-      layout(showlegend=FALSE,
+      layout(showlegend=TRUE,
              yaxis=list(title="DO (mg/L)"),
              xaxis=list(title="Sample Date",tickfont = list(size = 10)))   })
   

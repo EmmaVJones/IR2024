@@ -96,14 +96,14 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
   output$plotly <- renderPlotly({
     req(input$oneStationSelection, oneStation())
     dat <- mutate(oneStation(),top = `Max Temperature (C)`,
-                  LakeStratification = replace_na(LakeStratification,"NA")) %>%
-      mutate(LakeStratification = factor(LakeStratification,levels=c("Epilimnion",'NA',"Hypolimnion")))#,ordered=T)
+                  LakeStratification = replace_na(LakeStratification,"Unstratified")) %>%# replace_na(LakeStratification,"NA")) %>%
+      mutate(LakeStratification = factor(LakeStratification,levels=c("Epilimnion",'Unstratified',"Hypolimnion")))#,ordered=T)
     
     suppressWarnings(suppressMessages(
       plot_ly(data=dat)%>%
         add_lines(x=~SampleDate,y=~top, mode='line',line = list(color = 'black'),
                   hoverinfo = "text", text="Temperature Standard", name="Temperature Standard") %>%
-        add_markers(x= ~SampleDate, y= ~FDT_TEMP_CELCIUS,mode = 'scatter', name="Temperature (Celsius)",
+        add_markers(x= ~SampleDate, y= ~FDT_TEMP_CELCIUS,mode = 'scatter', #name="Temperature (Celsius)",
                     color=~LakeStratification,# colors=c('#BF382A', '#0C4B8E'),#marker = list(color= '#535559'),
                     hoverinfo="text",text=~paste(sep="<br>",
                                                  paste("Date: ",SampleDate),
@@ -111,7 +111,7 @@ temperaturePlotlySingleStation <- function(input,output,session, AUdata, station
                                                  paste("Temperature: ",FDT_TEMP_CELCIUS,"C"),
                                                  paste("Temperature Level: ",LEVEL_FDT_TEMP_CELCIUS),
                                                  paste("LakeStratification: ",LakeStratification)))%>%
-        layout(showlegend=FALSE,
+        layout(showlegend=TRUE,
                yaxis=list(title="Temperature (Celsius)"),
                xaxis=list(title="Sample Date",tickfont = list(size = 10))) ))
   })
