@@ -1,0 +1,151 @@
+---
+title: "Identify Biological Data for Assessment Period"
+author: "Emma Jones"
+date: "4/18/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#This script was built in R 4.1.2
+```
+
+
+# Background
+
+Often, the Integrated Report assessment cycle begins before all biological data are available to regional assessment staff for review. This is in part due to the lengthy sorting, IDing, and data entry, and bioassessment processes required of regional biological staff for each benthic sample collected. WQA staff are under short timelines to analyze and assess all available data in Virginia as soon as an assessment period begins. As such, it is important to have all data available for a given station and assessment unit prior to an assessor spending time on any decisions. 
+
+Assessors may strategically choose to assess certain areas of their region before others based on biological data availability. The following script allows regional assessors to decide where all biological data is available and bioassessed by regional biological staff in order to guide decisions on where to begin overall WQA processes.
+
+
+## Environment Set Up
+
+First, bring in the appropriate packages and connect to the production ODS environment using your MS credentials in order to query internal data. **Remember to change the driver to the ODBC driver available on your local system!**
+
+```{r libraries and ODS connection,  warning=F, message=F}
+# Required libraries
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(inlmisc)
+library(pool)
+library(dbplyr)
+library(pins)
+library(config)
+
+# Connect to server
+conn <- config::get("connectionSettings") # get configuration settings
+
+board_register_rsconnect(key = conn$CONNECT_API_KEY,  #Sys.getenv("CONNECT_API_KEY"),
+                         server = conn$CONNECT_SERVER)#Sys.getenv("CONNECT_SERVER"))
+
+
+### Connect to ODS Production Environment
+pool <- dbPool(
+  drv = odbc::odbc(),
+  Driver = "ODBC Driver 11 for SQL Server", # use the ODBC driver available on your system!
+  Server= "DEQ-SQLODS-PROD,50000",
+  dbname = "ODS",
+  trusted_connection = "yes"
+)
+```
+
+
+pull all the rarified 2022 benthic data in ODS
+
+```{r warning=F, message=F}
+# Benthic stations for the upcoming cycle
+benSamps <- pool %>% tbl(in_schema('wqm', "Edas_Benthic_Sample_View")) %>%
+  # filter to just rarified 2022 data 
+  filter(between(as.Date(FDT_DATE_TIME), as.Date("2022-01-01"),  as.Date("2022-12-31")) &
+           WBS_TARGET_COUNT == 110) %>% 
+  as_tibble()
+# more info on these stations
+wqaBethicStations <- pool %>% tbl(in_schema('wqa', "WQA Combined Stations Geospatial Data")) %>%
+  filter(Station_Id %in% !! benSamps$STA_ID) %>%
+  as_tibble() %>%  # keep only one row per site (dataset expanded on ID305b codes)
+   st_as_sf(coords = c('Longitude', 'Latitude'), 
+               remove = F, # don't remove these lat/lon cols from df
+               crs = 4326) # add projection, needs to be geographic for now bc entering lat/lng
+
+
+# Benthic stations with info from last IR cycle
+wqaStationDetails <- pool %>% tbl(in_schema('wqa', 'WQA Station Details')) %>% 
+  filter(`Station Id` %in% !! benSamps$STA_ID && `Assessment Cycle` == 2022) %>% 
+  as_tibble() %>%  
+   st_as_sf(coords = c('GIS Longitude', 'GIS Latitude'), 
+               remove = F, # don't remove these lat/lon cols from df
+               crs = 4326) # add projection, needs to be geographic for now bc entering lat/lng
+
+
+# All benthic stations
+wqa2022IRbenthicStations <- pool %>% tbl(in_schema('wqa', 'WQA Station Details')) %>%  
+  filter(`Assessment Cycle` == 2022) %>% 
+  filter(!is.na(`Benthics Status Code`)) %>% 
+  as_tibble() %>% 
+  distinct(`Station Id`, .keep_all = T) %>%  # keep only one row per site (dataset expanded on ID305b codes)
+   st_as_sf(coords = c('GIS Longitude', 'GIS Latitude'), 
+               remove = F, # don't remove these lat/lon cols from df
+               crs = 4326) # add projection, needs to be geographic for now bc entering lat/lng
+
+```
+
+Get data from R server: spatial assessment layer and bioassessment information submitted for IR2024
+
+```{r warning=F, message=F}
+vahu6 <- st_as_sf(pin_get('ejones/vahu6', board = 'rsconnect'))
+IR2024bioassessment <- pin_get('ejones/CurrentIRbioassessmentDecisions', board = 'rsconnect') %>% 
+  #drop test data
+  filter(Reviewer != 'EMMAV JONES' | !is.na(Reviewer)) %>% 
+  left_join(pin_get('ejones/WQM-Stations-Spatial', board = 'rsconnect') %>% 
+              distinct(StationID, .keep_all = T) %>% 
+              dplyr::select(StationID:Sta_Desc, ASSESS_REG, VAHU6), 
+            by =  'StationID') %>% 
+  st_as_sf(coords = c('Longitude', 'Latitude'), 
+               remove = F, # don't remove these lat/lon cols from df
+               crs = 4326) # add projection, needs to be geographic for now bc entering lat/lng
+  
+```
+
+
+
+Interactive map with sites
+
+```{r warning=F, message=F}
+
+# color palette for assessment polygons
+pal2 <- colorFactor(
+  palette = topo.colors(7),
+  domain = vahu6$ASSESS_REG)
+
+CreateWebMap(maps = c("Topo","Imagery","Hydrography"), collapsed = TRUE,
+                 options= leafletOptions(zoomControl = TRUE,minZoom = 5, maxZoom = 20,
+                                         preferCanvas = TRUE)) %>%
+      setView(-79.1, 37.7, zoom=7)  %>%
+    addPolygons(data= vahu6,  color = 'black', weight = 1,
+              fillColor= ~pal2(vahu6$ASSESS_REG), fillOpacity = 0.5,stroke=0.1,
+                  group="Assessment Regions", label = ~ASSESS_REG) %>% hideGroup('Assessment Regions') %>%
+  addCircleMarkers(data = wqaBethicStations,
+                       color='blue', fillColor='yellow', radius = 6,
+                       fillOpacity = 0.5,opacity=0.8,weight = 4,stroke=T, group="2022 Sampled Benthic Stations With Data in CEDS",
+                       label = ~Station_Id, layerId = ~paste("Bioassessed in 2022: ",
+                                                             Station_Id)) %>%
+    addCircleMarkers(data =IR2024bioassessment,
+                       color='black', fillColor='orange', radius = 6,
+                       fillOpacity = 0.5,opacity=0.8,weight = 4,stroke=T, group="Benthic Stations with Regional Biologist Bioassessment Information",
+                       label = ~`StationID`, layerId = ~paste("Sampled in 2022: ",
+                                                                `StationID`)) %>% 
+   addCircleMarkers(data = wqa2022IRbenthicStations,
+                       color='gray', fillColor='pink', radius = 6,
+                       fillOpacity = 0.5,opacity=0.8,weight = 4,stroke=T, group="Benthic Stations in IR2022",
+                       label = ~`Station Id`, layerId = ~paste('Benthic Station in IR2022:',
+                                                               `Station Id`)) %>% hideGroup('Benthic Stations in IR2022') %>%
+  
+      inlmisc::AddHomeButton(raster::extent(-83.89, -74.80, 36.54, 39.98), position = "topleft") %>%
+      addLayersControl(baseGroups=c("Topo","Imagery","Hydrography"),
+                       overlayGroups = c("Benthic Stations with Regional Biologist Bioassessment Information", 
+                                         "2022 Sampled Benthic Stations With Data in CEDS", "Benthic Stations in IR2022", 'Assessment Regions'),
+                       options=layersControlOptions(collapsed=T),
+                       position='topleft') 
+```
+

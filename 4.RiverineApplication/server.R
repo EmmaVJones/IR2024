@@ -786,9 +786,9 @@ output$downloadReport <- downloadHandler(
 output$historicalBioassessmentInfo <- DT::renderDataTable({req(pinnedDecisions)
   z <- filter(pinnedDecisions, StationID %in% input$stationSelection)   %>%  # only show information from not current cycle here
     filter(IRYear != assessmentCycle) %>%
-    arrange(IRYear)
+    arrange(desc(IRYear))
   DT::datatable(z,  escape=F, rownames = F,
-                options= list(dom= 't' , pageLength = nrow(assessmentDecision_UserSelection()),scrollX = TRUE, scrollY = "250px"),
+                options= list(dom= 't' , pageLength = nrow(z),scrollX = TRUE, scrollY = "250px"),
                 selection = 'none')})
 
 

@@ -1,0 +1,106 @@
+---
+title: "Generate Fact Sheets for Entire Region"
+author: "Emma Jones"
+date: "4/20/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Background
+
+This script walks users through generating all available bioassessment reports for an entire region.
+
+
+## Identify Region
+
+```{r region selection}
+region <- "PRO"
+```
+
+
+## Set up environment
+
+```{r}
+source('global.R')
+
+# Get pinned decisions
+currentIRassessmentDecisions <- pin_get('ejones/CurrentIRbioassessmentDecisions', board = 'rsconnect') %>% 
+  filter(Region == region)
+previousIRassessmentDecisions <- pin_get('ejones/PreviousIRbioassessmentDecisions', board = 'rsconnect') %>% 
+  filter(Region == region)
+```
+
+
+Create reports for all stations bioassessed in the current IR window.
+
+```{r}
+# organize benthic and habitat data for chosen stations to send to report
+
+SCI_UserSelection <- filter(VSCIresults, StationID %in% filter(currentIRassessmentDecisions, AssessmentMethod == 'VSCI')$StationID) %>%
+  bind_rows(
+    filter(VCPMI63results, StationID %in% filter(currentIRassessmentDecisions, AssessmentMethod == 'VCPMI + 63')$StationID)  ) %>%
+  bind_rows(
+    filter(VCPMI65results, StationID %in% filter(currentIRassessmentDecisions, AssessmentMethod == 'VCPMI - 65')$StationID)  ) %>%
+  # add back in description information
+  left_join(filter(benSamps, StationID %in% currentIRassessmentDecisions$StationID) %>%
+              dplyr::select(StationID, Sta_Desc, BenSampID,US_L3CODE, US_L3NAME, HUC_12, VAHU6, Basin, Basin_Code),
+            by = c('StationID', 'BenSampID')) %>%
+  dplyr::select(StationID, Sta_Desc, BenSampID, `Collection Date`, RepNum, everything())
+
+habitatUserSelection <- habitatConsolidation( currentIRassessmentDecisions$StationID, habSamps, habValues)
+
+# run report
+for(i in unique(currentIRassessmentDecisions$StationID)){
+  render("bioassessmentFactSheet.Rmd", # the template
+         # reorganize data from app to send to report
+         params = list(assessmentDecision = as_tibble(filter(currentIRassessmentDecisions, StationID %in% i)),
+                       SCI = filter(SCI_UserSelection, StationID %in% i),
+                       benSampsFilter = filter(benSampsAll, BenSampID %in% filter(SCI_UserSelection, StationID %in% i)$BenSampID),
+                       habitat = filter(habitatUserSelection, StationID %in% i),
+                       assessmentCycle = assessmentCycle), #filter(currentIRassessmentDecisions, StationID %in% i)$IRYear),
+         output_dir = paste0("reports/", region,"/IR", assessmentCycle), 
+         output_file = paste(i, '.html', sep = ''), # name of the output file
+         quiet = T,
+         encoding = 'UTF-8')
+}
+```
+
+
+Now run from previous cycle
+
+```{r}
+# organize benthic and habitat data for chosen stations to send to report
+previousIRassessmentDecisions <- filter(previousIRassessmentDecisions, IRYear == 2022)
+
+SCI_UserSelection <- filter(VSCIresults, StationID %in% filter(previousIRassessmentDecisions, AssessmentMethod == 'VSCI')$StationID) %>%
+  bind_rows(
+    filter(VCPMI63results, StationID %in% filter(previousIRassessmentDecisions, AssessmentMethod == 'VCPMI + 63')$StationID)  ) %>%
+  bind_rows(
+    filter(VCPMI65results, StationID %in% filter(previousIRassessmentDecisions, AssessmentMethod == 'VCPMI - 65')$StationID)  ) %>%
+  # add back in description information
+  left_join(filter(benSamps, StationID %in% previousIRassessmentDecisions$StationID) %>%
+              dplyr::select(StationID, Sta_Desc, BenSampID,US_L3CODE, US_L3NAME, HUC_12, VAHU6, Basin, Basin_Code),
+            by = c('StationID', 'BenSampID')) %>%
+  dplyr::select(StationID, Sta_Desc, BenSampID, `Collection Date`, RepNum, everything())
+
+habitatUserSelection <- habitatConsolidation( previousIRassessmentDecisions$StationID, habSamps, habValues)
+
+# run report
+for(i in unique(previousIRassessmentDecisions$StationID)){
+  render("bioassessmentFactSheet.Rmd", # the template
+         # reorganize data from app to send to report
+         params = list(assessmentDecision = as_tibble(filter(previousIRassessmentDecisions, StationID %in% i)),
+                       SCI = filter(SCI_UserSelection, StationID %in% i),
+                       benSampsFilter = filter(benSampsAll, BenSampID %in% filter(SCI_UserSelection, StationID %in% i)$BenSampID),
+                       habitat = filter(habitatUserSelection, StationID %in% i),
+                       assessmentCycle = filter(previousIRassessmentDecisions, StationID %in% i)$IRYear),
+         output_dir = paste0("reports/", region,"/IR", unique(previousIRassessmentDecisions$IRYear)), 
+         output_file = paste(i, '.html', sep = ''), # name of the output file
+         quiet = T,
+         encoding = 'UTF-8')
+}
+```
+
