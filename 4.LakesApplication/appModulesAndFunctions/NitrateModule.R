@@ -152,5 +152,3 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
                 selection = 'none') }}) 
   
 }
-
-

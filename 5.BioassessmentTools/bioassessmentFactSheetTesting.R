@@ -31,7 +31,7 @@ stations <- filter(pinnedDecisions, IRYear %in% userIRwindows) %>%
   arrange(StationID) %>% 
   pull(StationID)
 
-userStations <- stations[1]#'2-JKS023.61'#stations[1]
+userStations <- '9-NBS002.71'#stations[1]#'2-JKS023.61'#stations[1]
 
 # pull data for user selection
 assessmentDecision_UserSelection <- filter(pinnedDecisions, StationID %in% userStations &
@@ -43,7 +43,7 @@ SCI_UserSelection <- filter(VSCIresultsAll, StationID %in% filter(assessmentDeci
     filter(VCPMI65resultsAll, StationID %in% filter(assessmentDecision_UserSelection, AssessmentMethod == 'VCPMI65 - Chowan')$StationID)  ) %>%
   filter(between(`Collection Date`, filter(assessmentPeriodLookup, IRYear %in% userIRwindows)$PeriodStart,
                  filter(assessmentPeriodLookup, IRYear %in% userIRwindows)$PeriodEnd)) %>%# limit data to assessment window of interest
-  filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
+  filter(RepNum %in% c('1')) %>% #, '2')) %>% # drop QA and wonky rep numbers
   filter(`Target Count` == 110) %>% # only assess rarified data
   filter(Gradient != "Boatable") %>%  # don't assess where no SCI not validated
   # add back in description information

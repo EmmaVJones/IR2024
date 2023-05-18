@@ -87,7 +87,7 @@ shinyServer(function(input, output, session) {
         filter(VCPMI65resultsAll, StationID %in% filter(assessmentDecision_UserSelection(), AssessmentMethod == 'VCPMI65 - Chowan')$StationID)  ) %>%
       filter(between(`Collection Date`, filter(assessmentPeriodLookup, IRYear %in% input$userIRwindows)$PeriodStart,
                      filter(assessmentPeriodLookup, IRYear %in% input$userIRwindows)$PeriodEnd)) %>%# limit data to assessment window of interest
-      filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
+      filter(RepNum %in% c('1')) %>% #, '2')) %>% # drop QA and wonky rep numbers
       filter(`Target Count` == 110) %>% # only assess rarified data
       filter(Gradient != "Boatable") %>%  # don't assess where no SCI not validated
       # add back in description information

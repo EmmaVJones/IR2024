@@ -138,7 +138,7 @@ shinyUI(fluidPage(theme="yeti.css",
                                             DT::dataTableOutput('carryoverStationSummary'),
                                             
                                             h5(strong('These stations cannot be viewed in the application until the user enters a valid
-                                                     ID305B_1 for the stations in the uploaded stations table.')),
+                                                     ID305B_1 and WATER_TYPE = RIVER for the stations stations below in the uploaded stations table.')),
                                             DT::dataTableOutput('stationsWithoutID305B_1Summary'),
                                             
                                             br(), br(), br() # a bit of breathing room

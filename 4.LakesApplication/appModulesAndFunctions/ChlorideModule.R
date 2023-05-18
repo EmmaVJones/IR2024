@@ -228,4 +228,3 @@ ClPlotlySingleStation <- function(input,output,session, AUdata, stationSelectedA
                             buttons=list('copy')),
               selection = 'none') })
 }
-

@@ -45,11 +45,14 @@ WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsc
 WCmetalsAnalyzed <- readRDS('userDataToUpload/WCmetalsForApp.RDS')
 Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
 VSCIresults <- pin_get("VSCIresults", board = "rsconnect") %>%
-  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
+  filter(RepNum == 1)
 VCPMI63results <- pin_get("VCPMI63results", board = "rsconnect") %>%
-  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
+  filter(RepNum == 1)
 VCPMI65results <- pin_get("VCPMI65results", board = "rsconnect") %>%
-  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
+  filter(RepNum == 1)
 benSampsStations <- st_as_sf(pin_get("ejones/benSampsStations", board = "rsconnect")) #%>%
 benSamps <- pin_get("ejones/benSamps", board = "rsconnect") %>%
   filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2])) %>%# limit data to assessment window
@@ -149,8 +152,8 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
 ## Watershed selection Tab
 # side panel arguments
 DEQregionSelection <- "BRRO"#"NRO"#"NRO"#"VRO"#"PRO"#"NRO"#'BRRO'#"PRO"#'BRRO'
-basinSelection <- "New"#"James-Middle"#"James-Upper"#'Roanoke'#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
-HUC6Selection <- "NE75"#"JM11"#"RU19"#"NE74"#"JU21"#"NE46"#"JU56"#"RU23"#"JM20"#"RU13"#"JU21"#"JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+basinSelection <- "James-Upper"#"New"#"James-Middle"#"James-Upper"#'Roanoke'#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
+HUC6Selection <- "JM11"#"NE75"#"JM11"#"RU19"#"NE74"#"JU21"#"NE46"#"JU56"#"RU23"#"JM20"#"RU13"#"JU21"#"JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
 
 # pull together data based on user input on side panel
 # Pull AU data from server

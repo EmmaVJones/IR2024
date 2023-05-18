@@ -41,11 +41,14 @@ WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsc
 WCmetalsAnalyzed <- readRDS('userDataToUpload/WCmetalsForApp.RDS')
 Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
 VSCIresults <- pin_get("VSCIresults", board = "rsconnect") %>%
-  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
+  filter(RepNum == 1)
 VCPMI63results <- pin_get("VCPMI63results", board = "rsconnect") %>%
-  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
+  filter(RepNum == 1)
 VCPMI65results <- pin_get("VCPMI65results", board = "rsconnect") %>%
-  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
+  filter(RepNum == 1)
 benSampsStations <- st_as_sf(pin_get("ejones/benSampsStations", board = "rsconnect")) #%>%
 benSamps <- pin_get("ejones/benSamps", board = "rsconnect") %>%
   filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2])) %>%# limit data to assessment window

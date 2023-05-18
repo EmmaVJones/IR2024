@@ -54,16 +54,19 @@ WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsc
 Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
 markPCB <- pin_get("ejones/PCBIR2024", board = 'rsconnect')#read_excel('data/oldData/2022 IR PCBDatapull_EVJ.xlsx', sheet = '2022IR Datapull EVJ')
 fishPCB <- pin_get("ejones/fishPCBIR2024", board = "rsconnect")#read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'PCBs')
-fishMetals <- pin_get("ejones/fishMetalsIR2024", board = "rsconnect") #read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals')
+fishMetals <- pin_get("ejones/fishMetalsIR2024", board = "rsconnect")   #read_excel('data/oldData/FishTissuePCBsMetals_EVJ.xlsx', sheet= 'Metals')
 
 
 WQMstationFull <- pin_get("ejones/WQM-Station-Full", board = "rsconnect")
 VSCIresults <- pin_get("ejones/VSCIresults", board = "rsconnect") %>%
-  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) ) %>% 
+  filter(RepNum == 1)
 VCPMI63results <- pin_get("ejones/VCPMI63results", board = "rsconnect") %>%
-  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
+  filter(RepNum == 1)
 VCPMI65results <- pin_get("ejones/VCPMI65results", board = "rsconnect") %>%
-  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) ) 
+  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
+  filter(RepNum == 1)
 assessmentWindowLowFlows <- pin_get('ejones/AssessmentWindowLowFlows', board = 'rsconnect')
 #subbasinToVAHU6 <- pin_get('ejones/subbasinToVAHU6', board = 'rsconnect')
 basins <- st_as_sf(pin_get('ejones/DEQ_VAHUSB_subbasins_EVJ', board = 'rsconnect'))
@@ -363,7 +366,7 @@ waterColumnMetalsAnalysis <- tibble()
 # time it:
 startTime <- Sys.time()
 
-# if you want to know the ith number of a particular station, use this: which(stationTable$STATION_ID == '2-JKS023.61', arr.ind=TRUE)
+# if you want to know the ith number of a particular station, use this: i = which(stationTable$STATION_ID == '1AACO014.57', arr.ind=TRUE)
 
 # loop over all sites, not super efficient but get the job done in easy to follow format
 for(i in 1:nrow(stationTable)){
@@ -428,7 +431,9 @@ for(i in 1:nrow(stationTable)){
       if(is.na(unique(stationData$PWS))  ){
       PWSconcat <- tibble(PWS= NA)
    } else {
-     PWSconcat <- cbind(assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_NitrateTotal'),
+     PWSconcat <- cbind(assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_DISSOLVED_00618_mg_L, LEVEL_00618, 10), 'PWS_NitrateDissolved'), # remove in IR2026
+                        assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_NitrateTotal'),
+                        assessPWSsummary(assessPWS(stationData, CHLORIDE_DISSOLVED_00941_mg_L, LEVEL_00941, 250), 'PWS_ChlorideDissolved'), # remove in IR2026
                         assessPWSsummary(assessPWS(stationData, CHLORIDE_TOTAL_00940_mg_L, LEVEL_00940, 250), 'PWS_ChlorideTotal'),
                         assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate'),
                         assessPWSsummary(assessPWS(WCmetalsStationPWS, AntimonyTotal, RMK_AntimonyTotal, 5), 'PWS_AntimonyTotal'),
