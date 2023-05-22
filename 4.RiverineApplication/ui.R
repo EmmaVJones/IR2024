@@ -336,7 +336,14 @@ shinyUI(fluidPage(theme="yeti.css",
                                             tabPanel('Toxics Data',
                                                      toxicsSingleStationUI('PBC'))
                                                      )
-                                 )
+                                 ),
+                                 tabPanel('Quick Station Search',
+                                          br(),
+                                          h3('This tab is where users (after uploading a stations table in the `Data Upload` tab) can
+                                                   quickly identify the VAHU6 and Assessment Unit information for a particular station in order
+                                                   to expedite navigating to that station in the `Watershed Selection` and `Assessment Unit Review` tabs.'),
+                                          uiOutput('stationSearch_'),
+                                          DT::dataTableOutput('stationSearchResults'))
                                  
                       )
                     )

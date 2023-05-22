@@ -1,17 +1,17 @@
 # work through appTesting.R through the creation of stationData object
 
+
+
 NitratePlotlySingleStationUI <- function(id){
   ns <- NS(id)
   tagList(
     wellPanel(
       h4(strong('Single Station Data Visualization')),
-      fluidRow(column(2,uiOutput(ns('oneStationSelectionUI'))),
+      fluidRow(column(3,uiOutput(ns('oneStationSelectionUI'))),
                column(1),
-               column(2),
+               column(3,br(), uiOutput(ns('changeWQSUI'))),
                column(1),
-               column(2,br(), uiOutput(ns('changeWQSUI'))),
-               column(1),
-               column(2,br(),actionButton(ns('reviewData'),"Review Raw Parameter Data",class='btn-block', width = '250px'))),
+               column(3,br(),actionButton(ns('reviewData'),"Review Raw Parameter Data",class='btn-block', width = '250px'))),
       helpText('All data presented in the interactive plot is raw data. Rounding rules are appropriately applied to the 
                assessment functions utilized by the application. The orange dashed line is the NITRATE_mg_L averaged across the assessment window 
                (visible if the `Apply Public Water Supply Water Quality Standards` checkbox is selected).
@@ -32,7 +32,8 @@ NitratePlotlySingleStationUI <- function(id){
 NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSelectedAbove){
   ns <- session$ns
   
-  output$oneStationSelectionUI <- renderUI({    req(AUdata)
+  output$oneStationSelectionUI <- renderUI({
+    req(AUdata)
     selectInput(ns('oneStationSelection'),strong('Select Station to Review'),
                 choices= sort(unique(c(stationSelectedAbove(),AUdata()$FDT_STA_ID))), # Change this based on stationSelectedAbove
                 width='200px', selected = stationSelectedAbove())})
@@ -48,8 +49,10 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
     } else {return( NULL )}    })
   
   
+  
   # Option to change WQS used for modal
-  output$changeWQSUI <- renderUI({    req(oneStation())
+  output$changeWQSUI <- renderUI({
+    req(oneStation())
     if(nrow(oneStation()) > 0){
       defaultPWS <- unique(oneStation()$PWS) %in% c("Yes")
     } else { defaultPWS <- FALSE}
@@ -68,23 +71,25 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
       size = 'l', easyClose = TRUE))  })
   
   # modal parameter data
-  output$parameterData <- DT::renderDataTable({    req(oneStation())
-    parameterFilter <- dplyr::select(oneStation(),FDT_STA_ID, GROUP_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_COMMENT,
-                                     NITRATE_mg_L, RMK_NITRATE, LEVEL_NITRATE, 
+  output$parameterData <- DT::renderDataTable({
+    req(oneStation())
+    parameterFilter <- dplyr::select(oneStation(), FDT_STA_ID, GROUP_STA_ID, FDT_DATE_TIME, FDT_DEPTH, FDT_COMMENT,
+                                     NITRATE_mg_L, RMK_NITRATE, LEVEL_NITRATE,
                                      NITROGEN_NITRATE_DISSOLVED_00618_mg_L, RMK_00618, LEVEL_00618,
                                      NITROGEN_NITRATE_TOTAL_00620_mg_L, RMK_00620, LEVEL_00620,
-                                     `7Q10 Flag Gage`, `7Q10 Flag`)
+                                     ThermoclineDepth, LakeStratification)
     
     DT::datatable(parameterFilter, rownames = FALSE, extensions = c('Buttons',  'FixedColumns'),
                   options= list(dom= 'Bt', pageLength = nrow(parameterFilter), scrollX = TRUE, scrollY = "400px", 
                                 fixedColumns = list(leftColumns = 3), buttons=list('copy')),
                   selection = 'none') %>%
-      formatStyle(c('NITRATE_mg_L','RMK_NITRATE', 'LEVEL_NITRATE'), 'LEVEL_NITRATE', backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray')) %>% 
+      formatStyle(c('NITRATE_mg_L','RMK_NITRATE', 'LEVEL_NITRATE'), 'LEVEL_NITRATE', 
+                  backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray')) %>% 
       formatStyle(c('NITROGEN_NITRATE_DISSOLVED_00618_mg_L', 'RMK_00618', 'LEVEL_00618'), 'LEVEL_00618', backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray')) %>% 
       formatStyle(c('NITROGEN_NITRATE_TOTAL_00620_mg_L', 'RMK_00620', 'LEVEL_00620'), 'LEVEL_00620', backgroundColor = styleEqual(c('Level II', 'Level I'), c('yellow','orange'), default = 'lightgray'))
-  })
+    })
   
-  output$plotly <- renderPlotly({  req(input$oneStationSelection, oneStation())
+  output$plotly <- renderPlotly({req(oneStation())
     if(is.null(oneStationAssessment())){
       dat <- oneStation() %>% 
         mutate(`Parameter Median` = NA, 
@@ -96,7 +101,7 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
         mutate(PWSlimit = 10)
     }
     dat$SampleDate <- as.POSIXct(dat$FDT_DATE_TIME, format="%m/%d/%y")
-   
+    
     
     # Fix look of single measure
     if(nrow(dat) == 1){
@@ -105,68 +110,68 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
                        tibble(SampleDate = c(dat$SampleDate- days(5), dat$SampleDate + days(5)),
                               PWSlimit = c(10, 10)))%>%
         fill(`Parameter Median`)  } # fill average down so line will plot
-
+    
     
     maxheight <- ifelse(max(dat$NITRATE_mg_L, na.rm=T) < 50, 55, max(dat$NITRATE_mg_L, na.rm=T)* 1.2)
     
     if(input$changeWQS == TRUE){
-        plot_ly(data=dat)%>%
-          add_lines(data=dat, x=~SampleDate,y=~PWSlimit, mode='line', line = list(color = 'black'),
-                    hoverinfo = "text", text= "PWS Criteria (10 mg/L)", name="PWS Criteria (10 mg/L)") %>%
-          add_lines(data=dat, x=~SampleDate,y=~`Parameter Median`, mode='line', line = list(color = 'orange', dash= 'dash'), name="NITRATE_mg_L six year average",
-                    hoverinfo = "text", text= ~paste(sep="<br>",
-                                                     paste("NITRATE_mg_L six year average: ", `Parameter Median`, "mg/L"))) %>%
-          # add_markers(data=dat, x= ~SampleDate, y= ~NITRATE_mg_L,mode = 'scatter', name="Dissolved Nitrate (mg/L)",marker = list(color= '#535559'),
-          #             hoverinfo="text",text=~paste(sep="<br>",
-          #                                          paste("Date: ",SampleDate),
-          #                                          paste("Depth: ",FDT_DEPTH, "m"),
-          #                                          paste("Dissolved Nitrate: ",NITRATE_mg_L,"mg/L"),
-          #                                          paste("Dissolved Nitrate Level: ",LEVEL_NITRATE)))%>%
-          add_markers(data=dat, x= ~SampleDate, y= ~NITROGEN_NITRATE_DISSOLVED_00618_mg_L,mode = 'scatter', name="Dissolved Nitrate (mg/L)",marker = list(color= '#535559'),
-                      hoverinfo="text",text=~paste(sep="<br>",
-                                                   paste("Date: ",SampleDate),
-                                                   paste("Depth: ",FDT_DEPTH, "m"),
-                                                   paste("Dissolved Nitrate: ",NITROGEN_NITRATE_DISSOLVED_00618_mg_L,"mg/L"),
-                                                   paste("Dissolved Nitrate Level: ",LEVEL_00618)))%>%
-          add_markers(data=dat, x= ~SampleDate, y= ~NITROGEN_NITRATE_TOTAL_00620_mg_L,mode = 'scatter', name="Total Nitrate (mg/L)",marker = list(color= '#D3D3D3'),
-                      hoverinfo="text",text=~paste(sep="<br>",
-                                                   paste("Date: ",SampleDate),
-                                                   paste("Depth: ",FDT_DEPTH, "m"),
-                                                   paste("Total Nitrate: ",NITROGEN_NITRATE_TOTAL_00620_mg_L,"mg/L"),
-                                                   paste("Total Nitrate Level: ",LEVEL_00620)))%>%
-          layout(showlegend=TRUE,
-                 yaxis=list(title="Nitrate (mg/L)"),
-                 xaxis=list(title="Sample Date",tickfont = list(size = 10)))
-      } else {
-        plot_ly(data=dat)%>%
-          add_lines(data=dat, x=~SampleDate,y=~`Parameter Median`, mode='line', line = list(color = 'orange', dash= 'dash'), name="NITRATE_mg_L six year average",
-                    hoverinfo = "text", text= ~paste(sep="<br>",
-                                                     paste("NITRATE_mg_L six year average: ", `Parameter Median`, "mg/L"))) %>%
-          # add_markers(data=dat, x= ~SampleDate, y= ~NITRATE_mg_L,mode = 'scatter', name="Dissolved Nitrate (mg/L)",marker = list(color= '#535559'),
-          #             hoverinfo="text",text=~paste(sep="<br>",
-          #                                          paste("Date: ",SampleDate),
-          #                                          paste("Depth: ",FDT_DEPTH, "m"),
-          #                                          paste("Dissolved Nitrate: ",NITRATE_mg_L,"mg/L"),
-          #                                          paste("Dissolved Nitrate Level: ",LEVEL_NITRATE)))%>%
-          add_markers(data=dat, x= ~SampleDate, y= ~NITROGEN_NITRATE_DISSOLVED_00618_mg_L,mode = 'scatter', name="Dissolved Nitrate (mg/L)",marker = list(color= '#535559'),
-                      hoverinfo="text",text=~paste(sep="<br>",
-                                                   paste("Date: ",SampleDate),
-                                                   paste("Depth: ",FDT_DEPTH, "m"),
-                                                   paste("Dissolved Nitrate: ",NITROGEN_NITRATE_DISSOLVED_00618_mg_L,"mg/L"),
-                                                   paste("Dissolved Nitrate Level: ",LEVEL_00618)))%>%
-          add_markers(data=dat, x= ~SampleDate, y= ~NITROGEN_NITRATE_TOTAL_00620_mg_L,mode = 'scatter', name="Total Nitrate (mg/L)",marker = list(color= '#D3D3D3'),
-                      hoverinfo="text",text=~paste(sep="<br>",
-                                                   paste("Date: ",SampleDate),
-                                                   paste("Depth: ",FDT_DEPTH, "m"),
-                                                   paste("Total Nitrate: ",NITROGEN_NITRATE_TOTAL_00620_mg_L,"mg/L"),
-                                                   paste("Total Nitrate Level: ",LEVEL_00620)))%>%
-          layout(showlegend=TRUE,
-                 yaxis=list(title="Nitrate (mg/L)"),
-                 xaxis=list(title="Sample Date",tickfont = list(size = 10)))
-        
-      } 
+      plot_ly(data=dat)%>%
+        add_lines(data=dat, x=~SampleDate,y=~PWSlimit, mode='line', line = list(color = 'black'),
+                  hoverinfo = "text", text= "PWS Criteria (10 mg/L)", name="PWS Criteria (10 mg/L)") %>%
+        add_lines(data=dat, x=~SampleDate,y=~`Parameter Median`, mode='line', line = list(color = 'orange', dash= 'dash'), name="NITRATE_mg_L six year average",
+                  hoverinfo = "text", text= ~paste(sep="<br>",
+                                                   paste("NITRATE_mg_L six year average: ", `Parameter Median`, "mg/L"))) %>%
+        #old method
+        # add_markers(data=dat, x= ~SampleDate, y= ~NITRATE_mg_L,mode = 'scatter', name="Dissolved Nitrate (mg/L)",marker = list(color= '#535559'),
+        #             hoverinfo="text",text=~paste(sep="<br>",
+        #                                          paste("Date: ",SampleDate),
+        #                                          paste("Depth: ",FDT_DEPTH, "m"),
+        #                                          paste("Dissolved Nitrate: ",NITRATE_mg_L,"mg/L"), 
+        #                                          paste("Dissolved Nitrate Level: ",LEVEL_NITRATE)))%>%
+        add_markers(data=dat, x= ~SampleDate, y= ~NITROGEN_NITRATE_DISSOLVED_00618_mg_L,mode = 'scatter', name="Dissolved Nitrate (mg/L)",marker = list(color= '#535559'),
+                    hoverinfo="text",text=~paste(sep="<br>",
+                                                 paste("Date: ",SampleDate),
+                                                 paste("Depth: ",FDT_DEPTH, "m"),
+                                                 paste("Dissolved Nitrate: ",NITROGEN_NITRATE_DISSOLVED_00618_mg_L,"mg/L"),
+                                                 paste("Dissolved Nitrate Level: ",LEVEL_00618)))%>%
+        add_markers(data=dat, x= ~SampleDate, y= ~NITROGEN_NITRATE_TOTAL_00620_mg_L,mode = 'scatter', name="Total Nitrate (mg/L)",marker = list(color= '#D3D3D3'),
+                    hoverinfo="text",text=~paste(sep="<br>",
+                                                 paste("Date: ",SampleDate),
+                                                 paste("Depth: ",FDT_DEPTH, "m"),
+                                                 paste("Total Nitrate: ",NITROGEN_NITRATE_TOTAL_00620_mg_L,"mg/L"),
+                                                 paste("Total Nitrate Level: ",LEVEL_00620)))%>%
+        layout(showlegend=TRUE,
+               yaxis=list(title="Nitrate (mg/L)"),
+               xaxis=list(title="Sample Date",tickfont = list(size = 10)))
+    } else {
+      plot_ly(data=dat)%>%
+        add_lines(data=dat, x=~SampleDate,y=~`Parameter Median`, mode='line', line = list(color = 'orange', dash= 'dash'), name="NITRATE_mg_L six year average",
+                  hoverinfo = "text", text= ~paste(sep="<br>",
+                                                   paste("NITRATE_mg_L six year average: ", `Parameter Median`, "mg/L"))) %>%
+        #old method
+        # add_markers(data=dat, x= ~SampleDate, y= ~NITRATE_mg_L,mode = 'scatter', name="Dissolved Nitrate (mg/L)",marker = list(color= '#535559'),
+        #             hoverinfo="text",text=~paste(sep="<br>",
+        #                                          paste("Date: ",SampleDate),
+        #                                          paste("Depth: ",FDT_DEPTH, "m"),
+        #                                          paste("Dissolved Nitrate: ",NITRATE_mg_L,"mg/L")))%>%
+        add_markers(data=dat, x= ~SampleDate, y= ~NITROGEN_NITRATE_DISSOLVED_00618_mg_L,mode = 'scatter', name="Dissolved Nitrate (mg/L)",marker = list(color= '#535559'),
+                    hoverinfo="text",text=~paste(sep="<br>",
+                                                 paste("Date: ",SampleDate),
+                                                 paste("Depth: ",FDT_DEPTH, "m"),
+                                                 paste("Dissolved Nitrate: ",NITROGEN_NITRATE_DISSOLVED_00618_mg_L,"mg/L"),
+                                                 paste("Dissolved Nitrate Level: ",LEVEL_00618)))%>%
+        add_markers(data=dat, x= ~SampleDate, y= ~NITROGEN_NITRATE_TOTAL_00620_mg_L,mode = 'scatter', name="Total Nitrate (mg/L)",marker = list(color= '#D3D3D3'),
+                    hoverinfo="text",text=~paste(sep="<br>",
+                                                 paste("Date: ",SampleDate),
+                                                 paste("Depth: ",FDT_DEPTH, "m"),
+                                                 paste("Total Nitrate: ",NITROGEN_NITRATE_TOTAL_00620_mg_L,"mg/L"),
+                                                 paste("Total Nitrate Level: ",LEVEL_00620)))%>%
+        layout(showlegend=TRUE,
+               yaxis=list(title="Nitrate (mg/L)"),
+               xaxis=list(title="Sample Date",tickfont = list(size = 10)))
+      
+    }
   })
-  
   
   output$rangeTableSingleSite <- renderDataTable({   req(oneStation(), oneStationAssessment())
     if(input$changeWQS == TRUE){
@@ -181,7 +186,11 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
       z <- assessPWSsummary(oneStationAssessment(), 'PWS_Nitrate') %>% dplyr::select(-PWS_Nitrate_STAT) 
       datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "150px", dom='t'),
                 selection = 'none') }}) 
+  
 }
+
+
+
 
 
 ui <- fluidPage(
@@ -195,23 +204,13 @@ server <- function(input,output,session){
   stationSelected <- reactive({input$stationSelection})
   
   
-  #AUData <- reactive({filter_at(conventionals_HUC, vars(starts_with("ID305B")), any_vars(. %in% AUselection) ) })
-  AUData <- reactive({filter(conventionals, Huc6_Vahu6 %in% c("JU11")) %>% #'JM01','JM02', 'JM03', 'JM04', 'JM05', 'JM06')) %>%
-      left_join(dplyr::select(stationTable, STATION_ID:VAHU6,
-                              WQS_ID:CLASS_DESCRIPTION),
-                #WQS_ID:`Max Temperature (C)`), 
-                by = c('FDT_STA_ID' = 'STATION_ID')) %>%
-      filter(!is.na(ID305B_1)) %>%
-      pHSpecialStandardsCorrection() %>%
-      filter(!is.na(NITRATE_mg_L))})
+  AUData <- reactive({filter_at(conventionalsLake, vars(starts_with("ID305B")), any_vars(. %in% inputAUselection) ) })
+  
   
   callModule(NitratePlotlySingleStation,'Nitrate', AUData, stationSelected)
   
 }
 
 shinyApp(ui,server)
-
-
-
 
 

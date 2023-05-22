@@ -1,4 +1,3 @@
-# work through appTesting.R through the creation of stationData object
 
 NitratePlotlySingleStationUI <- function(id){
   ns <- NS(id)
@@ -96,7 +95,7 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
         mutate(PWSlimit = 10)
     }
     dat$SampleDate <- as.POSIXct(dat$FDT_DATE_TIME, format="%m/%d/%y")
-   
+    
     
     # Fix look of single measure
     if(nrow(dat) == 1){
@@ -105,11 +104,11 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
                        tibble(SampleDate = c(dat$SampleDate- days(5), dat$SampleDate + days(5)),
                               PWSlimit = c(10, 10)))%>%
         fill(`Parameter Median`)  } # fill average down so line will plot
-
+    
     
     maxheight <- ifelse(max(dat$NITRATE_mg_L, na.rm=T) < 50, 55, max(dat$NITRATE_mg_L, na.rm=T)* 1.2)
     
-    if(input$changeWQS == TRUE){
+      if(input$changeWQS == TRUE){
         plot_ly(data=dat)%>%
           add_lines(data=dat, x=~SampleDate,y=~PWSlimit, mode='line', line = list(color = 'black'),
                     hoverinfo = "text", text= "PWS Criteria (10 mg/L)", name="PWS Criteria (10 mg/L)") %>%
@@ -182,36 +181,3 @@ NitratePlotlySingleStation <- function(input,output,session, AUdata, stationSele
       datatable(z, rownames = FALSE, options= list(pageLength = nrow(z), scrollX = TRUE, scrollY = "150px", dom='t'),
                 selection = 'none') }}) 
 }
-
-
-ui <- fluidPage(
-  helpText('Review each site using the single site visualization section. There are no WQS for Specific Conductivity.'),
-  NitratePlotlySingleStationUI('Nitrate')
-)
-
-server <- function(input,output,session){
-  stationData <- eventReactive( input$stationSelection, {
-    filter(AUData, FDT_STA_ID %in% input$stationSelection) })
-  stationSelected <- reactive({input$stationSelection})
-  
-  
-  #AUData <- reactive({filter_at(conventionals_HUC, vars(starts_with("ID305B")), any_vars(. %in% AUselection) ) })
-  AUData <- reactive({filter(conventionals, Huc6_Vahu6 %in% c("JU11")) %>% #'JM01','JM02', 'JM03', 'JM04', 'JM05', 'JM06')) %>%
-      left_join(dplyr::select(stationTable, STATION_ID:VAHU6,
-                              WQS_ID:CLASS_DESCRIPTION),
-                #WQS_ID:`Max Temperature (C)`), 
-                by = c('FDT_STA_ID' = 'STATION_ID')) %>%
-      filter(!is.na(ID305B_1)) %>%
-      pHSpecialStandardsCorrection() %>%
-      filter(!is.na(NITRATE_mg_L))})
-  
-  callModule(NitratePlotlySingleStation,'Nitrate', AUData, stationSelected)
-  
-}
-
-shinyApp(ui,server)
-
-
-
-
-

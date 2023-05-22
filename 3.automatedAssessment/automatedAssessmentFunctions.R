@@ -181,6 +181,8 @@ thermoclineDepth <- function(stationData){
     group_by(FDT_STA_ID, SampleDate) 
   
   dailyThermDepth <- dplyr::select(stationData, FDT_STA_ID, SampleDate, FDT_DEPTH, FDT_TEMP_CELCIUS) %>%
+    filter(!is.na(FDT_TEMP_CELCIUS)) %>% 
+    filter(!is.na(FDT_DEPTH)) %>% 
     arrange(SampleDate, FDT_DEPTH) %>% # make sure data are in order
     mutate(DepthDiff = c(NA, diff(FDT_DEPTH)),
            TempDiff = c(NA, diff(FDT_TEMP_CELCIUS))) %>%

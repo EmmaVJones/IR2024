@@ -77,5 +77,5 @@ stationsWithData <- stationTableResults %>%
 
 stationTableResults1 <- filter(stationTableResults, STATION_ID %in% stationsWithData$STATION_ID)  %>% 
   dplyr::select(-PWS)
-write.csv(stationTableResults1, 'PWSwithDissolvedNO3Cl.csv', na = '', row.names = F)    
+write.csv(stationTableResults1, 'PWSwithDissolvedNO3Cl-.csv', na = '', row.names = F)    
     

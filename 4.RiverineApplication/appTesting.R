@@ -56,7 +56,7 @@ VCPMI65results <- pin_get("VCPMI65results", board = "rsconnect") %>%
 benSampsStations <- st_as_sf(pin_get("ejones/benSampsStations", board = "rsconnect")) #%>%
 benSamps <- pin_get("ejones/benSamps", board = "rsconnect") %>%
   filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2])) %>%# limit data to assessment window
-  filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
+  filter(RepNum %in% c('1')) %>% # drop QA and wonky rep numbers
   filter(`Target Count` == 110) %>% # only assess rarified data
   left_join(benSampsStations, by = 'StationID') %>% # update with spatial, assess reg, vahu6, basin/subbasin, & ecoregion info
   dplyr::select(StationID, Sta_Desc, everything()) %>%
@@ -152,8 +152,8 @@ stationTable <- filter(stationTable, !STATION_ID %in% lakeStations$STATION_ID) %
 ## Watershed selection Tab
 # side panel arguments
 DEQregionSelection <- "BRRO"#"NRO"#"NRO"#"VRO"#"PRO"#"NRO"#'BRRO'#"PRO"#'BRRO'
-basinSelection <- "James-Upper"#"New"#"James-Middle"#"James-Upper"#'Roanoke'#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
-HUC6Selection <- "JM11"#"NE75"#"JM11"#"RU19"#"NE74"#"JU21"#"NE46"#"JU56"#"RU23"#"JM20"#"RU13"#"JU21"#"JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
+basinSelection <- "Roanoke"#"James-Upper"#"New"#"James-Middle"#"James-Upper"#'Roanoke'#"James-Middle"#"Potomac-Lower"#"Appomattox"#"Potomac-Lower"#"James-Upper"#"James-Middle"#"James-Upper"#"Chowan-Dismal"#'Roanoke'#'James-Upper'#'Roanoke'#"Small Coastal" ##"Roanoke"#"Roanoke"#'James-Upper'#
+HUC6Selection <- "RU14"#"JM11"#"NE75"#"JM11"#"RU19"#"NE74"#"JU21"#"NE46"#"JU56"#"RU23"#"JM20"#"RU13"#"JU21"#"JU11"#"JM01"#"PL30"#"PU10"#"JA42"#"PL56"#"JU44"#JM01"#"JU41"#"CM01"#"RD15"#"RU24"#"JM01"#'JU21'#"RU14"#"CB47"#'JM16'#'RU09'#'RL12'#
 
 # pull together data based on user input on side panel
 # Pull AU data from server
@@ -212,7 +212,7 @@ AUselectionOptions <- unique(c(conventionals_HUC$ID305B_1,
 AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))] # double check nothing wonky in there before proceeding
 
 # user selection
-AUselection <- AUselectionOptions[1]# "VAN-A15R_ACO02A00"#"VAW-I04R_JKS03A00"##"VAV-B05R_BAR03A10"#"VAP-J17R_SFT01B98"#AUselectionOptions[1]#"VAN-A27R_AUA01A00"#
+AUselection <- AUselectionOptions[10]# "VAN-A15R_ACO02A00"#"VAW-I04R_JKS03A00"##"VAV-B05R_BAR03A10"#"VAP-J17R_SFT01B98"#AUselectionOptions[1]#"VAN-A27R_AUA01A00"#
 
 # Allow user to select from available stations in chosen AU to investigate further
 stationSelection_ <- filter(conventionals_HUC, ID305B_1 %in% AUselection | ID305B_2 %in% AUselection | 
@@ -233,7 +233,7 @@ if(nrow(carryoverStations) > 0){
     stationSelection_  <- c(stationSelection_ , carryoverStationsInAU)  } }
 
 # user selection
-stationSelection <- stationSelection_[1]
+stationSelection <- stationSelection_[2]
 
 
 # Pull conventionals data for just selected AU
@@ -468,7 +468,9 @@ WCmetalsStationPWS <- left_join(dplyr::select(stationData, FDT_STA_ID, PWS) %>% 
       PWSconcat <- tibble(#STATION_ID = unique(stationData$FDT_STA_ID),
         PWS= NA)
     } else {
-      PWSconcat <- cbind(assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_NitrateTotal'),
+      PWSconcat <- cbind(assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_DISSOLVED_00618_mg_L, LEVEL_00618, 10), 'PWS_NitrateDissolved'), # remove in IR2026
+                         assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_NitrateTotal'),
+                         assessPWSsummary(assessPWS(stationData, CHLORIDE_DISSOLVED_00941_mg_L, LEVEL_00941, 250), 'PWS_ChlorideDissolved'), # remove in IR2026
                          assessPWSsummary(assessPWS(stationData, CHLORIDE_TOTAL_00940_mg_L, LEVEL_00940, 250), 'PWS_ChlorideTotal'),
                          assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate'),
                          assessPWSsummary(assessPWS(WCmetalsStationPWS, AntimonyTotal, RMK_AntimonyTotal, 5), 'PWS_AntimonyTotal'),
@@ -502,8 +504,8 @@ WCmetalsStationPWS <- left_join(dplyr::select(stationData, FDT_STA_ID, PWS) %>% 
             dplyr::select(contains(c('_EXC','_STAT'))) %>%
             mutate(across( everything(),  as.character)) %>%
             pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) %>% 
-            filter(! str_detect(values, 'WQS info missing from analysis')) %>% 
-            filter(! values %in% c("S", 0))) >= 1) {
+            filter(! str_detect(values, 'WQS info missing from analysis')) #%>% filter(! values %in% c("S", 0))) >= 1) { We used to only flag when issues arise, but in the IR2024 rerun in late May, we changed this logic (per assessor request) to flag if any data present
+    ) >= 1) {
       WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = 'Review',
                          PWSinfo = list(PWSconcat))# add in PWS information so you don't need to run this analysis again
     } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,

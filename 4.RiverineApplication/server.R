@@ -52,7 +52,7 @@ VCPMI65results <- pin_get("VCPMI65results", board = "rsconnect") %>%
 benSampsStations <- st_as_sf(pin_get("ejones/benSampsStations", board = "rsconnect")) #%>%
 benSamps <- pin_get("ejones/benSamps", board = "rsconnect") %>%
   filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2])) %>%# limit data to assessment window
-  filter(RepNum %in% c('1', '2')) %>% # drop QA and wonky rep numbers
+  filter(RepNum %in% c('1')) %>% # drop QA and wonky rep numbers
   filter(`Target Count` == 110) %>% # only assess rarified data
   left_join(benSampsStations, by = 'StationID') %>% # update with spatial, assess reg, vahu6, basin/subbasin, & ecoregion info
   dplyr::select(StationID, Sta_Desc, everything()) %>%
@@ -109,7 +109,8 @@ shinyServer(function(input, output, session) {
                                              content=function(file){write_csv(template,file,na = "")})
   
   output$templateLastUpdated_ <- renderUI({
-    helpText(paste0('Template last updated: ', lastUpdated))  })
+    # helpText(paste0('Template last updated: ', lastUpdated))  }) # frozen for now, will make reactive in IR2026 again
+    helpText('Template last updated: 2023-04-30') })
   
   
   # read in stationTable that user uploads
@@ -490,7 +491,9 @@ shinyServer(function(input, output, session) {
           PWS= NA)
       } else {
         PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData()$FDT_STA_ID)),
+          assessPWSsummary(assessPWS(stationData(), NITROGEN_NITRATE_DISSOLVED_00618_mg_L, LEVEL_00618, 10), 'PWS_NitrateDissolved'), # remove in IR2026
           assessPWSsummary(assessPWS(stationData(), NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_NitrateTotal'),
+          assessPWSsummary(assessPWS(stationData(), CHLORIDE_DISSOLVED_00941_mg_L, LEVEL_00941, 250), 'PWS_ChlorideDissolved'), # remove in IR2026
           assessPWSsummary(assessPWS(stationData(), CHLORIDE_TOTAL_00940_mg_L, LEVEL_00940, 250), 'PWS_ChlorideTotal'),
           assessPWSsummary(assessPWS(stationData(), SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate'),
           assessPWSsummary(assessPWS(WCmetalsStationPWS(), AntimonyTotal, RMK_AntimonyTotal, 5), 'PWS_AntimonyTotal'),
@@ -525,8 +528,8 @@ shinyServer(function(input, output, session) {
               dplyr::select(contains(c('_EXC','_STAT'))) %>%
               mutate(across( everything(),  as.character)) %>%
               pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) %>%
-              filter(! str_detect(values, 'WQS info missing from analysis')) %>%
-              filter(! values %in% c("S", 0))) >= 1  ) {
+              filter(! str_detect(values, 'WQS info missing from analysis')) #%>% filter(! values %in% c("S", 0))) >= 1) { We used to only flag when issues arise, but in the IR2024 rerun in late May, we changed this logic (per assessor request) to flag if any data present
+      ) >= 1) {
         WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = 'Review',
                            PWSinfo = list(PWSconcat))# add in PWS information so you don't need to run this analysis again
       } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
@@ -805,4 +808,21 @@ callModule(metalsTableSingleStation,'metals', AUData,  WCmetals, WCmetalsAnalyze
 ### Toxics Sub Tab ####---------------------------------------------------------------------------------------------------
 callModule(toxicsSingleStation,'PBC',  AUData,  stationData, waterToxics, WCmetalsStationPWS,  reactive(intakeSites), markPCB, fishPCB, stationSelected)
 
+
+
+
+
+## Quick Station Search Tab
+
+output$stationSearch_ <- renderUI({req(stationTable())
+  selectInput('stationSearch', 'Choose a station (or stations) to retrieve information from the input stations table.',
+              choices = sort(unique(stationTable()$STATION_ID)), multiple = T) })
+
+output$stationSearchResults <- renderDataTable({ req(input$stationSearch)
+  z <- filter(stationTable(), STATION_ID %in% input$stationSearch) %>% 
+    dplyr::select(STATION_ID: VAHU6)
+  
+  DT::datatable(z, rownames = FALSE,
+                options= list(scrollX = TRUE, pageLength = nrow(z), scrollY = "300px", dom='Bti'),
+                selection = 'none')       })
 })

@@ -30,8 +30,11 @@ board_register_rsconnect(key = conn$CONNECT_API_KEY,
 
 
 modulesToReadIn <- c('thermocline','temperature','DO','pH', 'SpCond', 'Ecoli', 'Ecoli_AU',
-                     'chlA','TP','TSI', 'Ammonia',  'Nitrate', 'Chloride', 'Sulfate', 
-                     'metals', 'toxics')
+                     'chlA','TP','TSI', 'Ammonia',  #'Nitrate', 'Chloride', 
+                     'NitrateDissolvedAndTotal', 'ChlorideDissolvedAndTotal',
+                     'Sulfate', 'metals',
+                     'toxicsDissolvedAndTotal')
+                     #'toxics')
 for (i in 1:length(modulesToReadIn)){
   source(paste('appModulesAndFunctions/',modulesToReadIn[i],'Module.R',sep=''))
 }

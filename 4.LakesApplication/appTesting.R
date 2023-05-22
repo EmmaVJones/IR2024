@@ -161,7 +161,7 @@ lakeSelection_ <- regionalAUs %>%
   distinct(Lake_Name) %>% 
   arrange(Lake_Name) %>% 
   pull()
-lakeSelection <-  "Lake Gaston"#"Kerr Reservoir"#"Smith Mountain Lake" #"Claytor Lake"#"Timber Lake"#"Banister Lake"#"Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
+lakeSelection <-  "Smith Mountain Lake" #"Lake Gaston"#"Kerr Reservoir"#"Smith Mountain Lake" #"Claytor Lake"#"Timber Lake"#"Banister Lake"#"Smith Mountain Lake" #"Claytor Lake"#"Banister Lake"#"Cherrystone Reservoir"#"Aquia Reservoir (Smith Lake)"# "Claytor Lake"# "Cherrystone Reservoir"#lakeSelection_[7]
 
 AUs <- filter(regionalAUs, Lake_Name %in% lakeSelection & ASSESS_REG %in% DEQregionSelection)
 lake_filter <- filter_at(stationTable, vars(starts_with('ID305B')), any_vars(. %in% AUs$ID305B)) 
@@ -206,14 +206,14 @@ AUselectionOptions <- unique(dplyr::select(lake_filter, ID305B_1:ID305B_10) %>%
                                pull(keep) )
 AUselectionOptions <- AUselectionOptions[!is.na(AUselectionOptions) & !(AUselectionOptions %in% c("NA", "character(0)", "logical(0)"))]
 
-inputAUselection <- AUselectionOptions[2]
+inputAUselection <- "VAW-L07L_BDA01A10"#AUselectionOptions[2]
 AUselection <- filter(regionalAUs, ID305B %in% inputAUselection) %>% st_set_geometry(NULL) %>% as.data.frame()
 
 
 # Allow user to select from available stations in chosen AU to investigate further
 stationSelectionOptions <- filter_at(lake_filter, vars(starts_with("ID305B")), any_vars(. %in% inputAUselection)) %>%
   distinct(STATION_ID) %>% arrange(STATION_ID) %>%  pull()
-stationSelection <- stationSelectionOptions[1]
+stationSelection <- stationSelectionOptions[4]
 
 # Pull conventionals data for just selected AU
 AUData <- filter_at(conventionalsLake, vars(starts_with("ID305B")), any_vars(. %in% inputAUselection) ) 
@@ -434,7 +434,9 @@ if(nrow(stationData) > 0){
       PWS= NA)
   } else {
     PWSconcat <- cbind(#tibble(STATION_ID = unique(stationData$FDT_STA_ID)),
+      assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_DISSOLVED_00618_mg_L, LEVEL_00618, 10), 'PWS_NitrateDissolved'), # remove in IR2026
       assessPWSsummary(assessPWS(stationData, NITROGEN_NITRATE_TOTAL_00620_mg_L, LEVEL_00620, 10), 'PWS_NitrateTotal'),
+      assessPWSsummary(assessPWS(stationData, CHLORIDE_DISSOLVED_00941_mg_L, LEVEL_00941, 250), 'PWS_ChlorideDissolved'), # remove in IR2026
       assessPWSsummary(assessPWS(stationData, CHLORIDE_TOTAL_00940_mg_L, LEVEL_00940, 250), 'PWS_ChlorideTotal'),
       assessPWSsummary(assessPWS(stationData, SULFATE_TOTAL_mg_L, LEVEL_SULFATE_TOTAL, 250), 'PWS_Total_Sulfate'),
       assessPWSsummary(assessPWS(WCmetalsStationPWS, AntimonyTotal, RMK_AntimonyTotal, 5), 'PWS_AntimonyTotal'),
@@ -467,7 +469,9 @@ if(nrow(stationData) > 0){
                                         filter(StationID %in% stationData$FDT_STA_ID), 'WAT_TOX')) %>%
           dplyr::select(contains(c('_EXC','_STAT'))) %>%
           mutate(across( everything(),  as.character)) %>%
-          pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) ) >= 1) {
+          pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE)  %>%
+          filter(! str_detect(values, 'WQS info missing from analysis')) #%>% filter(! values %in% c("S", 0))) >= 1) { We used to only flag when issues arise, but in the IR2024 rerun in late May, we changed this logic (per assessor request) to flag if any data present
+  ) >= 1) {
     WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = 'Review',
                        PWSinfo = list(PWSconcat))# add in PWS information so you don't need to run this analysis again
   } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA,
@@ -496,9 +500,17 @@ stationTableOutput <- bind_rows(stationsTemplate,
                                           annualRollingExceedanceAnalysis(ammoniaAnalysisStation, yearsToRoll = 3, aquaticLifeUse = FALSE)), parameterAbbreviation = "AMMONIA"),
                                       
                                       # Water Column Metals
-                                      filter(WCmetalsForAnalysis, Station_Id %in%  stationData$FDT_STA_ID) %>% 
-                                        metalsAnalysis(stationData, WER= 1) %>% 
-                                        metalsAssessmentFunction(), 
+                                      metalsAssessmentFunction(WCmetalsStationAnalysisStation$WCmetalsExceedanceSummary),
+                                      
+                                      # takes too long to run this in app form, sourced from pre-analyzed data to expedite rendering time
+                                      # filter(WCmetalsForAnalysis, Station_Id %in%  stationData()$FDT_STA_ID) %>%
+                                      #   metalsAnalysis( stationData(), WER = 1) %>%
+                                      #   rename(FDT_STA_ID = Station_Id) %>%
+                                      #   mutate(`Criteria Type` = Criteria) %>%
+                                      #   annualRollingExceedanceAnalysis(yearsToRoll = 3, aquaticLifeUse = TRUE) %>%
+                                      #   annualRollingExceedanceSummary() %>%
+                                      #   metalsAssessmentFunction(),
+                                      
                                       
                                       # Water Toxics combo fields
                                       waterToxics, 

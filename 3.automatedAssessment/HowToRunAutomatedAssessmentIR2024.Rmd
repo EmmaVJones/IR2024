@@ -366,7 +366,7 @@ waterColumnMetalsAnalysis <- tibble()
 # time it:
 startTime <- Sys.time()
 
-# if you want to know the ith number of a particular station, use this: i = which(stationTable$STATION_ID == '1AACO014.57', arr.ind=TRUE)
+# if you want to know the ith number of a particular station, use this: i = which(stationTable$STATION_ID == '4AROA175.63', arr.ind=TRUE)
 
 # loop over all sites, not super efficient but get the job done in easy to follow format
 for(i in 1:nrow(stationTable)){
@@ -468,8 +468,8 @@ for(i in 1:nrow(stationTable)){
           dplyr::select(contains(c('_EXC','_STAT'))) %>%
           mutate(across( everything(),  as.character)) %>%
           pivot_longer(cols = contains(c('_EXC','_STAT')), names_to = 'parameter', values_to = 'values', values_drop_na = TRUE) %>% 
-          filter(! str_detect(values, 'WQS info missing from analysis')) %>% 
-          filter(! values %in% c("S", 0))) >= 1) {
+          filter(! str_detect(values, 'WQS info missing from analysis')) #%>% filter(! values %in% c("S", 0))) >= 1) { We used to only flag when issues arise, but in the IR2024 rerun in late May, we changed this logic (per assessor request) to flag if any data present
+          ) >= 1) {
     WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = 'Review')
     } else { WCtoxics <- tibble(WAT_TOX_EXC = NA, WAT_TOX_STAT = NA)} 
   
@@ -618,7 +618,7 @@ Now save all this work as a this is the starting point for the app or for region
 
 ```{r}
 # can use write_csv bc there are no date fields that could be corrupted by function
-write_csv(stationTableResults, 'processedStationData/stationTableResults.csv',
+write_csv(stationTableResults, 'processedStationData/stationTableResults05192023.csv',
           na = "") # dont write out a character NA in csv
 
 # If you want just one region's worth of stations, you could do this:
