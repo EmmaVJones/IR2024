@@ -34,21 +34,25 @@ historicalStationsTable <- readRDS('data/stationsTable2022.RDS')# last cycle sta
 historicalStationsTable2 <- readRDS('data/stationsTable2020.RDS') # two cycle ago stations table
 intakeSites <- readRDS('data/sites100mFromVDHintakes.RDS')
 extraSites <- readRDS('data/extraSites.RDS')
+#these were live but in June 2023 we decided to archive these for consistency
+VSCIresults <- readRDS('data/VSCIresultsArchiveIR2024.RDS')
+VCPMI63results <- readRDS('data/VCPMI63resultsArchiveIR2024.RDS')
+VCPMI65results <- readRDS('data/VCPMI65resultsArchiveIR2024.RDS')
 
 
 WCmetals <- pin_get("WCmetalsIR2024",  board = "rsconnect")#pin_get("WCmetalsIR2024",  board = "rsconnect")
 WCmetalsForAnalysis <- pin_get("ejones/WCmetalsForAnalysisIR2024",  board = "rsconnect") # this is included in local data above
 WCmetalsAnalyzed <- readRDS('userDataToUpload/WCmetalsForApp.RDS')
 Smetals <- pin_get("SmetalsIR2024",  board = "rsconnect")
-VSCIresults <- pin_get("VSCIresults", board = "rsconnect") %>%
-  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
-  filter(RepNum == 1)
-VCPMI63results <- pin_get("VCPMI63results", board = "rsconnect") %>%
-  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
-  filter(RepNum == 1)
-VCPMI65results <- pin_get("VCPMI65results", board = "rsconnect") %>%
-  filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
-  filter(RepNum == 1)
+# VSCIresults <- pin_get("VSCIresults", board = "rsconnect") %>%
+#   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
+#   filter(RepNum == 1)
+# VCPMI63results <- pin_get("VCPMI63results", board = "rsconnect") %>%
+#   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
+#   filter(RepNum == 1)
+# VCPMI65results <- pin_get("VCPMI65results", board = "rsconnect") %>%
+#   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
+#   filter(RepNum == 1)
 benSampsStations <- st_as_sf(pin_get("ejones/benSampsStations", board = "rsconnect")) #%>%
 benSamps <- pin_get("ejones/benSamps", board = "rsconnect") %>%
   filter(between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2])) %>%# limit data to assessment window
