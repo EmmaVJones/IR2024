@@ -58,15 +58,27 @@ fishMetals <- pin_get("ejones/fishMetalsIR2024", board = "rsconnect")   #read_ex
 
 
 WQMstationFull <- pin_get("ejones/WQM-Station-Full", board = "rsconnect")
+
+
+# Note: these get a cut off when bios are "done" assessing for all cycles starting in IR2024. When the stations table is run the first X many times, we want to source all SCI data, but after the deadline (not the same every cycle), we need to change this to the local dataset archived for the specific IR
 VSCIresults <- pin_get("ejones/VSCIresults", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) ) %>% 
-  filter(RepNum == 1)
+  filter(RepNum == 1) %>% 
+  filter(! Gradient %in% c('Boatable')) %>% 
+  filter(`Target Count` == 110)
 VCPMI63results <- pin_get("ejones/VCPMI63results", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
-  filter(RepNum == 1)
+  filter(RepNum == 1) %>% 
+  filter(! Gradient %in% c('Boatable')) %>% 
+  filter(`Target Count` == 110)
 VCPMI65results <- pin_get("ejones/VCPMI65results", board = "rsconnect") %>%
   filter( between(`Collection Date`, assessmentPeriod[1], assessmentPeriod[2]) )%>% 
-  filter(RepNum == 1)
+  filter(RepNum == 1) %>% 
+  filter(! Gradient %in% c('Boatable')) %>% 
+  filter(`Target Count` == 110)
+
+
+
 assessmentWindowLowFlows <- pin_get('ejones/AssessmentWindowLowFlows', board = 'rsconnect')
 #subbasinToVAHU6 <- pin_get('ejones/subbasinToVAHU6', board = 'rsconnect')
 basins <- st_as_sf(pin_get('ejones/DEQ_VAHUSB_subbasins_EVJ', board = 'rsconnect'))

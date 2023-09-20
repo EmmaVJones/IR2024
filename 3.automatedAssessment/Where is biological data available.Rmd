@@ -59,6 +59,7 @@ benSamps <- pool %>% tbl(in_schema('wqm', "Edas_Benthic_Sample_View")) %>%
   # filter to just rarified 2022 data 
   filter(between(as.Date(FDT_DATE_TIME), as.Date("2022-01-01"),  as.Date("2022-12-31")) &
            WBS_TARGET_COUNT == 110) %>% 
+  filter(WBCM_DESCRIPTION != 'Boatable') %>% 
   as_tibble()
 # more info on these stations
 wqaBethicStations <- pool %>% tbl(in_schema('wqa', "WQA Combined Stations Geospatial Data")) %>%
@@ -147,5 +148,13 @@ CreateWebMap(maps = c("Topo","Imagery","Hydrography"), collapsed = TRUE,
                                          "2022 Sampled Benthic Stations With Data in CEDS", "Benthic Stations in IR2022", 'Assessment Regions'),
                        options=layersControlOptions(collapsed=T),
                        position='topleft') 
+```
+
+```{r}
+# # any sites missing bioassessment info?
+# together <- left_join(benSamps, IR2024bioassessment, by =  c('STA_ID' = 'StationID'))
+# 
+# z <- filter(together, is.na(FinalAssessmentRating))
+# write.csv(z , '2022 missing bioassessment.csv')
 ```
 
